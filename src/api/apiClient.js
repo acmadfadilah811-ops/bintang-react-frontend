@@ -2,13 +2,12 @@ import axios from 'axios';
 
 // Ganti URL fallback ke Cloudflare Tunnel untuk testing via Netlify
 // Ganti URL fallback ke URL Ngrok / production nanti
-const BASE_URL = import.meta.env.VITE_API_URL || 'https://quarry-grew-fetch.ngrok-free.dev/api';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://bintang-adv.duckdns.org/api';
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
-  headers: { 
+  headers: {
     'Content-Type': 'application/json',
-    'ngrok-skip-browser-warning': 'true' // Bypass halaman peringatan ngrok
   },
 });
 
@@ -26,7 +25,7 @@ let isRefreshing = false;
 let failedQueue = []; // antrian request yang pending saat refresh berlangsung
 
 const processQueue = (error, token = null) => {
-  failedQueue.forEach(prom => {
+  failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
     } else {
@@ -58,10 +57,12 @@ apiClient.interceptors.response.use(
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
-        }).then(token => {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          return apiClient(originalRequest);
-        }).catch(err => Promise.reject(err));
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return apiClient(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
       }
 
       originalRequest._retry = true;
@@ -85,7 +86,6 @@ apiClient.interceptors.response.use(
         // Ulangi request asli dengan token baru
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
-
       } catch (refreshError) {
         // Refresh gagal → hapus semua token & paksa login
         processQueue(refreshError, null);

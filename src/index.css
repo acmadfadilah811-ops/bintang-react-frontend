@@ -1,6 +1,8 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -16,7 +18,7 @@ body {
   min-height: 100vh;
 }
 
-/* Sidebar Dark Scrollbar */
+/* General Dark Scrollbar (untuk area konten gelap) */
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
 }
@@ -24,18 +26,36 @@ body {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #334155; /* slate-700 */
+  background: #cbd5e1; /* slate-300 */
   border-radius: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #475569; /* slate-600 */
+  background: #94a3b8; /* slate-400 */
+}
+
+/* Sidebar White Scrollbar */
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+}
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 @media print {
   body * {
     visibility: hidden;
   }
-  .receipt-print-area, .receipt-print-area * {
+
+  /* ── Resi Thermal (existing) ── */
+  .receipt-print-area,
+  .receipt-print-area * {
     visibility: visible;
   }
   .receipt-print-area {
@@ -49,8 +69,27 @@ body {
     background: white;
     color: black;
   }
-  /* Optional: Optimize for thermal printer 80mm */
+
+  /* ── Invoice & Surat Jalan A4 (baru) ── */
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* Sembunyikan tombol & UI saat mencetak */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Page setup untuk A4 */
   @page {
-    margin: 0;
+    size: A4;
+    margin: 15mm;
   }
 }

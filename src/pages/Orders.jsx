@@ -1,10 +1,11 @@
 import apiClient from '../api/apiClient';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { 
-  Download, Plus, FileText, FileClock, FileCheck, 
-  CheckSquare, XCircle, Search, Calendar, Edit2, X, UserCheck, Trash2, Printer
+import {
+  Download, Plus, FileText, FileClock, FileCheck,
+  CheckSquare, XCircle, Search, Calendar, Edit2, X, UserCheck, Trash2, Printer, Truck, DollarSign
 } from 'lucide-react';
+import OrderInputForm from '../components/orders/OrderInputForm';
 
 export default function Orders() {
   const { user } = useAuth();
@@ -13,10 +14,16 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
-  
+
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [editModalData, setEditModalData] = useState(null);
-  const [printOrder, setPrintOrder] = useState(null);
+  const [printOrder, setPrintOrder] = useState(null); // Resi Thermal
+  const [printInvoiceOrder, setPrintInvoiceOrder] = useState(null); // Invoice A4
+  const [printSuratJalanOrder, setPrintSuratJalanOrder] = useState(null); // Surat Jalan
+  const [printSpkOrder, setPrintSpkOrder] = useState(null); // SPK Produksi (Baru)
+
+  // State untuk Dropdown Menu Aksi Cetak per Order
+  const [activeDropdownId, setActiveDropdownId] = useState(null);
 
   const isManager = ['owner', 'manager'].includes(user?.role);
 
@@ -41,7 +48,13 @@ export default function Orders() {
     }).catch(() => {});
   }, []);
 
-  // Isu 2 Fix — Menyesuaikan dengan value status_global Django
+  // Tutup dropdown jika user klik di luar area tabel
+  useEffect(() => {
+    const handleClickOutside = () => setActiveDropdownId(null);
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
+
   const getStatusType = (statusText = '') => {
     if (statusText === 'batal') return 'cancelled';
     if (statusText === 'review') return 'pending';
@@ -50,9 +63,8 @@ export default function Orders() {
     return 'other';
   };
 
-  // Hitung jumlah stats
   const stats = useMemo(() => {
-    const counts = { pending: 0, progress: 0, ready: 0, completed: 0, cancelled: 0 };
+    const counts = { pending: 0, progress: 0, ready: 0, completed: 0, cancelled: 0, piutang: 0, total_piutang_amount: 0 };
     orders.forEach(order => {
       const type = getStatusType(order.status_global);
       if (type === 'pending') counts.pending++;
@@ -60,24 +72,28 @@ export default function Orders() {
       if (type === 'ready') counts.ready++;
       if (type === 'completed') counts.completed++;
       if (type === 'cancelled') counts.cancelled++;
+      
+      if (order.sisa_tagihan > 0 && order.status_global !== 'batal') {
+        counts.piutang++;
+        counts.total_piutang_amount += order.sisa_tagihan;
+      }
     });
     return counts;
   }, [orders]);
 
-  // Filter & Search Data
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
       const searchData = `${order.id} ${(order.nama || '').toLowerCase()} ${(order.nomor_wa || '').toLowerCase()}`;
       const matchesSearch = searchData.includes(searchQuery.toLowerCase());
       
       const type = getStatusType(order.status_global);
-      const matchesTab = activeTab === 'all' || type === activeTab;
+      const matchesTab = activeTab === 'all' 
+        || (activeTab === 'piutang' ? (order.sisa_tagihan > 0 && order.status_global !== 'batal') : type === activeTab);
       
       return matchesSearch && matchesTab;
     });
   }, [orders, searchQuery, activeTab]);
 
-  // Render Helper Badge
   const renderBadge = (statusText = '') => {
     const type = getStatusType(statusText);
     if (type === 'cancelled') {
@@ -98,65 +114,54 @@ export default function Orders() {
     return null;
   };
 
-  const handleCreateOrder = async (e) => {
-    e.preventDefault();
-    const form = e.target;
-
-    try {
-      // STEP 1: Buat Order header dulu
-      const orderRes = await apiClient.post('/orders/', {
-        nama: form.nama.value,
-        nomor_wa: form.nomor_wa.value,
-        status_global: 'review',
-        catatan_pelanggan: form.ui_notes.value || '',
-      });
-      const newOrderId = orderRes.data.id;
-
-      // STEP 2: Buat OrderItem (detail produk) yang terhubung ke order tadi
-      await apiClient.post('/order-items/', {
-        order: newOrderId,
-        jenis_produk: form.ui_job_type.value,
-        qty: parseInt(form.ui_quantity.value) || 1,
-        harga_jual: parseInt(form.harga_jual.value) || 0,
-        estimasi: form.estimasi.value || '-',
-        detail: {
-          deskripsi: form.ui_description.value,
-          bahan: form.ui_material.value || '-',
-          warna: form.ui_color.value,
-        },
-      });
-
-      alert('Order berhasil dibuat!');
-      setIsManualModalOpen(false);
-      fetchOrders();
-    } catch (error) {
-      console.error('Gagal membuat order:', error);
-      alert('Gagal membuat pesanan. Cek koneksi atau data form.');
-    }
-  };
-
+  const formatRupiah = (angka) =>
+    new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+    }).format(angka || 0);
 
   const handleUpdateStatus = async (e) => {
     e.preventDefault();
     const form = e.target;
     const newStatus = form.status.value;
     const staffId = form.assign_staff?.value;
+    const jumlahBayar = parseInt(form.jumlah_bayar?.value || '0');
+    const metodePembayaran = form.metode_pembayaran?.value || 'tunai';
     
     try {
-      // 1. Update status order
+      // 1. Update status global
       await apiClient.patch(`/orders/${editModalData.id}/`, {
         status_global: newStatus
       });
 
-      // 2. Assign staff jika dipilih (buat/update JobBoard)
+      // 2. Tambah Pembayaran jika diisi
+      if (jumlahBayar > 0) {
+        await apiClient.post(`/orders/${editModalData.id}/bayar/`, {
+          jumlah_bayar: jumlahBayar,
+          metode_pembayaran: metodePembayaran
+        });
+      }
+
+      // 3. Assign Staff PIC jika diisi
+      let updatedOrderData = null;
       if (staffId && staffId !== '') {
         await apiClient.post(`/orders/${editModalData.id}/assign/`, {
           staff_id: parseInt(staffId)
         });
       }
 
+      // Tarik data pesanan terbaru setelah semua update selesai
+      const orderRes = await apiClient.get(`/orders/${editModalData.id}/`);
+      updatedOrderData = orderRes.data;
+
       setEditModalData(null);
       fetchOrders();
+
+      // Jika ada PIC yang di-assign, otomatis tampilkan SPK cetak
+      if (staffId && staffId !== '' && updatedOrderData) {
+        setPrintSpkOrder(updatedOrderData);
+      }
     } catch (error) {
       console.error('Gagal update:', error);
       alert('Gagal menyimpan perubahan.');
@@ -164,17 +169,17 @@ export default function Orders() {
   };
 
   const handleDeleteOrder = async (order) => {
-  const konfirmasi = window.confirm(
-    `⚠️ HAPUS PERMANEN order ${order.id}?\n\nNama: ${order.nama}\n\nSemua item dan job terkait juga akan terhapus. Tindakan ini tidak dapat dibatalkan!`
-  );
-  if (!konfirmasi) return;
-  try {
-    await apiClient.delete(`/orders/${order.id}/`);
-    fetchOrders();
-  } catch (error) {
-    console.error('Gagal hapus order:', error);
-    alert('Gagal menghapus order.');
-  }
+    const konfirmasi = window.confirm(
+      `⚠️ HAPUS PERMANEN order ${order.id}?\n\nNama: ${order.nama}\n\nSemua item dan job terkait juga akan terhapus. Tindakan ini tidak dapat dibatalkan!`
+    );
+    if (!konfirmasi) return;
+    try {
+      await apiClient.delete(`/orders/${order.id}/`);
+      fetchOrders();
+    } catch (error) {
+      console.error('Gagal hapus order:', error);
+      alert('Gagal menghapus order.');
+    }
   };
 
   const handleExport = async () => {
@@ -194,7 +199,7 @@ export default function Orders() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-4">
+    <div className="max-w-6xl mx-auto space-y-4 pb-10">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -207,35 +212,42 @@ export default function Orders() {
               <Download className="w-3.5 h-3.5" /> Export Excel
             </button>
           )}
-          <button onClick={() => setIsManualModalOpen(true)} className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-sm">
+          <button onClick={() => setIsManualModalOpen(true)} className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer">
             <Plus className="w-3.5 h-3.5" /> New Order
           </button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-6">
         <StatCard title="Pending" icon={FileText} count={stats.pending} iconColor="text-slate-400" />
         <StatCard title="In Progress" icon={FileClock} count={stats.progress} iconColor="text-orange-500" />
         <StatCard title="Ready" icon={FileCheck} count={stats.ready} iconColor="text-emerald-500" />
         <StatCard title="Completed" icon={CheckSquare} count={stats.completed} iconColor="text-blue-600" />
         <StatCard title="Cancelled" icon={XCircle} count={stats.cancelled} iconColor="text-red-500" />
+        <StatCard 
+          title="Belum Lunas" 
+          icon={DollarSign} 
+          count={stats.piutang} 
+          iconColor="text-red-600" 
+          subtitle={formatRupiah(stats.total_piutang_amount)} 
+        />
       </div>
 
       {/* Filters & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-1">
         <div className="flex gap-1 bg-slate-100/50 p-1 rounded-md border border-slate-200 overflow-x-auto">
-          {['all', 'pending', 'printing', 'ready', 'completed', 'cancelled'].map((tab) => (
+          {['all', 'pending', 'printing', 'ready', 'completed', 'cancelled', 'piutang'].map((tab) => (
             <button 
               key={tab} 
               onClick={() => setActiveTab(tab)}
-              className={`px-3 py-1 rounded text-[10px] font-bold transition-all whitespace-nowrap ${
+              className={`px-3 py-1 rounded text-[10px] font-bold transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === tab 
                   ? 'bg-white shadow-sm border border-slate-200 text-slate-900' 
-                  : tab === 'cancelled' ? 'text-red-500 hover:text-red-700' : 'text-slate-500 hover:text-slate-900'
+                  : tab === 'cancelled' || tab === 'piutang' ? 'text-red-500 hover:text-red-700' : 'text-slate-500 hover:text-slate-900'
               }`}
             >
-              {tab === 'all' ? 'All Jobs' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'all' ? 'All Jobs' : tab === 'piutang' ? 'Piutang' : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
         </div>
@@ -265,7 +277,6 @@ export default function Orders() {
                 <th className="px-3 py-2 w-48">Description</th>
                 <th className="px-3 py-2">Team</th>
                 <th className="px-3 py-2 text-right">Price</th>
-                <th className="px-3 py-2">Due Date</th>
                 <th className="px-3 py-2 text-center">Status</th>
                 <th className="px-3 py-2 text-center">Action</th>
               </tr>
@@ -275,7 +286,7 @@ export default function Orders() {
                 <SkeletonRow />
               ) : filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-3 py-6 text-center text-slate-400 text-[10px] italic">No jobs found matching your criteria.</td>
+                  <td colSpan="7" className="px-3 py-6 text-center text-slate-400 text-[10px] italic">No jobs found matching your criteria.</td>
                 </tr>
               ) : (
                 filteredOrders.map(order => {
@@ -299,7 +310,6 @@ export default function Orders() {
                       </td>
                       <td className="px-3 py-2 text-slate-700">
                         {(() => {
-                          // Ambil semua staff yang ada di job dari seluruh items order ini
                           const staffs = [];
                           order.items?.forEach(item => {
                             item.jobs?.forEach(job => {
@@ -312,25 +322,49 @@ export default function Orders() {
                           return <span className="font-bold">{staffs.join(', ')}</span>;
                         })()}
                       </td>
-                      <td className="px-3 py-2 text-right font-bold text-slate-900">
-                        {(() => {
-                          const total = order.items?.reduce((sum, item) => sum + (item.harga_jual || 0), 0) || 0;
-                          return `Rp ${new Intl.NumberFormat('id-ID').format(total)}`;
-                        })()}
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-1 text-slate-600">
-                          <Calendar className="w-3 h-3" /> 
-                          {(() => {
-                            const estimasiList = order.items?.map(i => i.estimasi).filter(e => e && e !== '-');
-                            return estimasiList?.length > 0 ? estimasiList[0] : "TBD";
-                          })()}
+                      <td className="px-3 py-2 text-right">
+                        <div className="font-bold text-slate-900">
+                          {formatRupiah(order.total_harga)}
+                        </div>
+                        <div className={`text-[9px] font-semibold ${order.sisa_tagihan <= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                          {order.sisa_tagihan <= 0 ? 'LUNAS' : `Sisa: ${formatRupiah(order.sisa_tagihan)}`}
                         </div>
                       </td>
                       <td className="px-3 py-2 text-center">{renderBadge(order.status_global)}</td>
                       <td className="px-3 py-2">
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => setEditModalData(order)} className="p-1 bg-white border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 rounded-[4px] transition-colors shadow-sm">
+                        <div className="flex items-center justify-center gap-1.5 relative">
+                          
+                          {/* DROPDOWN TERPADU CETAK */}
+                          <div className="relative" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => setActiveDropdownId(activeDropdownId === order.id ? null : order.id)}
+                              className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-[4px] text-[10px] font-bold flex items-center gap-1 transition-colors shadow-sm cursor-pointer"
+                            >
+                              <Printer className="w-3 h-3" /> Cetak
+                            </button>
+
+                            {activeDropdownId === order.id && (
+                              <div className="absolute right-0 mt-1 w-44 bg-white border border-slate-200 shadow-xl rounded-lg z-50 py-1 overflow-hidden animate-fade-in text-left">
+                                <button onClick={() => { setPrintOrder(order); setActiveDropdownId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-[11px] font-medium text-slate-700 flex items-center gap-2 border-b border-slate-100 cursor-pointer">
+                                  <Printer size={13} className="text-slate-400" /> Resi Thermal
+                                </button>
+                                <button onClick={() => { setPrintInvoiceOrder(order); setActiveDropdownId(null); }} className="w-full text-left px-4 py-2 hover:bg-blue-50 text-[11px] font-medium text-blue-700 flex items-center gap-2 border-b border-slate-100 cursor-pointer">
+                                  <FileText size={13} className="text-blue-500" /> Invoice Resmi
+                                </button>
+                                <button onClick={() => { setPrintSuratJalanOrder(order); setActiveDropdownId(null); }} className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-[11px] font-medium text-emerald-700 flex items-center gap-2 border-b border-slate-100 cursor-pointer">
+                                  <Truck size={13} className="text-emerald-500" /> Surat Jalan
+                                </button>
+                                <button onClick={() => { setPrintSpkOrder(order); setActiveDropdownId(null); }} className="w-full text-left px-4 py-2 hover:bg-orange-50 text-[11px] font-medium text-orange-700 flex items-center gap-2 cursor-pointer">
+                                  <FileCheck size={13} className="text-orange-500" /> SPK Produksi
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="w-px h-4 bg-slate-200 mx-0.5"></div>
+
+                          {/* ACTION ASLI (Edit, Cancel, Delete) */}
+                          <button onClick={() => setEditModalData(order)} title="Edit Status" className="p-1 bg-white border border-slate-200 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 rounded-[4px] transition-colors shadow-sm cursor-pointer">
                             <Edit2 className="w-3 h-3" />
                           </button>
                           {type !== 'cancelled' && type !== 'completed' && (
@@ -341,27 +375,17 @@ export default function Orders() {
                                   fetchOrders();
                                 }
                               }} 
-                              className="p-1 bg-white border border-slate-200 text-slate-400 hover:bg-red-50 hover:text-red-600 hover:border-red-200 rounded-[4px] transition-colors shadow-sm"
+                              title="Batalkan Order"
+                              className="p-1 bg-white border border-slate-200 text-slate-400 hover:bg-red-50 hover:text-red-600 hover:border-red-200 rounded-[4px] transition-colors shadow-sm cursor-pointer"
                             >
                               <XCircle className="w-3 h-3" />
                             </button>
                           )}
-                          {/* Cetak Resi (hanya jika order selesai) */}
-                          {type === 'completed' && (
-                            <button
-                              onClick={() => setPrintOrder(order)}
-                              title="Cetak Resi"
-                              className="p-1 bg-white border border-emerald-200 text-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 rounded-[4px] transition-colors shadow-sm"
-                            >
-                              <Printer className="w-3 h-3" />
-                            </button>
-                          )}
-                          {/* Hapus Permanen — hanya owner/manager */}
                           {isManager && (
                             <button
                               onClick={() => handleDeleteOrder(order)}
-                              title="Hapus permanen"
-                              className="p-1 bg-white border border-slate-200 text-slate-300 hover:bg-red-100 hover:text-red-700 hover:border-red-300 rounded-[4px] transition-colors shadow-sm"
+                              title="Hapus Permanen"
+                              className="p-1 bg-white border border-slate-200 text-slate-300 hover:bg-red-100 hover:text-red-700 hover:border-red-300 rounded-[4px] transition-colors shadow-sm cursor-pointer"
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
@@ -377,87 +401,17 @@ export default function Orders() {
         </div>
       </div>
 
-      {/* Manual Order Modal */}
-      {isManualModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[2px] overflow-y-auto w-full h-full flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-[42rem] overflow-hidden">
-            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-start">
-              <div>
-                <h3 className="text-[1.15rem] font-bold text-slate-900">Create New Print Job</h3>
-                <p className="text-[13px] text-slate-500 mt-1">Enter the details for the new print order</p>
-              </div>
-              <button type="button" onClick={() => setIsManualModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleCreateOrder}>
-              <div className="px-6 py-5 space-y-5 max-h-[65vh] overflow-y-auto">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div className="space-y-2">
-                    <label className="text-[13px] font-bold text-slate-900">Customer Name *</label>
-                    <div className="flex gap-2">
-                      <input type="text" name="nama" required placeholder="Customer Name" className="w-1/2 text-[13px] border-0 bg-slate-100 rounded-md px-3 py-2.5 focus:ring-2 focus:ring-slate-900 outline-none" />
-                      <input type="text" name="nomor_wa" required placeholder="WhatsApp" className="w-1/2 text-[13px] border-0 bg-slate-100 rounded-md px-3 py-2.5 focus:ring-2 focus:ring-slate-900 outline-none" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[13px] font-bold text-slate-900">Job Type *</label>
-                    <select name="ui_job_type" className="w-full text-[13px] border-0 bg-slate-100 rounded-md px-3 py-2.5 focus:ring-2 focus:ring-slate-900 outline-none">
-                      <option value="Business Cards">Business Cards</option>
-                      <option value="Flyers">Flyers</option>
-                      <option value="Posters">Posters</option>
-                      <option value="Banners">Banners</option>
-                      <option value="Custom Print">Custom Print</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[13px] font-bold text-slate-900">Description *</label>
-                  <input type="text" name="ui_description" required placeholder="Brief description" className="w-full text-[13px] border-0 bg-slate-100 rounded-md px-3 py-2.5 focus:ring-2 focus:ring-slate-900 outline-none" />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                  <div className="space-y-2">
-                    <label className="text-[13px] font-bold text-slate-900">Quantity *</label>
-                    <input type="number" name="ui_quantity" required placeholder="1000" className="w-full text-[13px] border-0 bg-slate-100 rounded-md px-3 py-2.5 focus:ring-2 focus:ring-slate-900 outline-none" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[13px] font-bold text-slate-900">Material</label>
-                    <input type="text" name="ui_material" placeholder="100lb Gloss" className="w-full text-[13px] border-0 bg-slate-100 rounded-md px-3 py-2.5 focus:ring-2 focus:ring-slate-900 outline-none" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[13px] font-bold text-slate-900">Color Mode</label>
-                    <select name="ui_color" className="w-full text-[13px] border-0 bg-slate-100 rounded-md px-3 py-2.5 focus:ring-2 focus:ring-slate-900 outline-none">
-                      <option>Full Color</option>
-                      <option>Black & White</option>
-                      <option>Spot Color</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div className="space-y-2">
-                    <label className="text-[13px] font-bold text-slate-900">Price (Rp) *</label>
-                    <input type="number" name="harga_jual" required placeholder="0" className="w-full text-[13px] border-0 bg-slate-100 rounded-md px-3 py-2.5 focus:ring-2 focus:ring-slate-900 outline-none" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[13px] font-bold text-slate-900">Due Date *</label>
-                    <input type="date" name="estimasi" required className="w-full text-[13px] border-0 bg-slate-100 rounded-md px-3 py-2.5 focus:ring-2 focus:ring-slate-900 outline-none" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[13px] font-bold text-slate-900">Notes</label>
-                  <input type="text" name="ui_notes" placeholder="Any special instructions" className="w-full text-[13px] border-0 bg-slate-100 rounded-md px-3 py-2.5 focus:ring-2 focus:ring-slate-900 outline-none" />
-                </div>
-              </div>
-              <div className="bg-white px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
-                <button type="button" onClick={() => setIsManualModalOpen(false)} className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-md text-[13px] font-bold hover:bg-slate-50 transition-colors">Cancel</button>
-                <button type="submit" className="px-5 py-2.5 bg-[#0a0a0a] text-white rounded-md text-[13px] font-bold hover:bg-black shadow-sm transition-colors">Create Job</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* COMPONENT FORM INPUT FULLSCREEN */}
+      <OrderInputForm 
+        isOpen={isManualModalOpen} 
+        onClose={() => setIsManualModalOpen(false)} 
+        onSuccess={() => {
+          setIsManualModalOpen(false);
+          fetchOrders(); // Refresh table
+        }}
+      />
 
-      {/* Edit Status Modal */}
+      {/* EDIT STATUS MODAL */}
       {editModalData && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[2px] overflow-y-auto w-full h-full flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
@@ -482,7 +436,6 @@ export default function Orders() {
                   </select>
                 </div>
 
-                {/* Assign Staff — hanya tampil untuk owner/manager */}
                 {isManager && (
                   <div className="space-y-1.5">
                     <label className="text-[12px] font-bold text-slate-800 flex items-center gap-1.5">
@@ -505,6 +458,55 @@ export default function Orders() {
                     </p>
                   </div>
                 )}
+
+                {editModalData.sisa_tagihan > 0 && (
+                  <div className="border-t border-slate-100 pt-4 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[12px] font-bold text-slate-800">Pembayaran & Pelunasan</label>
+                      <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                        Piutang: {formatRupiah(editModalData.sisa_tagihan)}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500">Bayar Cicilan / Pelunasan (Rp)</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            name="jumlah_bayar"
+                            placeholder="Cth: 50000"
+                            className="w-full text-[12px] border border-slate-200 bg-white rounded-md pl-3 pr-12 py-2 focus:ring-1 focus:ring-slate-900 outline-none"
+                            id="jumlah_bayar_input"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const input = document.getElementById('jumlah_bayar_input');
+                              if (input) input.value = editModalData.sisa_tagihan;
+                            }}
+                            className="absolute right-1 top-1 px-2 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[9px] rounded cursor-pointer"
+                          >
+                            Lunas
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500">Metode Pembayaran</label>
+                        <select
+                          name="metode_pembayaran"
+                          defaultValue={editModalData.metode_pembayaran || 'tunai'}
+                          className="w-full text-[12px] border border-slate-200 bg-white rounded-md px-2 py-2 focus:ring-1 focus:ring-slate-900 outline-none"
+                        >
+                          <option value="tunai">Tunai / Kas</option>
+                          <option value="transfer">Transfer Bank</option>
+                          <option value="qris">QRIS / E-Wallet</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
                 <button type="button" onClick={() => setEditModalData(null)} className="px-4 py-1.5 border border-slate-200 rounded-md text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
@@ -515,29 +517,27 @@ export default function Orders() {
         </div>
       )}
 
-      {/* Cetak Resi Modal */}
+      {/* CETAK RESI THERMAL MODAL */}
       {printOrder && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm flex flex-col overflow-hidden">
-            {/* Header Modal - tidak ikut dicetak */}
-            <div className="flex justify-between items-center px-4 py-3 border-b border-slate-100 bg-slate-50">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                <Printer size={16} /> Cetak Resi
+        <div className="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-4 backdrop-blur-[2px]">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm flex flex-col overflow-hidden border border-slate-200">
+            <div className="flex justify-between items-center px-4 py-3 border-b border-slate-100 bg-slate-50 no-print">
+              <h3 className="font-bold text-slate-800 text-[13px] flex items-center gap-2">
+                <Printer size={14} /> Cetak Resi
               </h3>
               <button onClick={() => setPrintOrder(null)} className="text-slate-400 hover:text-slate-600">
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
             
-            {/* Area Resi (yang akan dicetak) */}
-            <div className="p-6 receipt-print-area text-slate-800 text-sm font-mono max-h-[70vh] overflow-y-auto">
+            <div className="p-6 receipt-print-area text-slate-900 text-sm font-mono max-h-[70vh] overflow-y-auto bg-white">
               <div className="text-center border-b border-dashed border-slate-300 pb-4 mb-4">
-                <h2 className="font-extrabold text-xl uppercase tracking-widest">BINTANG ADVERTISING</h2>
-                <p className="text-xs text-slate-500 mt-1">Jl. Produksi No. 123, Kota</p>
-                <p className="text-xs text-slate-500">Telp: 0812-3456-7890</p>
+                <h2 className="font-extrabold text-[16px] uppercase tracking-widest text-slate-900">BINTANG ADVERTISING</h2>
+                <p className="text-[11px] text-slate-500 mt-1">Jl. Produksi No. 123, Kota</p>
+                <p className="text-[11px] text-slate-500">Telp: 0812-3456-7890</p>
               </div>
               
-              <div className="space-y-1 mb-4 text-xs">
+              <div className="space-y-1 mb-4 text-[11px]">
                 <div className="flex justify-between">
                   <span className="text-slate-500">No. Order:</span>
                   <span className="font-bold">{printOrder.id}</span>
@@ -558,46 +558,380 @@ export default function Orders() {
               
               <div className="border-t border-b border-dashed border-slate-300 py-3 mb-4 space-y-3">
                 {printOrder.items?.map((item, idx) => (
-                  <div key={idx} className="flex flex-col text-xs">
+                  <div key={idx} className="flex flex-col text-[11px]">
                     <div className="flex justify-between font-bold">
                       <span>{item.qty}x {item.jenis_produk}</span>
-                      <span>Rp {new Intl.NumberFormat('id-ID').format(item.harga_jual || 0)}</span>
+                      <span>{formatRupiah(item.harga_jual || 0)}</span>
                     </div>
-                    {item.keterangan && (
-                      <span className="text-[10px] text-slate-500 mt-0.5 max-w-[80%] break-words">{item.keterangan}</span>
+                    {item.keterangan_detail && (
+                      <span className="text-[10px] text-slate-500 mt-0.5 max-w-[80%] break-words">{item.keterangan_detail}</span>
                     )}
                   </div>
                 ))}
               </div>
               
-              <div className="flex justify-between font-bold text-sm">
-                <span>TOTAL BAYAR:</span>
-                <span>
-                  Rp {new Intl.NumberFormat('id-ID').format(
-                    printOrder.items?.reduce((sum, item) => sum + (item.harga_jual || 0), 0) || 0
-                  )}
-                </span>
+              <div className="space-y-1 text-[11px] font-bold">
+                <div className="flex justify-between">
+                  <span>TOTAL:</span>
+                  <span>{formatRupiah(printOrder.total_harga || 0)}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>DP / BAYAR:</span>
+                  <span>{formatRupiah(printOrder.dp_dibayar || 0)}</span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-dashed border-slate-300 text-indigo-700">
+                  <span>SISA TAGIHAN:</span>
+                  <span>{printOrder.sisa_tagihan <= 0 ? 'LUNAS' : formatRupiah(printOrder.sisa_tagihan || 0)}</span>
+                </div>
               </div>
               
-              <div className="text-center mt-8 text-xs text-slate-500 italic">
+              <div className="text-center mt-6 text-[10px] text-slate-500 italic">
                 <p>Terima kasih telah mempercayakan</p>
                 <p>kebutuhan advertising Anda pada kami.</p>
               </div>
             </div>
             
-            {/* Footer Modal - Action buttons (tidak ikut dicetak) */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
-              <button 
-                onClick={() => setPrintOrder(null)} 
-                className="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-md hover:bg-slate-100"
-              >
-                Tutup
-              </button>
-              <button 
-                onClick={() => window.print()} 
-                className="px-4 py-2 bg-indigo-600 text-white font-bold text-xs rounded-md hover:bg-indigo-700 flex items-center gap-2 shadow-sm"
-              >
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 no-print">
+              <button onClick={() => setPrintOrder(null)} className="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-md hover:bg-slate-100 cursor-pointer">Tutup</button>
+              <button onClick={() => window.print()} className="px-4 py-2 bg-indigo-600 text-white font-bold text-xs rounded-md hover:bg-indigo-700 flex items-center gap-2 shadow-sm cursor-pointer">
                 <Printer size={14} /> Cetak Sekarang
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* INVOICE A4 MODAL */}
+      {printInvoiceOrder && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-start justify-center p-4 backdrop-blur-[2px] overflow-y-auto pt-10 pb-10">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl flex flex-col border border-slate-200 mt-4">
+            <div className="flex justify-between items-center px-4 py-3 border-b border-slate-100 bg-slate-50 no-print">
+              <h3 className="font-bold text-slate-800 text-[13px] flex items-center gap-2">
+                <FileText size={14} /> Preview Invoice A4
+              </h3>
+              <button onClick={() => setPrintInvoiceOrder(null)} className="text-slate-400 hover:text-slate-600">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-8 print-area bg-white text-slate-800 text-[12px]">
+              <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-6">
+                <div>
+                  <h1 className="text-2xl font-black tracking-widest uppercase text-slate-900">INVOICE</h1>
+                  <p className="text-slate-500 font-mono mt-1">#{printInvoiceOrder.id}</p>
+                </div>
+                <div className="text-right">
+                  <h2 className="font-bold text-[14px]">BINTANG ADVERTISING</h2>
+                  <p className="text-slate-500 mt-0.5">Jl. Produksi No. 123, Kota</p>
+                  <p className="text-slate-500">WA: 0812-3456-7890</p>
+                </div>
+              </div>
+
+              <div className="flex justify-between mb-8">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">DITAGIHKAN KEPADA:</p>
+                  <p className="font-bold text-[14px]">{printInvoiceOrder.nama}</p>
+                  <p className="text-slate-600">{printInvoiceOrder.nomor_wa}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">TANGGAL INVOICE:</p>
+                  <p className="font-bold">
+                    {new Date(printInvoiceOrder.waktu).toLocaleDateString('id-ID', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </p>
+                  <p className="text-slate-500 text-[11px] mt-1 capitalize">Pembayaran: {printInvoiceOrder.metode_pembayaran || 'Tunai'}</p>
+                </div>
+              </div>
+
+              <table className="w-full text-left border-collapse mb-8">
+                <thead>
+                  <tr className="bg-slate-100 border-y border-slate-300">
+                    <th className="py-2 px-2 font-bold text-slate-700 w-10 text-center">NO</th>
+                    <th className="py-2 px-2 font-bold text-slate-700">DESKRIPSI PRODUK</th>
+                    <th className="py-2 px-2 font-bold text-slate-700 text-center">UKURAN</th>
+                    <th className="py-2 px-2 font-bold text-slate-700 text-center">QTY</th>
+                    <th className="py-2 px-2 font-bold text-slate-700 text-right">TOTAL</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {printInvoiceOrder.items?.map((item, idx) => (
+                    <tr key={idx}>
+                      <td className="py-3 px-2 text-center text-slate-500">{idx + 1}</td>
+                      <td className="py-3 px-2">
+                        <p className="font-bold text-slate-800">{item.jenis_produk}</p>
+                        <p className="text-[10px] text-slate-500 font-semibold">Bahan: {item.bahan || '-'}</p>
+                        {item.keterangan_detail && (
+                          <p className="text-[10px] text-slate-400 italic mt-0.5">{item.keterangan_detail}</p>
+                        )}
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        {item.panjang || 0} x {item.lebar || 0} m
+                      </td>
+                      <td className="py-3 px-2 text-center font-bold">{item.qty}</td>
+                      <td className="py-3 px-2 text-right font-bold">
+                        {formatRupiah(item.harga_jual)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="flex justify-end mb-12">
+                <div className="w-64 space-y-2">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Subtotal</span>
+                    <span>
+                      {formatRupiah(
+                        printInvoiceOrder.items?.reduce((s, i) => s + (i.harga_jual || 0), 0)
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Diskon ({printInvoiceOrder.diskon_persen || 0}%)</span>
+                    <span>
+                      - {formatRupiah(
+                        (printInvoiceOrder.items?.reduce((s, i) => s + (i.harga_jual || 0), 0) || 0) * (printInvoiceOrder.diskon_persen || 0) / 100
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-bold text-[14px] border-t border-slate-300 pt-2 text-slate-900">
+                    <span>TOTAL</span>
+                    <span>{formatRupiah(printInvoiceOrder.total_harga)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>DP Dibayar</span>
+                    <span>{formatRupiah(printInvoiceOrder.dp_dibayar)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-[14px] bg-slate-100 p-2 rounded border border-slate-200 mt-2">
+                    <span>SISA TAGIHAN</span>
+                    <span className={printInvoiceOrder.sisa_tagihan <= 0 ? 'text-emerald-600' : 'text-red-600'}>
+                      {printInvoiceOrder.sisa_tagihan <= 0 ? 'LUNAS' : formatRupiah(printInvoiceOrder.sisa_tagihan)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-end mt-10">
+                <div className="text-[10px] text-slate-500 space-y-1">
+                  <p className="font-bold text-slate-700">Metode Pembayaran:</p>
+                  <p>Transfer BCA: 1234567890 a/n Bintang Adv</p>
+                </div>
+                <div className="text-center w-40">
+                  <p className="mb-12">Hormat Kami,</p>
+                  <p className="font-bold border-t border-slate-400 pt-1">Finance Dept.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 no-print">
+              <button onClick={() => setPrintInvoiceOrder(null)} className="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-md hover:bg-slate-100 cursor-pointer">Tutup</button>
+              <button onClick={() => window.print()} className="px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-md hover:bg-blue-700 flex items-center gap-2 cursor-pointer">
+                <Printer size={14} /> Cetak (Ctrl+P)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SURAT JALAN MODAL */}
+      {printSuratJalanOrder && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-start justify-center p-4 backdrop-blur-[2px] overflow-y-auto pt-10 pb-10">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl flex flex-col border border-slate-200 mt-4">
+            <div className="flex justify-between items-center px-4 py-3 border-b border-slate-100 bg-slate-50 no-print">
+              <h3 className="font-bold text-slate-800 text-[13px] flex items-center gap-2">
+                <Truck size={14} /> Preview Surat Jalan
+              </h3>
+              <button onClick={() => setPrintSuratJalanOrder(null)} className="text-slate-400 hover:text-slate-600">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-8 print-area bg-white text-slate-800 text-[12px]">
+              <div className="text-center border-b-2 border-slate-800 pb-4 mb-6">
+                <h1 className="text-xl font-black tracking-widest uppercase text-slate-900">SURAT JALAN</h1>
+                <p className="text-slate-500 font-mono mt-1">Ref Order: #{printSuratJalanOrder.id}</p>
+              </div>
+
+              <div className="flex justify-between mb-8">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">PENERIMA:</p>
+                  <p className="font-bold text-[14px]">{printSuratJalanOrder.nama}</p>
+                  <p className="text-slate-600">{printSuratJalanOrder.nomor_wa}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">TANGGAL KIRIM:</p>
+                  <p className="font-bold border-b border-slate-300 pb-1 w-32 ml-auto">&nbsp;</p>
+                </div>
+              </div>
+
+              <table className="w-full text-left border-collapse mb-16 border border-slate-300">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300">
+                    <th className="py-2 px-3 font-bold text-slate-700 w-10 text-center border-r border-slate-300">NO</th>
+                    <th className="py-2 px-3 font-bold text-slate-700 border-r border-slate-300">NAMA BARANG / DESKRIPSI</th>
+                    <th className="py-2 px-3 font-bold text-slate-700 text-center border-r border-slate-300">UKURAN</th>
+                    <th className="py-2 px-3 font-bold text-slate-700 text-center">QTY</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-300">
+                  {printSuratJalanOrder.items?.map((item, idx) => (
+                    <tr key={idx}>
+                      <td className="py-3 px-3 text-center border-r border-slate-300">{idx + 1}</td>
+                      <td className="py-3 px-3 border-r border-slate-300">
+                        <p className="font-bold text-slate-800">{item.jenis_produk}</p>
+                        <p className="text-[10px] text-slate-500 font-semibold">Bahan: {item.bahan || '-'}</p>
+                      </td>
+                      <td className="py-3 px-3 text-center border-r border-slate-300">
+                        {item.panjang || 0} x {item.lebar || 0} m
+                      </td>
+                      <td className="py-3 px-3 text-center font-bold text-[14px]">{item.qty}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="flex justify-between items-start mt-10">
+                <div className="text-center w-40">
+                  <p className="mb-16">Penerima,</p>
+                  <p className="font-bold border-t border-slate-400 pt-1">( {printSuratJalanOrder.nama} )</p>
+                </div>
+                <div className="text-center w-40">
+                  <p className="mb-16">Pengirim,</p>
+                  <p className="font-bold border-t border-slate-400 pt-1">( Kurir / Staff )</p>
+                </div>
+                <div className="text-center w-40">
+                  <p className="mb-16">Mengetahui,</p>
+                  <p className="font-bold border-t border-slate-400 pt-1">Bintang Adv</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 no-print">
+              <button onClick={() => setPrintSuratJalanOrder(null)} className="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-md hover:bg-slate-100 cursor-pointer">Tutup</button>
+              <button onClick={() => window.print()} className="px-4 py-2 bg-emerald-600 text-white font-bold text-xs rounded-md hover:bg-emerald-700 flex items-center gap-2 cursor-pointer">
+                <Printer size={14} /> Cetak Surat Jalan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SURAT PERINTAH KERJA (SPK) MODAL */}
+      {printSpkOrder && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-start justify-center p-4 backdrop-blur-[2px] overflow-y-auto pt-10 pb-10">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl flex flex-col border border-slate-200 mt-4">
+            <div className="flex justify-between items-center px-4 py-3 border-b border-slate-100 bg-slate-50 no-print">
+              <h3 className="font-bold text-slate-800 text-[13px] flex items-center gap-2">
+                <FileCheck size={14} className="text-orange-500" /> Preview SPK Produksi
+              </h3>
+              <button onClick={() => setPrintSpkOrder(null)} className="text-slate-400 hover:text-slate-600">
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Area SPK yang diprint (TANPA HARGA JUAL) */}
+            <div className="p-8 print-area bg-white text-slate-800 text-[12px]">
+              <div className="text-center border-b-2 border-slate-800 pb-4 mb-6">
+                <h1 className="text-xl font-black tracking-widest uppercase text-slate-900">SURAT PERINTAH KERJA (SPK)</h1>
+                <p className="text-slate-500 font-mono mt-1">No. Order: #{printSpkOrder.id}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">NAMA PELANGGAN:</p>
+                  <p className="font-bold text-[13px]">{printSpkOrder.nama}</p>
+                  <p className="text-slate-500">{printSpkOrder.nomor_wa}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">TANGGAL ORDER / MASUK:</p>
+                  <p className="font-bold">
+                    {new Date(printSpkOrder.waktu).toLocaleDateString('id-ID', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              {printSpkOrder.catatan_pelanggan && (
+                <div className="bg-slate-50 border border-slate-200 rounded p-3 mb-6">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Catatan Global / Instruksi Khusus CS:</p>
+                  <p className="text-slate-700 whitespace-pre-wrap">{printSpkOrder.catatan_pelanggan}</p>
+                </div>
+              )}
+
+              <table className="w-full text-left border-collapse mb-10 border border-slate-300">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300">
+                    <th className="py-2 px-3 font-bold text-slate-700 w-10 text-center border-r border-slate-300">NO</th>
+                    <th className="py-2 px-3 font-bold text-slate-700 border-r border-slate-300">BARANG / SPEK TEKNIS</th>
+                    <th className="py-2 px-3 font-bold text-slate-700 text-center border-r border-slate-300">UKURAN (PxL)</th>
+                    <th className="py-2 px-3 font-bold text-slate-700 text-center border-r border-slate-300">QTY</th>
+                    <th className="py-2 px-3 font-bold text-slate-700">KETERANGAN / FINISHING</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-300">
+                  {printSpkOrder.items?.map((item, idx) => (
+                    <tr key={idx}>
+                      <td className="py-3 px-3 text-center border-r border-slate-300">{idx + 1}</td>
+                      <td className="py-3 px-3 border-r border-slate-300">
+                        <p className="font-bold text-slate-800">{item.jenis_produk}</p>
+                        <p className="text-[10px] text-slate-500 font-semibold">Bahan: {item.bahan || '-'}</p>
+                      </td>
+                      <td className="py-3 px-3 text-center border-r border-slate-300">
+                        {item.panjang || 0} x {item.lebar || 0} m
+                      </td>
+                      <td className="py-3 px-3 text-center font-bold text-[14px] border-r border-slate-300">{item.qty}</td>
+                      <td className="py-3 px-3">
+                        <p className="text-[11px] text-slate-700 whitespace-pre-wrap">{item.keterangan_detail || '-'}</p>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Lembar Checklist Alur Produksi */}
+              <div className="border border-slate-300 rounded p-4 mb-8">
+                <p className="text-[11px] font-bold text-slate-600 mb-3 uppercase tracking-wider">Lembar Checklist Alur Produksi:</p>
+                <div className="grid grid-cols-4 gap-4 text-center">
+                  <div className="border border-slate-200 rounded p-2">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-4">1. Desain / Layout</p>
+                    <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
+                    <p className="text-[9px] text-slate-500">Nama & Paraf</p>
+                  </div>
+                  <div className="border border-slate-200 rounded p-2">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-4">2. Proses Cetak</p>
+                    <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
+                    <p className="text-[9px] text-slate-500">Nama & Paraf</p>
+                  </div>
+                  <div className="border border-slate-200 rounded p-2">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-4">3. Finishing</p>
+                    <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
+                    <p className="text-[9px] text-slate-500">Nama & Paraf</p>
+                  </div>
+                  <div className="border border-slate-200 rounded p-2">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-4">4. Quality Control</p>
+                    <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
+                    <p className="text-[9px] text-slate-500">Nama & Paraf</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-[10px] text-slate-400 italic text-center mt-6">
+                <p>Dokumen Internal Produksi Bintang Advertising. Harap kembalikan ke meja CS setelah selesai.</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 no-print">
+              <button onClick={() => setPrintSpkOrder(null)} className="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-md hover:bg-slate-100 cursor-pointer">Tutup</button>
+              <button onClick={() => window.print()} className="px-4 py-2 bg-orange-600 text-white font-bold text-xs rounded-md hover:bg-orange-700 flex items-center gap-2 cursor-pointer">
+                <Printer size={14} /> Cetak SPK Produksi
               </button>
             </div>
           </div>
@@ -608,19 +942,22 @@ export default function Orders() {
 }
 
 // Sub-komponen StatCard
-function StatCard({ title, icon: Icon, count, iconColor }) {
+function StatCard({ title, icon: Icon, count, iconColor, subtitle }) {
   return (
     <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between h-20">
       <div className="flex justify-between items-start">
         <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">{title}</p>
         <Icon className={`w-3.5 h-3.5 ${iconColor}`} />
       </div>
-      <h3 className="text-xl font-extrabold text-slate-900">{count}</h3>
+      <div>
+        <h3 className="text-xl font-extrabold text-slate-900">{count}</h3>
+        {subtitle && <p className="text-[9px] text-red-500 font-bold truncate mt-0.5">{subtitle}</p>}
+      </div>
     </div>
   );
 }
 
-// Sub-komponen Skeleton Table Row untuk Loading State
+// Sub-komponen Skeleton Table Row
 function SkeletonRow() {
   return (
     <tr className="animate-pulse">
@@ -633,7 +970,6 @@ function SkeletonRow() {
       <td className="px-3 py-3"><div className="h-3 bg-slate-200 rounded w-16"></div></td>
       <td className="px-3 py-3"><div className="h-3 bg-slate-200 rounded w-16 ms-auto"></div></td>
       <td className="px-3 py-3"><div className="h-3 bg-slate-200 rounded w-16"></div></td>
-      <td className="px-3 py-3"><div className="h-4 bg-slate-200 rounded w-12 mx-auto"></div></td>
       <td className="px-3 py-3"><div className="h-5 bg-slate-200 rounded w-8 mx-auto"></div></td>
     </tr>
   );

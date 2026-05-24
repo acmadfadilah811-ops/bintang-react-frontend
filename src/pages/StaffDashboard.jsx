@@ -1,22 +1,41 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Clock, CheckCircle, Package, AlertCircle } from 'lucide-react';
-import api from '../api/apiClient';
+import {
+  CalendarClock,
+  CheckCircle2,
+  Package,
+  AlertTriangle,
+  Briefcase,
+  Activity,
+  Info,
+  ShieldCheck,
+  ArrowLeft,
+  Download,
+  ChevronRight,
+} from 'lucide-react';
+import apiClient from '../api/apiClient';
 
 export default function StaffDashboard() {
   const { user } = useAuth();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
+  // State untuk mengontrol tampilan Full Screen Info Karyawan
+  const [showInfoModal, setShowInfoModal] = useState(false);
+
+  // Update jam real-time setiap detik
   useEffect(() => {
-    fetchDashboardData();
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/hr/dashboard/staff/');
+      const response = await apiClient.get('/hr/dashboard/staff/');
       setDashboardData(response.data);
       setError(null);
     } catch (err) {
@@ -27,161 +46,418 @@ export default function StaffDashboard() {
     }
   };
 
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const playNotificationSound = (filename) => {
+    try {
+      const audioBaseUrl = import.meta.env.VITE_AUDIO_BASE_URL || '/audio';
+      const audio = new Audio(`${audioBaseUrl}/${filename}`);
+      audio.play().catch((e) => console.log('Autoplay dicegah oleh browser, abaikan.', e));
+    } catch (error) {
+      console.log('Gagal memutar audio', error);
+    }
+  };
+
   const handleClockIn = async () => {
     try {
-      await api.post('/hr/absensi/clock-in/', { catatan: '' });
-      fetchDashboardData(); // Refresh data
+      setActionLoading(true);
+      await apiClient.post('/hr/absensi/clock-in/', { catatan: '' });
+      playNotificationSound('checkin.mp3');
+      await fetchDashboardData();
     } catch (err) {
-      alert(err.response?.data?.detail || 'Gagal clock-in');
+      alert(err.response?.data?.detail || 'Gagal melakukan Clock-In');
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleClockOut = async () => {
+    if (!window.confirm('Apakah Anda yakin ingin mengakhiri jam kerja hari ini?')) return;
+
     try {
-      await api.post('/hr/absensi/clock-out/', { catatan: '' });
-      fetchDashboardData(); // Refresh data
+      setActionLoading(true);
+      await apiClient.post('/hr/absensi/clock-out/', { catatan: '' });
+      playNotificationSound('selesai.mp3');
+      await fetchDashboardData();
     } catch (err) {
-      alert(err.response?.data?.detail || 'Gagal clock-out');
+      alert(err.response?.data?.detail || 'Gagal melakukan Clock-Out');
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  if (loading) {
-    return <div className="flex justify-center items-center h-full">Memuat Dashboard...</div>;
-  }
+  const formatDateStr = (dateStr) => {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'aktif':
+        return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+      case 'nonaktif':
+        return 'bg-red-100 text-red-700 border-red-200';
+      case 'cuti':
+        return 'bg-amber-100 text-amber-700 border-amber-200';
+      default:
+        return 'bg-slate-100 text-slate-700 border-slate-200';
+    }
+  };
+
+  if (loading)
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50/50">
+        <div className="flex flex-col items-center gap-2">
+          <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-500 text-xs font-medium">Memuat dashboard staff...</p>
+        </div>
+      </div>
+    );
 
   if (error) {
-    return <div className="text-red-500 text-center p-4 bg-red-50 rounded-lg">{error}</div>;
+    return (
+      <div className="flex flex-col items-center justify-center h-64 bg-red-50 rounded-lg border border-red-100 p-6 text-center">
+        <AlertTriangle className="text-red-500 mb-2" size={32} />
+        <h3 className="text-red-800 font-bold">Terjadi Kesalahan</h3>
+        <p className="text-red-600 text-sm mt-1">{error}</p>
+        <button
+          onClick={fetchDashboardData}
+          className="mt-4 px-4 py-2 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700"
+        >
+          Coba Lagi
+        </button>
+      </div>
+    );
   }
 
-  const { absensi_hari_ini, timecard_bulan_ini, job_aktif, total_job_aktif, pengumuman } = dashboardData;
+  const { absensi_hari_ini, timecard_bulan_ini, job_aktif, total_job_aktif, pengumuman } =
+    dashboardData || {};
+  const isClockedIn = absensi_hari_ini?.status !== 'belum_absen';
+  const isClockedOut = Boolean(absensi_hari_ini?.jam_keluar);
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Halo, {user?.username} 👋</h1>
-          <p className="text-slate-500">Berikut adalah ringkasan hari ini.</p>
+    <div className="space-y-3 max-w-7xl mx-auto pb-4 animate-fade-in relative">
+      {/* Header Compact */}
+      <div className="bg-white p-2.5 rounded-lg shadow-sm border border-slate-200 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-9 h-9 rounded-md bg-blue-100 flex items-center justify-center overflow-hidden shrink-0 border border-blue-200">
+            {user?.foto_profil ? (
+              <img src={user.foto_profil} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-blue-700 font-black text-lg">{user?.username?.charAt(0)}</span>
+            )}
+          </div>
+          <div>
+            <h1 className="text-sm font-bold text-slate-800 leading-tight">
+              Halo, {user?.username} 👋
+            </h1>
+            <p className="text-[10px] text-slate-500 font-medium capitalize">
+              {user?.divisi_nama || user?.role} - Selamat Bekerja!
+            </p>
+          </div>
+        </div>
+        <div className="hidden sm:block text-right">
+          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+            {currentTime.toLocaleDateString('id-ID', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })}
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Card Absensi Hari Ini */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <div className="flex justify-between items-start">
+      {/* Grid Ringkasan Atas */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+        <div className="md:col-span-5 bg-white rounded-lg p-3 border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div className="flex justify-between items-start border-b border-slate-100 pb-2 mb-2">
             <div>
-              <p className="text-sm font-medium text-slate-500">Status Kehadiran</p>
-              <h3 className="text-xl font-bold text-slate-800 mt-1 uppercase">
-                {absensi_hari_ini?.status === 'belum_absen' ? 'Belum Masuk' : absensi_hari_ini?.status}
+              <p className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                <CalendarClock size={12} /> Status Kehadiran
+              </p>
+              <h3
+                className={`text-lg font-extrabold mt-0.5 uppercase ${!isClockedIn ? 'text-amber-600' : isClockedOut ? 'text-slate-600' : 'text-emerald-600'}`}
+              >
+                {!isClockedIn ? 'Belum Masuk' : absensi_hari_ini?.status}
               </h3>
-              {absensi_hari_ini?.jam_masuk && (
-                <p className="text-xs text-slate-500 mt-1">Masuk: {absensi_hari_ini.jam_masuk}</p>
-              )}
             </div>
-            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg">
-              <Clock size={24} />
+            <div className="text-right">
+              <div className="text-2xl font-black text-slate-800 tracking-tighter tabular-nums leading-none">
+                {currentTime.toLocaleTimeString('id-ID', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                })}
+              </div>
             </div>
           </div>
-          <div className="mt-4 flex gap-2">
+          <div className="flex gap-2 mt-auto">
             <button
               onClick={handleClockIn}
-              disabled={absensi_hari_ini?.status !== 'belum_absen'}
-              className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white py-2 rounded-lg text-sm font-medium transition-colors"
+              disabled={isClockedIn || actionLoading}
+              className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5
+                ${isClockedIn ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-600 text-white'}`}
             >
-              Masuk
+              {isClockedIn ? 'Sudah Masuk' : 'Clock In Sekarang'}
             </button>
             <button
               onClick={handleClockOut}
-              disabled={absensi_hari_ini?.status === 'belum_absen' || absensi_hari_ini?.jam_keluar}
-              className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-slate-300 text-white py-2 rounded-lg text-sm font-medium transition-colors"
+              disabled={!isClockedIn || isClockedOut || actionLoading}
+              className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5
+                ${!isClockedIn || isClockedOut ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 text-white'}`}
             >
-              Keluar
+              {isClockedOut ? 'Sudah Pulang' : 'Clock Out'}
             </button>
           </div>
         </div>
 
-        {/* Card Papan Pekerjaan */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Pekerjaan Aktif</p>
-              <h3 className="text-2xl font-bold text-slate-800 mt-1">{total_job_aktif}</h3>
-              <p className="text-xs text-slate-500 mt-1">Yang sedang Anda kerjakan</p>
+        <div className="md:col-span-4 bg-white rounded-lg p-3 border border-slate-200 shadow-sm flex flex-col justify-between">
+          <p className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1 border-b border-slate-100 pb-2 mb-2">
+            <Activity size={12} /> Statistik Bulan Ini
+          </p>
+          <div className="grid grid-cols-2 gap-2 flex-1">
+            <div className="bg-blue-50/50 p-2 rounded flex flex-col justify-center text-center">
+              <h3 className="text-xl font-extrabold text-blue-700">
+                {timecard_bulan_ini?.total_hadir || 0}
+              </h3>
+              <p className="text-[9px] text-blue-600 font-bold uppercase">Kehadiran</p>
             </div>
-            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
-              <Package size={24} />
+            <div className="bg-purple-50/50 p-2 rounded flex flex-col justify-center text-center">
+              <h3 className="text-xl font-extrabold text-purple-700">
+                {timecard_bulan_ini?.total_jam_kerja || 0}
+              </h3>
+              <p className="text-[9px] text-purple-600 font-bold uppercase">Jam Kerja</p>
             </div>
           </div>
         </div>
 
-        {/* Card Timecard Bulanan */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Statistik Bulan Ini</p>
-              <div className="flex gap-6 mt-2">
-                <div>
-                  <p className="text-2xl font-bold text-slate-800">{timecard_bulan_ini?.total_hadir || 0}</p>
-                  <p className="text-xs text-slate-500">Hari Masuk</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-slate-800">{timecard_bulan_ini?.total_jam_kerja || 0}</p>
-                  <p className="text-xs text-slate-500">Jam Kerja</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-emerald-600">Rp {timecard_bulan_ini?.total_insentif?.toLocaleString('id-ID') || 0}</p>
-                  <p className="text-xs text-slate-500">Estimasi Insentif</p>
-                </div>
+        <div className="md:col-span-3 bg-blue-600 rounded-lg p-3 text-white shadow-sm flex flex-col justify-center relative overflow-hidden">
+          <div className="relative z-10">
+            <p className="text-blue-200 text-[10px] font-bold uppercase tracking-wider mb-1">
+              Pekerjaan Aktif
+            </p>
+            <h3 className="text-4xl font-extrabold leading-none">{total_job_aktif || 0}</h3>
+          </div>
+          <Package className="absolute -right-4 -bottom-4 text-blue-500/30" size={100} />
+        </div>
+      </div>
+
+      {/* Grid Bawah */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        {/* List Pekerjaan Aktif */}
+        <div className="lg:col-span-2 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
+          <div className="px-3 py-2 border-b border-slate-200 bg-slate-50 flex items-center gap-1.5">
+            <Briefcase className="text-blue-600" size={14} />
+            <h2 className="text-slate-800 font-bold text-xs">Pekerjaan Dalam Proses</h2>
+          </div>
+          <div className="overflow-x-auto flex-1 p-2">
+            <table className="w-full text-left text-[11px] whitespace-nowrap">
+              <thead className="bg-slate-100/80 text-slate-500 border-b border-slate-200">
+                <tr>
+                  <th className="py-1.5 px-3 font-semibold">Produk / Job</th>
+                  <th className="py-1.5 px-3 font-semibold text-center">Order ID</th>
+                  <th className="py-1.5 px-3 font-semibold text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {job_aktif && job_aktif.length > 0 ? (
+                  job_aktif.map((job) => (
+                    <tr key={job.job_id} className="hover:bg-blue-50/50">
+                      <td className="py-2 px-3">
+                        <div className="font-bold text-slate-800">{job.produk}</div>
+                        <div className="text-[9px] text-slate-500">Tahap: {job.tahap}</div>
+                      </td>
+                      <td className="py-2 px-3 text-center font-mono text-slate-500">
+                        #{job.order_id}
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-bold rounded uppercase">
+                          {job.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="3" className="py-6 text-center text-slate-400 text-[10px]">
+                      <CheckCircle2 className="mx-auto mb-1 text-slate-300" size={20} />
+                      Tidak ada pekerjaan aktif saat ini.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Kolom Kanan: Status Karyawan & Pengumuman */}
+        <div className="flex flex-col gap-3">
+          {/* Card Info Kepegawaian & Kontrak - BISA DIKLIK */}
+          <div
+            onClick={() => setShowInfoModal(true)}
+            className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex flex-col cursor-pointer hover:border-blue-400 hover:shadow-md transition-all group"
+          >
+            <div className="px-3 py-2 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="text-blue-600" size={14} />
+                <h2 className="text-slate-800 font-bold text-xs">Info Karyawan</h2>
+              </div>
+              <ChevronRight
+                size={14}
+                className="text-slate-400 group-hover:text-blue-600 transition-colors"
+              />
+            </div>
+            <div className="p-3 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] text-slate-500 font-medium">Status Karyawan</span>
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase ${getStatusColor(user?.status_karyawan || 'aktif')}`}
+                >
+                  {user?.status_karyawan || 'Aktif'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] text-slate-500 font-medium">Jenis Kontrak</span>
+                <span className="text-[11px] font-bold text-slate-800 capitalize">
+                  {user?.jenis_kontrak || 'Tetap'}
+                </span>
               </div>
             </div>
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
-              <CheckCircle size={24} />
+          </div>
+
+          {/* Card Pengumuman Perusahaan */}
+          <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1 min-h-[180px]">
+            <div className="px-3 py-2 border-b border-slate-200 bg-slate-50 flex items-center gap-1.5">
+              <Info className="text-blue-600" size={14} />
+              <h2 className="text-slate-800 font-bold text-xs">Pengumuman</h2>
+            </div>
+            <div className="p-3 space-y-2 overflow-y-auto custom-scrollbar flex-1">
+              {pengumuman && pengumuman.length > 0 ? (
+                pengumuman.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-2.5 bg-slate-50 hover:bg-blue-50/30 transition-colors rounded border border-slate-100"
+                  >
+                    <div className="flex justify-between items-start mb-1">
+                      <h4 className="font-bold text-slate-800 text-[11px] leading-tight">
+                        {item.judul}
+                      </h4>
+                      <span className="text-[8px] text-slate-400 bg-white px-1 py-0.5 rounded border border-slate-200 shrink-0 ml-2">
+                        {new Date(item.dibuat_pada).toLocaleDateString('id-ID', {
+                          day: 'numeric',
+                          month: 'short',
+                        })}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-600 leading-relaxed mb-1.5 line-clamp-2">
+                      {item.isi}
+                    </p>
+                    <div className="flex items-center gap-1 text-[9px] text-slate-400 font-medium">
+                      <div className="w-3 h-3 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 font-bold">
+                        {item.dibuat_oleh_nama?.charAt(0)}
+                      </div>
+                      {item.dibuat_oleh_nama}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 py-6">
+                  <AlertTriangle size={24} className="mb-2 text-slate-300" />
+                  <p className="text-[10px]">Belum ada pengumuman.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Info Pengumuman */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <AlertCircle className="text-orange-500" size={20} />
-            Pengumuman Terbaru
-          </h3>
-          <div className="space-y-4">
-            {pengumuman && pengumuman.length > 0 ? (
-              pengumuman.map(item => (
-                <div key={item.id} className="p-4 bg-slate-50 rounded-lg border border-slate-100">
-                  <h4 className="font-semibold text-slate-800">{item.judul}</h4>
-                  <p className="text-sm text-slate-600 mt-1">{item.isi}</p>
-                  <p className="text-xs text-slate-400 mt-2">
-                    Dari: {item.dibuat_oleh_nama} • {new Date(item.dibuat_pada).toLocaleDateString('id-ID')}
+      {/* FULL SCREEN MODAL TRANSISI - INFO KARYAWAN (Hanya Field Essensial) */}
+      <div
+        className={`fixed inset-0 z-50 flex justify-center bg-slate-900/40 backdrop-blur-sm transition-all duration-300 ${
+          showInfoModal ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+      >
+        <div
+          className={`w-full max-w-md bg-[#eaf2d7] h-full relative flex flex-col shadow-2xl transition-transform duration-300 ${
+            showInfoModal ? 'translate-y-0' : 'translate-y-full'
+          }`}
+        >
+          {/* Header Mobile Style */}
+          <div className="bg-[#1565c0] text-white px-4 py-4 flex items-center gap-4 shadow-md z-10 shrink-0">
+            <button
+              onClick={() => setShowInfoModal(false)}
+              className="hover:bg-white/10 p-1 rounded-full transition-colors"
+            >
+              <ArrowLeft size={24} />
+            </button>
+            <h1 className="text-lg font-medium tracking-wide">Info Karyawan</h1>
+          </div>
+
+          {/* Konten (Bisa Di-scroll) */}
+          <div className="flex-1 overflow-y-auto px-5 py-6 flex flex-col gap-4">
+            <div className="flex flex-col">
+              <span className="text-[13px] font-bold text-slate-800 mb-0.5">Nama :</span>
+              <span className="text-[15px] font-bold text-[#0a5b9e] uppercase">
+                {user?.username || '-'}
+              </span>
+            </div>
+
+            <div className="flex flex-col">
+              <span className="text-[13px] font-bold text-slate-800 mb-0.5">Status Karyawan :</span>
+              <span className="text-[15px] font-medium text-[#0a5b9e] uppercase">
+                {user?.status_karyawan || 'Aktif'}
+              </span>
+            </div>
+
+            <div className="flex flex-col">
+              <span className="text-[13px] font-bold text-slate-800 mb-0.5">
+                Tgl Mulai Kontrak :
+              </span>
+              <span className="text-[15px] font-medium text-[#0a5b9e]">
+                {formatDateStr(user?.kontrak_mulai)}
+              </span>
+            </div>
+
+            <div className="flex flex-col">
+              <span className="text-[13px] font-bold text-slate-800 mb-0.5">
+                Tgl Akhir Kontrak :
+              </span>
+              <span className="text-[15px] font-medium text-[#0a5b9e]">
+                {formatDateStr(user?.kontrak_selesai)}
+              </span>
+            </div>
+
+            <div className="flex flex-col">
+              <span className="text-[13px] font-bold text-slate-800 mb-0.5">No. WA / HP :</span>
+              <span className="text-[15px] font-medium text-[#0a5b9e]">{user?.no_hp || '-'}</span>
+            </div>
+
+            <div className="flex flex-col">
+              <span className="text-[13px] font-bold text-slate-800 mb-0.5">Email :</span>
+              <span className="text-[15px] font-medium text-[#0a5b9e]">{user?.email || '-'}</span>
+            </div>
+
+            {/* Note text & Button: Hanya tampil jika ada file PKWT yang diunggah */}
+            {user?.file_pkwt && (
+              <>
+                <div className="mt-4">
+                  <p className="text-[12px] text-[#e53935] font-medium leading-tight">
+                    *Segera Unduh dokumen PKWT setelah di tanda tangani <br />
+                    File hanya disimpan 7 hari setelah di upload
                   </p>
                 </div>
-              ))
-            ) : (
-              <p className="text-sm text-slate-500 text-center py-4">Belum ada pengumuman.</p>
-            )}
-          </div>
-        </div>
 
-        {/* List Pekerjaan Teratas */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <h3 className="text-lg font-bold text-slate-800 mb-4">Pekerjaan Aktif Saya</h3>
-          <div className="space-y-3">
-            {job_aktif && job_aktif.length > 0 ? (
-              job_aktif.map(job => (
-                <div key={job.job_id} className="p-4 bg-slate-50 rounded-lg flex justify-between items-center border border-slate-100">
-                  <div>
-                    <h4 className="font-semibold text-slate-800">{job.produk}</h4>
-                    <p className="text-sm text-slate-500">{job.tahap} • Order ID: #{job.order_id}</p>
-                  </div>
-                  <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full capitalize">
-                    {job.status}
-                  </span>
+                <div className="mt-2 mb-8">
+                  <button className="w-full bg-[#f0442c] hover:bg-[#d32f2f] text-white font-bold py-3.5 px-4 rounded-full flex items-center justify-center gap-2 shadow-sm transition-colors active:scale-[0.98]">
+                    <Download size={18} />
+                    <span>Unduh PKWT</span>
+                  </button>
                 </div>
-              ))
-            ) : (
-              <p className="text-sm text-slate-500 text-center py-4">Tidak ada pekerjaan di antrean Anda.</p>
+              </>
             )}
           </div>
         </div>

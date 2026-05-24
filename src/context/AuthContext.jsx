@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
@@ -10,21 +11,21 @@ export function AuthProvider({ children }) {
     // Cek apakah ada token tersimpan saat pertama buka
     const token = localStorage.getItem('access_token');
     const savedUser = localStorage.getItem('user_data');
-    const apiBase = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+    const apiBase = import.meta.env.VITE_API_URL || 'https://bintang-adv.duckdns.org/api';
     if (token && savedUser) {
       setUser(JSON.parse(savedUser));
       // Ambil data terbaru dari server di background agar foto dll selalu sinkron
       fetch(`${apiBase}/users/me/`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       })
-      .then(res => res.json())
-      .then(data => {
-        if (data.id) {
-          setUser(data);
-          localStorage.setItem('user_data', JSON.stringify(data));
-        }
-      })
-      .catch(err => console.error("Gagal sinkronisasi data user:", err));
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.id) {
+            setUser(data);
+            localStorage.setItem('user_data', JSON.stringify(data));
+          }
+        })
+        .catch((err) => console.error('Gagal sinkronisasi data user:', err));
     }
     setLoading(false);
   }, []);
