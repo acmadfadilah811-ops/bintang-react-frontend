@@ -45,7 +45,9 @@ export function useJobsData(isManager = false) {
             jenisProduk: item.jenis_produk,
             customerName: order.nama,
             nomorWa: order.nomor_wa,
-            keterangan: item.detail || order.catatan_pelanggan || '',
+            keterangan: item.detail || '',
+            keteranganDetail: item.keterangan_detail || '',
+            catatanPelanggan: order.catatan_pelanggan || '',
             fileLink: item.gdrive_customer_link || '',
             qty: item.qty || 1,
             hargaJual: item.harga_jual || 0,
@@ -149,6 +151,8 @@ export function useJobsData(isManager = false) {
     hargaJualBaru,
     hargaLama,
     orderItemId,
+    statusPekerjaan,
+    alasanGagal,
     fromStart,
   }) => {
     setSaving(true);
@@ -167,7 +171,12 @@ export function useJobsData(isManager = false) {
       }
 
       // 2. Simpan catatan & link drive
-      const jobPayload = { catatan_staff: tableRows, gdrive_output_link: driveLink || '' };
+      const jobPayload = {
+        catatan_staff: tableRows,
+        gdrive_output_link: driveLink || '',
+        status_pekerjaan: statusPekerjaan,
+      };
+      if (alasanGagal) jobPayload.alasan_gagal = alasanGagal;
       if (fromStart) jobPayload.status_pekerjaan = 'dikerjakan';
       await apiClient.patch(`/jobs/${jobId}/`, jobPayload);
 

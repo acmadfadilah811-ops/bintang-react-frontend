@@ -89,20 +89,32 @@ export default function ManagerTable({ jobs, orderMap, staffList, onGenerateOtp,
                         </span>
                       </td>
                       <td className="py-2 px-3 border-r border-slate-200 text-center">
-                        <span
-                          className={`px-2 py-0.5 text-[9px] font-bold rounded border uppercase ${badge.cls}`}
-                        >
-                          {badge.label}
-                        </span>
+                        <div className="flex flex-col items-center gap-1 justify-center">
+                          <span
+                            className={`px-2 py-0.5 text-[9px] font-bold rounded border uppercase ${badge.cls}`}
+                          >
+                            {badge.label}
+                          </span>
+                          {job.otp_requested && !job.otp_sent && (
+                            <span className="bg-red-100 text-red-700 text-[8px] font-extrabold px-1.5 py-0.5 rounded border border-red-200 uppercase tracking-tight animate-pulse">
+                              Minta OTP
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-1 px-3 text-center bg-indigo-50/30">
                         <div className="flex gap-2 justify-center items-center">
                           {job.status_pekerjaan !== 'gagal' && (
                             <button
                               onClick={() => onGenerateOtp(job)}
-                              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[9px] px-2.5 py-1.5 rounded flex items-center gap-1.5 shadow-sm transition-colors"
+                              className={`font-bold text-[9px] px-2.5 py-1.5 rounded flex items-center gap-1.5 shadow-sm transition-all duration-300 ${
+                                job.otp_requested && !job.otp_sent
+                                  ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse ring-2 ring-red-500/50'
+                                  : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                              }`}
                             >
-                              <Key size={10} /> Buat Kode OTP
+                              <Key size={10} />
+                              {job.otp_requested && !job.otp_sent ? 'Minta OTP!' : 'Buat Kode OTP'}
                             </button>
                           )}
                           <button

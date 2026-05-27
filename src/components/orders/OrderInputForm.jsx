@@ -1,10 +1,20 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { X, Save, Plus, Trash2, ShoppingCart, User, Calculator, Calendar, CreditCard } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import {
+  X,
+  Save,
+  Plus,
+  Trash2,
+  ShoppingCart,
+  User,
+  Calculator,
+  Calendar,
+  CreditCard,
+} from 'lucide-react';
 import apiClient from '../../api/apiClient';
 
 export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // ── State Asisten Daftar Harga ──
   const [dbPrices, setDbPrices] = useState([]);
   const [pricelistActiveIndex, setPricelistActiveIndex] = useState(null);
@@ -40,7 +50,7 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
   }, [isOpen]);
 
   const filteredProducts = useMemo(() => {
-    return dbPrices.filter(prod => {
+    return dbPrices.filter((prod) => {
       const matchesCategory = selectedCategory === 'all' || prod.kategori === selectedCategory;
       const searchData = `${(prod.nama_produk || '').toLowerCase()} ${(prod.material || '').toLowerCase()}`;
       const matchesSearch = searchData.includes(priceSearch.toLowerCase());
@@ -50,11 +60,7 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
 
   const handleSelectProduct = (product, selectedPrice) => {
     if (pricelistActiveIndex === null) return;
-    
-    let jenisProduk = '';
-    let defaultPanjang = '';
-    let defaultLebar = '';
-    
+
     const catMap = {
       print_outdoor_per_m2: 'Cetak Outdoor',
       stand_banner: 'Stand Banner',
@@ -68,32 +74,26 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
       kartu_nama_aster_200: 'Kartu Nama',
     };
 
-    jenisProduk = catMap[product.kategori] || product.kategori;
-    if (product.kategori !== 'print_outdoor_per_m2') {
-      defaultPanjang = 1;
-      defaultLebar = 1;
-    }
+    const jenisProduk = catMap[product.kategori] || product.kategori;
+    const isMeteran = product.kategori === 'print_outdoor_per_m2';
 
     const newItems = [...formData.items];
+    newItems[pricelistActiveIndex].is_meteran = isMeteran;
     newItems[pricelistActiveIndex].jenis_produk = jenisProduk;
-    newItems[pricelistActiveIndex].bahan = product.nama_produk + (product.material ? ` (${product.material})` : '');
+    newItems[pricelistActiveIndex].bahan =
+      product.nama_produk + (product.material ? ` (${product.material})` : '');
     newItems[pricelistActiveIndex].harga_per_m2 = selectedPrice;
-    
-    if (defaultPanjang !== '') {
-      newItems[pricelistActiveIndex].panjang = defaultPanjang;
-    }
-    if (defaultLebar !== '') {
-      newItems[pricelistActiveIndex].lebar = defaultLebar;
-    }
+    newItems[pricelistActiveIndex].panjang = isMeteran ? 1 : 0;
+    newItems[pricelistActiveIndex].lebar = isMeteran ? 1 : 0;
 
     setFormData({ ...formData, items: newItems });
-    
+
     // Close modal
     setPricelistActiveIndex(null);
     setPriceSearch('');
     setSelectedCategory('all');
   };
-  
+
   // Struktur state baru sesuai rencana
   const [formData, setFormData] = useState({
     waktu: new Date().toISOString().slice(0, 16), // Format YYYY-MM-DDTHH:MM
@@ -104,8 +104,17 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
     dp_dibayar: 0,
     diskon_persen: 0,
     items: [
-      { jenis_produk: '', bahan: '', panjang: 0, lebar: 0, harga_per_m2: 0, qty: 1, keterangan_detail: '' }
-    ]
+      {
+        jenis_produk: '',
+        bahan: '',
+        panjang: 0,
+        lebar: 0,
+        harga_per_m2: 0,
+        qty: 1,
+        keterangan_detail: '',
+        is_meteran: true,
+      },
+    ],
   });
 
   if (!isOpen) return null;
@@ -113,7 +122,19 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
   const handleAddItem = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { jenis_produk: '', bahan: '', panjang: 0, lebar: 0, harga_per_m2: 0, qty: 1, keterangan_detail: '' }]
+      items: [
+        ...formData.items,
+        {
+          jenis_produk: '',
+          bahan: '',
+          panjang: 0,
+          lebar: 0,
+          harga_per_m2: 0,
+          qty: 1,
+          keterangan_detail: '',
+          is_meteran: true,
+        },
+      ],
     });
   };
 
@@ -133,12 +154,16 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
 
   const calculateSubtotal = () => {
     return formData.items.reduce((total, item) => {
-      const p = parseFloat(item.panjang) || 0;
-      const l = parseFloat(item.lebar) || 0;
-      const luas = p * l;
-      const harga = parseFloat(item.harga_per_m2) || 0;
+      const isMeteran = item.is_meteran !== false;
       const qty = parseInt(item.qty) || 1;
-      return total + (luas * harga * qty);
+      const harga = parseFloat(item.harga_per_m2) || 0;
+      if (isMeteran) {
+        const p = parseFloat(item.panjang) || 0;
+        const l = parseFloat(item.lebar) || 0;
+        return total + p * l * harga * qty;
+      } else {
+        return total + harga * qty;
+      }
     }, 0);
   };
 
@@ -147,12 +172,18 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
   const totalAkhir = subtotal - nilaiDiskon;
   const sisaTagihan = totalAkhir - parseFloat(formData.dp_dibayar || 0);
 
-  const formatRupiah = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
+  const formatRupiah = (angka) =>
+    new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+    }).format(angka || 0);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.nomor_wa || !formData.nama) return alert('Data pelanggan wajib diisi!');
-    if (formData.items.some(item => !item.jenis_produk)) return alert('Pastikan semua item memiliki jenis produk!');
+    if (formData.items.some((item) => !item.jenis_produk))
+      return alert('Pastikan semua item memiliki jenis produk!');
 
     try {
       setIsSubmitting(true);
@@ -171,11 +202,13 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
       const orderId = orderRes.data.id;
 
       // 2. Buat Items
-      const itemPromises = formData.items.map(item => {
-        const p = parseFloat(item.panjang) || 0;
-        const l = parseFloat(item.lebar) || 0;
-        const luas = p * l;
-        const harga_jual = luas * (parseFloat(item.harga_per_m2) || 0) * (parseInt(item.qty) || 1);
+      const itemPromises = formData.items.map((item) => {
+        const isMeteran = item.is_meteran !== false;
+        const p = isMeteran ? parseFloat(item.panjang) || 0 : 0;
+        const l = isMeteran ? parseFloat(item.lebar) || 0 : 0;
+        const harga_jual = isMeteran
+          ? p * l * (parseFloat(item.harga_per_m2) || 0) * (parseInt(item.qty) || 1)
+          : (parseFloat(item.harga_per_m2) || 0) * (parseInt(item.qty) || 1);
 
         return apiClient.post('/order-items/', {
           order: orderId,
@@ -207,23 +240,30 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
       {/* Header Fullscreen */}
       <div className="bg-white px-6 py-4 border-b border-slate-200 flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-slate-900 text-white rounded-lg"><ShoppingCart size={20} /></div>
+          <div className="p-2 bg-slate-900 text-white rounded-lg">
+            <ShoppingCart size={20} />
+          </div>
           <div>
-            <h2 className="text-[1.25rem] font-bold text-slate-900 leading-tight">Create New Print Job</h2>
-            <p className="text-[12px] text-slate-500 font-medium">Lengkapi detail pesanan dan kalkulasi harga</p>
+            <h2 className="text-[1.25rem] font-bold text-slate-900 leading-tight">
+              Create New Print Job
+            </h2>
+            <p className="text-[12px] text-slate-500 font-medium">
+              Lengkapi detail pesanan dan kalkulasi harga
+            </p>
           </div>
         </div>
-        <button onClick={onClose} className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-2 rounded-lg transition-colors flex items-center gap-1 font-bold text-[12px]">
+        <button
+          onClick={onClose}
+          className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-2 rounded-lg transition-colors flex items-center gap-1 font-bold text-[12px]"
+        >
           <X size={18} /> Tutup (Esc)
         </button>
       </div>
 
       <div className="p-6 max-w-[1400px] mx-auto w-full">
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
           {/* KOLOM KIRI (65%) */}
           <div className="lg:col-span-8 space-y-6">
-            
             {/* Baris 1: Info Pelanggan & Tanggal */}
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-6">
               <div className="flex-1 space-y-4">
@@ -232,12 +272,30 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1.5 uppercase">WhatsApp Number</label>
-                    <input type="text" required placeholder="08123456789" value={formData.nomor_wa} onChange={(e) => setFormData({...formData, nomor_wa: e.target.value})} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-md text-[13px] outline-none focus:ring-1 focus:ring-slate-900" />
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1.5 uppercase">
+                      WhatsApp Number
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="08123456789"
+                      value={formData.nomor_wa}
+                      onChange={(e) => setFormData({ ...formData, nomor_wa: e.target.value })}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-md text-[13px] outline-none focus:ring-1 focus:ring-slate-900"
+                    />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1.5 uppercase">Customer Name</label>
-                    <input type="text" required placeholder="Nama Pelanggan / PT" value={formData.nama} onChange={(e) => setFormData({...formData, nama: e.target.value})} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-md text-[13px] outline-none focus:ring-1 focus:ring-slate-900" />
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1.5 uppercase">
+                      Customer Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Nama Pelanggan / PT"
+                      value={formData.nama}
+                      onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-md text-[13px] outline-none focus:ring-1 focus:ring-slate-900"
+                    />
                   </div>
                 </div>
               </div>
@@ -246,8 +304,16 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
                   <Calendar size={14} className="text-indigo-500" /> Order Date
                 </h3>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1.5 uppercase">Waktu Pesanan</label>
-                  <input type="datetime-local" required value={formData.waktu} onChange={(e) => setFormData({...formData, waktu: e.target.value})} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-md text-[13px] outline-none focus:ring-1 focus:ring-slate-900" />
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1.5 uppercase">
+                    Waktu Pesanan
+                  </label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={formData.waktu}
+                    onChange={(e) => setFormData({ ...formData, waktu: e.target.value })}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-md text-[13px] outline-none focus:ring-1 focus:ring-slate-900"
+                  />
                 </div>
               </div>
             </div>
@@ -256,76 +322,190 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
               <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-4">
                 <h3 className="text-[13px] font-bold text-slate-800 flex items-center gap-2">
-                  <Calculator size={14} className="text-indigo-500" /> Item Detail & Kalkulasi M²
+                  <Calculator size={14} className="text-indigo-500" /> Item Detail & Kalkulasi Harga
                 </h3>
-                <button type="button" onClick={handleAddItem} className="text-[11px] font-bold text-indigo-700 hover:text-white hover:bg-indigo-600 flex items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-md border border-indigo-200 transition-colors">
+                <button
+                  type="button"
+                  onClick={handleAddItem}
+                  className="text-[11px] font-bold text-indigo-700 hover:text-white hover:bg-indigo-600 flex items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-md border border-indigo-200 transition-colors"
+                >
                   <Plus size={12} /> Tambah Item
                 </button>
               </div>
 
               <div className="space-y-4">
                 {formData.items.map((item, idx) => {
-                  const l = (item.panjang || 0) * (item.lebar || 0);
-                  const sub = l * (item.harga_per_m2 || 0) * (item.qty || 1);
+                  const isMeteran = item.is_meteran !== false;
+                  const sub = isMeteran
+                    ? (parseFloat(item.panjang) || 0) *
+                      (parseFloat(item.lebar) || 0) *
+                      (parseFloat(item.harga_per_m2) || 0) *
+                      (item.qty || 1)
+                    : (parseFloat(item.harga_per_m2) || 0) * (item.qty || 1);
                   return (
-                    <div key={idx} className="p-4 bg-slate-50 border border-slate-200 rounded-lg relative group">
+                    <div
+                      key={idx}
+                      className="p-4 bg-slate-50 border border-slate-200 rounded-lg relative group"
+                    >
                       {formData.items.length > 1 && (
-                        <button type="button" onClick={() => handleRemoveItem(idx)} className="absolute -top-3 -right-3 bg-red-100 text-red-600 p-1.5 rounded-full hover:bg-red-200 border border-red-200 shadow-sm">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(idx)}
+                          className="absolute -top-3 -right-3 bg-red-100 text-red-600 p-1.5 rounded-full hover:bg-red-200 border border-red-200 shadow-sm"
+                        >
                           <Trash2 size={12} />
                         </button>
                       )}
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
-                        <div className="md:col-span-3">
-                          <div className="flex justify-between items-center">
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase">Product Type *</label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setPricelistActiveIndex(idx);
-                                setPriceSearch('');
-                                setSelectedCategory('all');
-                              }}
-                              className="text-[9px] font-bold text-indigo-600 hover:underline"
-                            >
-                              Cari Harga
-                            </button>
-                          </div>
-                          <input type="text" required placeholder="Banner / Sticker..." value={item.jenis_produk} onChange={(e) => handleItemChange(idx, 'jenis_produk', e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded text-[12px] outline-none mt-1 focus:ring-1 focus:ring-slate-900" />
-                        </div>
+                        {/* 1. Product Type */}
                         <div className="md:col-span-2">
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase">Material</label>
-                          <input type="text" placeholder="Flexi / Vinyl..." value={item.bahan} onChange={(e) => handleItemChange(idx, 'bahan', e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded text-[12px] outline-none mt-1 focus:ring-1 focus:ring-slate-900" />
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase">
+                            Product Type *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Banner / Yasin..."
+                            value={item.jenis_produk}
+                            onChange={(e) => handleItemChange(idx, 'jenis_produk', e.target.value)}
+                            className="w-full p-2 bg-white border border-slate-200 rounded text-[12px] outline-none mt-1 focus:ring-1 focus:ring-slate-900"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPricelistActiveIndex(idx);
+                              setPriceSearch('');
+                              setSelectedCategory('all');
+                            }}
+                            className="mt-1 w-full px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[9px] font-black uppercase tracking-wider cursor-pointer shadow-sm transition-colors text-center"
+                          >
+                            Cari Harga
+                          </button>
                         </div>
 
-                        {/* Ukuran */}
-                        <div className="md:col-span-2 flex items-end gap-1">
-                          <div className="w-full">
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase">P (m)</label>
-                            <input type="number" step="0.01" value={item.panjang || ''} onChange={(e) => handleItemChange(idx, 'panjang', e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded text-[12px] text-center outline-none mt-1 focus:ring-1 focus:ring-slate-900" />
-                          </div>
-                          <span className="pb-2 text-slate-400 font-bold text-[10px]">x</span>
-                          <div className="w-full">
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase">L (m)</label>
-                            <input type="number" step="0.01" value={item.lebar || ''} onChange={(e) => handleItemChange(idx, 'lebar', e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded text-[12px] text-center outline-none mt-1 focus:ring-1 focus:ring-slate-900" />
-                          </div>
+                        {/* 2. Kalkulasi */}
+                        <div className="md:col-span-2">
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase">
+                            Kalkulasi
+                          </label>
+                          <select
+                            value={isMeteran ? 'meteran' : 'satuan'}
+                            onChange={(e) => {
+                              const val = e.target.value === 'meteran';
+                              handleItemChange(idx, 'is_meteran', val);
+                              if (!val) {
+                                handleItemChange(idx, 'panjang', 0);
+                                handleItemChange(idx, 'lebar', 0);
+                              } else {
+                                handleItemChange(idx, 'panjang', 1);
+                                handleItemChange(idx, 'lebar', 1);
+                              }
+                            }}
+                            className="w-full p-2 bg-white border border-slate-200 rounded text-[12px] outline-none mt-1 focus:ring-1 focus:ring-slate-900 cursor-pointer"
+                          >
+                            <option value="meteran">P x L (Meteran)</option>
+                            <option value="satuan">Pcs (Satuan)</option>
+                          </select>
                         </div>
 
+                        {/* 3. Material */}
                         <div className="md:col-span-2">
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase">Price /m² (Rp)</label>
-                          <input type="number" value={item.harga_per_m2 || ''} onChange={(e) => handleItemChange(idx, 'harga_per_m2', e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded text-[12px] outline-none mt-1 focus:ring-1 focus:ring-slate-900" />
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase">
+                            Material
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Bahan / Deskripsi..."
+                            value={item.bahan}
+                            onChange={(e) => handleItemChange(idx, 'bahan', e.target.value)}
+                            className="w-full p-2 bg-white border border-slate-200 rounded text-[12px] outline-none mt-1 focus:ring-1 focus:ring-slate-900"
+                          />
                         </div>
+
+                        {/* 4. Ukuran / Spacer */}
+                        {isMeteran ? (
+                          <div className="md:col-span-2 flex items-end gap-1">
+                            <div className="w-full">
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase">
+                                P (m)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.panjang || ''}
+                                onChange={(e) => handleItemChange(idx, 'panjang', e.target.value)}
+                                className="w-full p-2 bg-white border border-slate-200 rounded text-[12px] text-center outline-none mt-1 focus:ring-1 focus:ring-slate-900"
+                              />
+                            </div>
+                            <span className="pb-2 text-slate-400 font-bold text-[10px]">x</span>
+                            <div className="w-full">
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase">
+                                L (m)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.lebar || ''}
+                                onChange={(e) => handleItemChange(idx, 'lebar', e.target.value)}
+                                className="w-full p-2 bg-white border border-slate-200 rounded text-[12px] text-center outline-none mt-1 focus:ring-1 focus:ring-slate-900"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="md:col-span-2"></div>
+                        )}
+
+                        {/* 5. Price */}
+                        <div className="md:col-span-2">
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase">
+                            {isMeteran ? 'Price /m² (Rp)' : 'Price /Pcs (Rp)'}
+                          </label>
+                          <input
+                            type="number"
+                            value={item.harga_per_m2 || ''}
+                            onChange={(e) => handleItemChange(idx, 'harga_per_m2', e.target.value)}
+                            className="w-full p-2 bg-white border border-slate-200 rounded text-[12px] outline-none mt-1 focus:ring-1 focus:ring-slate-900"
+                          />
+                        </div>
+
+                        {/* 6. Qty */}
                         <div className="md:col-span-1">
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase">Qty</label>
-                          <input type="number" min="1" value={item.qty || ''} onChange={(e) => handleItemChange(idx, 'qty', e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded text-[12px] text-center outline-none mt-1 focus:ring-1 focus:ring-slate-900" />
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase">
+                            Qty
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.qty || ''}
+                            onChange={(e) => handleItemChange(idx, 'qty', e.target.value)}
+                            className="w-full p-2 bg-white border border-slate-200 rounded text-[12px] text-center outline-none mt-1 focus:ring-1 focus:ring-slate-900"
+                          />
                         </div>
-                        <div className="md:col-span-2 text-right bg-indigo-50 p-2 rounded border border-indigo-100 h-[40px] flex flex-col justify-center mt-5">
-                          <p className="text-[12px] font-black text-indigo-700 leading-none">{formatRupiah(sub)}</p>
+
+                        {/* 7. Subtotal */}
+                        <div className="md:col-span-1 text-right mt-5 pt-2">
+                          <span className="block text-[9px] font-bold text-slate-400 uppercase md:hidden mb-1">
+                            Subtotal
+                          </span>
+                          <p className="text-[12px] font-black text-indigo-700 leading-none">
+                            {formatRupiah(sub)}
+                          </p>
                         </div>
-                        
+
                         {/* Keterangan Detail Item (Area Baru) */}
                         <div className="md:col-span-12 mt-1">
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase">Keterangan Khusus / Finishing (Opsional)</label>
-                          <textarea rows="1" placeholder="Mata ayam tiap sudut, laminasi doff..." value={item.keterangan_detail} onChange={(e) => handleItemChange(idx, 'keterangan_detail', e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded text-[12px] outline-none mt-1 focus:ring-1 focus:ring-slate-900 resize-none"></textarea>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase">
+                            Keterangan Khusus / Finishing (Opsional)
+                          </label>
+                          <textarea
+                            rows="1"
+                            placeholder="Mata ayam tiap sudut, laminasi doff..."
+                            value={item.keterangan_detail}
+                            onChange={(e) =>
+                              handleItemChange(idx, 'keterangan_detail', e.target.value)
+                            }
+                            className="w-full p-2 bg-white border border-slate-200 rounded text-[12px] outline-none mt-1 focus:ring-1 focus:ring-slate-900 resize-none"
+                          ></textarea>
                         </div>
                       </div>
                     </div>
@@ -344,8 +524,16 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
 
               <div className="space-y-4 mb-6">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-400 mb-1.5 uppercase">Metode Pembayaran</label>
-                  <select value={formData.metode_pembayaran} onChange={(e) => setFormData({...formData, metode_pembayaran: e.target.value})} className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-md text-[13px] text-white outline-none focus:ring-1 focus:ring-slate-500">
+                  <label className="block text-[11px] font-bold text-slate-400 mb-1.5 uppercase">
+                    Metode Pembayaran
+                  </label>
+                  <select
+                    value={formData.metode_pembayaran}
+                    onChange={(e) =>
+                      setFormData({ ...formData, metode_pembayaran: e.target.value })
+                    }
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-md text-[13px] text-white outline-none focus:ring-1 focus:ring-slate-500"
+                  >
                     <option value="tunai">Tunai / Cash</option>
                     <option value="transfer">Transfer Bank</option>
                     <option value="qris">QRIS / E-Wallet</option>
@@ -353,17 +541,44 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-400 mb-1.5 uppercase">Discount (%)</label>
-                    <input type="number" step="0.1" min="0" max="100" value={formData.diskon_persen} onChange={(e) => setFormData({...formData, diskon_persen: e.target.value})} className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-md text-[13px] text-white outline-none focus:ring-1 focus:ring-slate-500" />
+                    <label className="block text-[11px] font-bold text-slate-400 mb-1.5 uppercase">
+                      Discount (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      value={formData.diskon_persen}
+                      onChange={(e) => setFormData({ ...formData, diskon_persen: e.target.value })}
+                      className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-md text-[13px] text-white outline-none focus:ring-1 focus:ring-slate-500"
+                    />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-400 mb-1.5 uppercase">DP Dibayar (Rp)</label>
-                    <input type="number" min="0" value={formData.dp_dibayar} onChange={(e) => setFormData({...formData, dp_dibayar: e.target.value})} className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-md text-[13px] text-white outline-none focus:ring-1 focus:ring-slate-500" />
+                    <label className="block text-[11px] font-bold text-slate-400 mb-1.5 uppercase">
+                      DP Dibayar (Rp)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.dp_dibayar}
+                      onChange={(e) => setFormData({ ...formData, dp_dibayar: e.target.value })}
+                      className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-md text-[13px] text-white outline-none focus:ring-1 focus:ring-slate-500"
+                    />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-400 mb-1.5 uppercase">Catatan Tambahan Nota</label>
-                  <textarea rows="2" value={formData.catatan_pelanggan} onChange={(e) => setFormData({...formData, catatan_pelanggan: e.target.value})} className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-md text-[13px] text-white outline-none resize-none focus:ring-1 focus:ring-slate-500" />
+                  <label className="block text-[11px] font-bold text-slate-400 mb-1.5 uppercase">
+                    Catatan Tambahan Nota
+                  </label>
+                  <textarea
+                    rows="2"
+                    value={formData.catatan_pelanggan}
+                    onChange={(e) =>
+                      setFormData({ ...formData, catatan_pelanggan: e.target.value })
+                    }
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-md text-[13px] text-white outline-none resize-none focus:ring-1 focus:ring-slate-500"
+                  />
                 </div>
               </div>
 
@@ -380,24 +595,31 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
                   <span>Down Payment</span>
                   <span className="font-semibold">- {formatRupiah(formData.dp_dibayar)}</span>
                 </div>
-                
+
                 <div className="flex justify-between items-center bg-indigo-900/30 p-3 rounded-lg border border-indigo-800/50 mt-4">
                   <span className="font-bold text-indigo-300 text-[11px]">SISA TAGIHAN</span>
-                  <span className={`text-[18px] font-black ${sisaTagihan <= 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  <span
+                    className={`text-[18px] font-black ${sisaTagihan <= 0 ? 'text-emerald-400' : 'text-amber-400'}`}
+                  >
                     {sisaTagihan <= 0 ? 'LUNAS' : formatRupiah(sisaTagihan)}
                   </span>
                 </div>
               </div>
 
-              <button type="submit" disabled={isSubmitting} className="w-full mt-6 bg-white hover:bg-slate-200 text-black px-8 py-3.5 rounded-lg text-[14px] font-extrabold flex justify-center items-center gap-2 shadow-sm transition-all disabled:opacity-50">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full mt-6 bg-white hover:bg-slate-200 text-black px-8 py-3.5 rounded-lg text-[14px] font-extrabold flex justify-center items-center gap-2 shadow-sm transition-all disabled:opacity-50"
+              >
                 {isSubmitting ? (
                   <span className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin"></span>
-                ) : <Save size={18} />}
+                ) : (
+                  <Save size={18} />
+                )}
                 Simpan & Cetak Job
               </button>
             </div>
           </div>
-
         </form>
       </div>
 
@@ -408,10 +630,14 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-indigo-600 text-white rounded"><Calculator size={16} /></div>
+                <div className="p-1.5 bg-indigo-600 text-white rounded">
+                  <Calculator size={16} />
+                </div>
                 <div>
                   <h3 className="font-bold text-slate-800 text-sm">Asisten Daftar Harga</h3>
-                  <p className="text-[10px] text-slate-500 font-medium">Pilih produk untuk mengisi data item #{pricelistActiveIndex + 1}</p>
+                  <p className="text-[10px] text-slate-500 font-medium">
+                    Pilih produk untuk mengisi data item #{pricelistActiveIndex + 1}
+                  </p>
                 </div>
               </div>
               <button
@@ -462,10 +688,14 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {filteredProducts.length > 0 ? (
                     filteredProducts.map((prod, idx) => {
-                      const currentQty = parseInt(formData.items[pricelistActiveIndex]?.qty || '1') || 1;
-                      
+                      const currentQty =
+                        parseInt(formData.items[pricelistActiveIndex]?.qty || '1') || 1;
+
                       return (
-                        <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex flex-col justify-between hover:border-indigo-300 transition-all">
+                        <div
+                          key={idx}
+                          className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex flex-col justify-between hover:border-indigo-300 transition-all"
+                        >
                           <div>
                             <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
                               {priceCategories[prod.kategori] || prod.kategori}
@@ -479,7 +709,9 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
                           <div className="mt-4 border-t border-slate-100 pt-3">
                             {prod.price_type === 'flat' ? (
                               <div className="flex justify-between items-center">
-                                <span className="text-[13px] font-black text-slate-900">{formatRupiah(prod.harga)}</span>
+                                <span className="text-[13px] font-black text-slate-900">
+                                  {formatRupiah(prod.harga)}
+                                </span>
                                 <button
                                   type="button"
                                   onClick={() => handleSelectProduct(prod, prod.harga)}
@@ -490,13 +722,15 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
                               </div>
                             ) : (
                               <div className="space-y-2">
-                                <p className="text-[10px] text-slate-400 font-bold mb-1 uppercase">Harga Bertingkat (Qty saat ini: {currentQty}):</p>
+                                <p className="text-[10px] text-slate-400 font-bold mb-1 uppercase">
+                                  Harga Bertingkat (Qty saat ini: {currentQty}):
+                                </p>
                                 <div className="space-y-1.5">
                                   {Object.entries(prod.tiers || {}).map(([tierKey, tierVal]) => {
                                     const tierPrice = parseInt(tierVal) || 0;
-                                    
+
                                     // Pengecekan apakah tier ini cocok dengan qty saat ini
-                                    let isMatched = false;
+                                    let isMatched;
                                     const cleanKey = tierKey.toLowerCase();
                                     if (cleanKey.includes('-')) {
                                       const parts = cleanKey.split('-');
@@ -507,7 +741,8 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
                                       const min = parseInt(cleanKey.replace(/[^\d]/g, '')) || 0;
                                       isMatched = currentQty > min;
                                     } else if (cleanKey.includes('<')) {
-                                      const max = parseInt(cleanKey.replace(/[^\d]/g, '')) || 999999;
+                                      const max =
+                                        parseInt(cleanKey.replace(/[^\d]/g, '')) || 999999;
                                       isMatched = currentQty < max;
                                     } else {
                                       const val = parseInt(cleanKey.replace(/[^\d]/g, '')) || 1;
@@ -519,9 +754,15 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
                                         key={tierKey}
                                         className={`flex justify-between items-center p-1.5 rounded-lg border text-[10px] ${isMatched ? 'bg-emerald-50 border-emerald-300' : 'bg-slate-50 border-slate-100'}`}
                                       >
-                                        <span className={`font-semibold ${isMatched ? 'text-emerald-800' : 'text-slate-600'}`}>{tierKey}</span>
+                                        <span
+                                          className={`font-semibold ${isMatched ? 'text-emerald-800' : 'text-slate-600'}`}
+                                        >
+                                          {tierKey}
+                                        </span>
                                         <div className="flex items-center gap-2">
-                                          <span className="font-bold text-slate-800">{formatRupiah(tierPrice)}</span>
+                                          <span className="font-bold text-slate-800">
+                                            {formatRupiah(tierPrice)}
+                                          </span>
                                           <button
                                             type="button"
                                             onClick={() => handleSelectProduct(prod, tierPrice)}

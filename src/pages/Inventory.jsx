@@ -307,7 +307,7 @@ export default function Inventory() {
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-12 text-slate-400 italic">
-                    {showKritis ? 'Tidak ada stok kritis 🎉' : 'Belum ada data inventori.'}
+                    {showKritis ? 'Tidak ada stok kritis.' : 'Belum ada data inventori.'}
                   </td>
                 </tr>
               ) : (

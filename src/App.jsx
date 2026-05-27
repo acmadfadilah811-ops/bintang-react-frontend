@@ -1,10 +1,12 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { DynamicIslandProvider } from './context/DynamicIslandContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import AdminDashboard from './pages/AdminDashboard';
 import StaffDashboard from './pages/StaffDashboard';
 import Orders from './pages/Orders';
 import Jobs from './pages/Jobs';
@@ -17,6 +19,7 @@ import Attendance from './pages/Attendance';
 import BukuBesar from './pages/BukuBesar';
 import Announcements from './pages/Announcements';
 import Pricelist from './pages/Pricelist';
+import Reports from './pages/Reports';
 import { useAuth } from './context/AuthContext';
 
 // Halaman placeholder untuk route yang belum ada halamannya
@@ -29,8 +32,17 @@ const PageNotReady = ({ name }) => (
 
 function HomeRedirect() {
   const { user } = useAuth();
-  if (user?.role?.toLowerCase() === 'staff') return <Navigate to="/staff-dashboard" replace />;
+  const role = user?.role?.toLowerCase();
+  if (role === 'staff') return <Navigate to="/staff-dashboard" replace />;
   return <Navigate to="/dashboard" replace />;
+}
+
+// Komponen routing dashboard berdasarkan role
+function DashboardRouter() {
+  const { user } = useAuth();
+  const role = user?.role?.toLowerCase();
+  if (role === 'admin') return <AdminDashboard />;
+  return <Dashboard />;
 }
 
 function App() {
@@ -88,45 +100,47 @@ function App() {
 
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Halaman publik */}
-          <Route path="/login" element={<Login />} />
+      <DynamicIslandProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Halaman publik */}
+            <Route path="/login" element={<Login />} />
 
-          {/* Halaman yang butuh login */}
-          <Route element={<ProtectedRoute />}>
-            <Route element={<Layout />}>
-              {/* Redirect root ke dashboard sesuai role */}
-              <Route path="/" element={<HomeRedirect />} />
+            {/* Halaman yang butuh login */}
+            <Route element={<ProtectedRoute />}>
+              <Route element={<Layout />}>
+                {/* Redirect root ke dashboard sesuai role */}
+                <Route path="/" element={<HomeRedirect />} />
 
-              {/* Dashboard */}
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/staff-dashboard" element={<StaffDashboard />} />
+                {/* Dashboard */}
+                <Route path="/dashboard" element={<DashboardRouter />} />
+                <Route path="/staff-dashboard" element={<StaffDashboard />} />
 
-              {/* Operasional */}
-              <Route path="/orders" element={<Orders />} />
-              <Route path="/orders/create" element={<Orders />} />
-              <Route path="/jobs" element={<Jobs />} />
-              <Route path="/inventory" element={<Inventory />} />
-              <Route path="/attendance" element={<Attendance />} />
+                {/* Operasional */}
+                <Route path="/orders" element={<Orders />} />
+                <Route path="/orders/create" element={<Orders />} />
+                <Route path="/jobs" element={<Jobs />} />
+                <Route path="/inventory" element={<Inventory />} />
+                <Route path="/attendance" element={<Attendance />} />
 
-              {/* Tim */}
-              <Route path="/customers" element={<Customers />} />
-              <Route path="/users" element={<Employees />} />
-              <Route path="/employees" element={<Employees />} />
-              <Route path="/divisi" element={<PageNotReady name="Divisi & Jadwal" />} />
+                {/* Tim */}
+                <Route path="/customers" element={<Customers />} />
+                <Route path="/users" element={<Employees />} />
+                <Route path="/employees" element={<Employees />} />
+                <Route path="/divisi" element={<PageNotReady name="Divisi & Jadwal" />} />
 
-              {/* Laporan & Lainnya */}
-              <Route path="/buku-besar" element={<BukuBesar />} />
-              <Route path="/pricelist" element={<Pricelist />} />
-              <Route path="/announcements" element={<Announcements />} />
-              <Route path="/reports" element={<PageNotReady name="Laporan Omset" />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/settings" element={<Settings />} />
+                {/* Laporan & Lainnya */}
+                <Route path="/buku-besar" element={<BukuBesar />} />
+                <Route path="/pricelist" element={<Pricelist />} />
+                <Route path="/announcements" element={<Announcements />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/settings" element={<Settings />} />
+              </Route>
             </Route>
-          </Route>
-        </Routes>
-      </BrowserRouter>
+          </Routes>
+        </BrowserRouter>
+      </DynamicIslandProvider>
     </AuthProvider>
   );
 }

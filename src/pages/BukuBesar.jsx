@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
-import { BookOpen, Calendar, Filter, FileText, Download, Plus, Trash2, X } from 'lucide-react';
+import {
+  BookOpen,
+  Calendar,
+  Filter,
+  FileText,
+  Download,
+  Plus,
+  Trash2,
+  X,
+  Info,
+} from 'lucide-react';
 import dayjs from 'dayjs';
 import { useAuth } from '../context/AuthContext';
 
@@ -8,6 +18,7 @@ export default function BukuBesar() {
   const [akunList, setAkunList] = useState([]);
   const [bukuBesarData, setBukuBesarData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
   // State Filter
   const [filter, setFilter] = useState({
@@ -18,7 +29,7 @@ export default function BukuBesar() {
 
   // Auth & Permissions
   const { user } = useAuth();
-  const isManagerOrOwner = user?.role === 'owner' || user?.role === 'manager';
+  const isManagerOrOwner = ['owner', 'manager', 'admin'].includes(user?.role?.toLowerCase());
 
   // Saldo awal dari backend
   const [saldoAwal, setSaldoAwal] = useState(0);
@@ -36,7 +47,6 @@ export default function BukuBesar() {
 
   const fetchDaftarAkun = async () => {
     try {
-      // Endpoint ini asumsikan mengembalikan daftar Chart of Accounts
       const res = await apiClient.get('/finance/akun/');
       setAkunList(res.data);
       if (res.data.length > 0) {
@@ -56,16 +66,22 @@ export default function BukuBesar() {
 
     try {
       setLoading(true);
-      // Endpoint mengambil data buku besar berdasarkan akun dan tanggal
       const res = await apiClient.get('/finance/buku-besar/', { params: filter });
-      setBukuBesarData(res.data.transaksi); // Array transaksi
-      setSaldoAwal(res.data.saldo_awal); // Saldo sebelum tanggal mulai
+      setBukuBesarData(res.data.transaksi || []);
+      setSaldoAwal(res.data.saldo_awal || 0);
     } catch (err) {
       console.error('Gagal memuat buku besar:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  // Trigger fetch ketika akun_id di-set pertama kali oleh daftar akun
+  useEffect(() => {
+    if (filter.akun_id) {
+      fetchBukuBesar();
+    }
+  }, [filter.akun_id]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -96,7 +112,7 @@ export default function BukuBesar() {
       await apiClient.post('/finance/transaksi/', payload);
       setShowModal(false);
       setFormData((prev) => ({ ...prev, no_referensi: '', keterangan: '', nominal: '' }));
-      fetchBukuBesar(); // Refresh tabel
+      fetchBukuBesar();
     } catch (err) {
       console.error('Gagal menambah transaksi:', err);
       alert('Gagal menambah transaksi.');
@@ -116,6 +132,19 @@ export default function BukuBesar() {
     }
   };
 
+  // Identifikasi kategori akun terpilih & aturan normal balance
+  const selectedAkunObj = akunList.find((a) => String(a.id) === String(filter.akun_id));
+  const kategoriAkun = selectedAkunObj ? (selectedAkunObj.kategori || '').toLowerCase() : '';
+
+  // Kewajiban (Utang), Ekuitas (Modal), Pendapatan memiliki saldo normal KREDIT
+  const isCreditNormal =
+    kategoriAkun.includes('kewajiban') ||
+    kategoriAkun.includes('utang') ||
+    kategoriAkun.includes('ekuitas') ||
+    kategoriAkun.includes('modal') ||
+    kategoriAkun.includes('pendapatan') ||
+    kategoriAkun.includes('revenue');
+
   const exportToCSV = () => {
     if (bukuBesarData.length === 0) return alert('Tidak ada data untuk diexport!');
 
@@ -126,13 +155,19 @@ export default function BukuBesar() {
     csvContent += `,,Saldo Awal,,,${current}\n`;
 
     bukuBesarData.forEach((trx) => {
-      current = current + parseFloat(trx.debit) - parseFloat(trx.kredit);
+      const d = parseFloat(trx.debit) || 0;
+      const k = parseFloat(trx.kredit) || 0;
+      if (isCreditNormal) {
+        current = current + k - d;
+      } else {
+        current = current + d - k;
+      }
       const row = [
         dayjs(trx.tanggal).format('YYYY-MM-DD'),
         `"${trx.no_referensi || ''}"`,
         `"${trx.keterangan || ''}"`,
-        trx.debit,
-        trx.kredit,
+        d,
+        k,
         current,
       ];
       csvContent += row.join(',') + '\n';
@@ -142,168 +177,408 @@ export default function BukuBesar() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `Buku_Besar_${filter.start_date}_${filter.end_date}.csv`);
+    link.setAttribute(
+      'download',
+      `Buku_Besar_${selectedAkunObj?.nama_akun || 'Akun'}_${filter.start_date}_${filter.end_date}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   const formatRupiah = (angka) =>
-    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(angka || 0);
+    new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+    }).format(angka || 0);
 
-  // Menghitung saldo berjalan secara dinamis di frontend (bisa juga dari backend)
+  // Menghitung saldo berjalan secara dinamis di frontend
   let currentSaldo = saldoAwal;
 
+  // Menghitung total mutasi dan saldo akhir
+  const totalDebit = bukuBesarData.reduce((sum, trx) => sum + (parseFloat(trx.debit) || 0), 0);
+  const totalKredit = bukuBesarData.reduce((sum, trx) => sum + (parseFloat(trx.kredit) || 0), 0);
+
+  const saldoAkhir = isCreditNormal
+    ? saldoAwal + totalKredit - totalDebit
+    : saldoAwal + totalDebit - totalKredit;
+
+  // Warna kategori lencana (badge)
+  const getKategoriBadge = (kat) => {
+    const k = kat.toLowerCase();
+    if (k.includes('aset') || k.includes('harta')) {
+      return 'bg-blue-50 text-blue-700 border-blue-200';
+    } else if (k.includes('kewajiban') || k.includes('utang')) {
+      return 'bg-amber-50 text-amber-700 border-amber-200';
+    } else if (k.includes('ekuitas') || k.includes('modal')) {
+      return 'bg-purple-50 text-purple-700 border-purple-200';
+    } else if (k.includes('pendapatan') || k.includes('revenue')) {
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    } else if (k.includes('beban') || k.includes('biaya')) {
+      return 'bg-rose-50 text-rose-700 border-rose-200';
+    }
+    return 'bg-slate-50 text-slate-700 border-slate-200';
+  };
+
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-10">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="max-w-6xl mx-auto space-y-6 pb-12 w-full text-slate-800">
+      {/* Title Panel */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-250 pb-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+          <h1 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
             <BookOpen className="text-blue-600" /> Buku Besar
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Laporan mutasi transaksi per akun (General Ledger).
+          <p className="text-xs text-slate-500 mt-1">
+            Induk pencatatan mutasi transaksi keuangan berdasarkan klasifikasi rekening (General
+            Ledger).
           </p>
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <button
+            onClick={() => setShowGuide(!showGuide)}
+            className="flex-1 md:flex-none bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-250 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
+          >
+            <Info size={14} /> {showGuide ? 'Tutup Panduan' : 'Panduan Akun'}
+          </button>
           <button
             onClick={exportToCSV}
-            className="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+            disabled={bukuBesarData.length === 0}
+            className="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer disabled:opacity-50"
           >
-            <Download size={16} /> Export Excel
+            <Download size={14} /> Export CSV
           </button>
           {isManagerOrOwner && (
             <button
               onClick={() => {
-                if (!filter.akun_id) return alert('Pilih Akun di filter terlebih dahulu!');
+                if (!filter.akun_id) return alert('Pilih Akun terlebih dahulu!');
                 setShowModal(true);
               }}
-              className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+              className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
             >
-              <Plus size={16} /> Transaksi
+              <Plus size={14} /> Transaksi Baru
             </button>
           )}
         </div>
       </div>
 
+      {/* Panduan Kategori Akun */}
+      {showGuide && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4 animate-fade-in">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+            <Info className="text-blue-600" size={18} />
+            <h3 className="font-extrabold text-slate-800 text-sm">
+              Panduan 5 Kategori Akun Utama (Percetakan)
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {/* Aset */}
+            <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-4 space-y-2">
+              <h4 className="font-extrabold text-blue-800 text-xs uppercase tracking-wider">
+                Aset (Harta)
+              </h4>
+              <p className="text-[11px] leading-relaxed text-slate-600">
+                Segala sesuatu yang dimiliki perusahaan dan bernilai uang.
+              </p>
+              <div className="text-[10px] text-slate-600 space-y-1.5 pt-1 border-t border-blue-100/50">
+                <p>
+                  <span className="font-bold text-slate-700">Kas & Bank:</span> Uang tunai kasir &
+                  saldo rekening bank.
+                </p>
+                <p>
+                  <span className="font-bold text-slate-700">Piutang Usaha:</span> Tagihan
+                  tempo/invoice pelanggan cetak.
+                </p>
+                <p>
+                  <span className="font-bold text-slate-700">Persediaan:</span> Kertas berbagai
+                  ukuran, tinta, pelat, lem.
+                </p>
+                <p>
+                  <span className="font-bold text-slate-700">Aset Tetap:</span> Mesin cetak
+                  offset/digital, pemotong, komputer desain.
+                </p>
+              </div>
+            </div>
+
+            {/* Kewajiban */}
+            <div className="bg-amber-50/40 border border-amber-100 rounded-xl p-4 space-y-2">
+              <h4 className="font-extrabold text-amber-800 text-xs uppercase tracking-wider">
+                Kewajiban (Utang)
+              </h4>
+              <p className="text-[11px] leading-relaxed text-slate-600">
+                Kewajiban finansial perusahaan kepada pihak luar.
+              </p>
+              <div className="text-[10px] text-slate-600 space-y-1.5 pt-1 border-t border-amber-100/50">
+                <p>
+                  <span className="font-bold text-slate-700">Utang Usaha:</span> Tagihan belum
+                  dibayar ke supplier kertas/tinta.
+                </p>
+                <p>
+                  <span className="font-bold text-slate-700">Utang Bank:</span> Cicilan pembelian
+                  kredit mesin cetak.
+                </p>
+                <p>
+                  <span className="font-bold text-slate-700">Utang Pajak:</span> Pajak PPN atau PPh
+                  yang wajib disetor.
+                </p>
+              </div>
+            </div>
+
+            {/* Ekuitas */}
+            <div className="bg-purple-50/40 border border-purple-100 rounded-xl p-4 space-y-2">
+              <h4 className="font-extrabold text-purple-800 text-xs uppercase tracking-wider">
+                Ekuitas (Modal)
+              </h4>
+              <p className="text-[11px] leading-relaxed text-slate-600">
+                Hak kepemilikan atas aset setelah dikurangi kewajiban.
+              </p>
+              <div className="text-[10px] text-slate-600 space-y-1.5 pt-1 border-t border-purple-100/50">
+                <p>
+                  <span className="font-bold text-slate-700">Modal Pemilik:</span> Suntikan dana
+                  awal dari pemilik/investor.
+                </p>
+                <p>
+                  <span className="font-bold text-slate-700">Laba Ditahan:</span> Akumulasi
+                  keuntungan yang diputar kembali.
+                </p>
+              </div>
+            </div>
+
+            {/* Pendapatan */}
+            <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-4 space-y-2">
+              <h4 className="font-extrabold text-emerald-800 text-xs uppercase tracking-wider">
+                Pendapatan
+              </h4>
+              <p className="text-[11px] leading-relaxed text-slate-600">
+                Aliran uang masuk dari aktivitas bisnis percetakan.
+              </p>
+              <div className="text-[10px] text-slate-600 space-y-1.5 pt-1 border-t border-emerald-100/50">
+                <p>
+                  <span className="font-bold text-slate-700">Jasa Cetak:</span> Hasil cetak buku,
+                  kalender, brosur, dll.
+                </p>
+                <p>
+                  <span className="font-bold text-slate-700">Lain-lain:</span> Hasil penjualan
+                  limbah kertas afkir/potong.
+                </p>
+              </div>
+            </div>
+
+            {/* Beban */}
+            <div className="bg-rose-50/40 border border-rose-100 rounded-xl p-4 space-y-2">
+              <h4 className="font-extrabold text-rose-800 text-xs uppercase tracking-wider">
+                Beban (Biaya)
+              </h4>
+              <p className="text-[11px] leading-relaxed text-slate-600">
+                Pengeluaran untuk menjaga operasional berjalan.
+              </p>
+              <div className="text-[10px] text-slate-600 space-y-1.5 pt-1 border-t border-rose-100/50">
+                <p>
+                  <span className="font-bold text-slate-700">HPP:</span> Pembelian kertas & tinta
+                  terpakai produksi.
+                </p>
+                <p>
+                  <span className="font-bold text-slate-700">Operasional:</span> Gaji staff, listrik
+                  industri, pemeliharaan mesin.
+                </p>
+                <p>
+                  <span className="font-bold text-slate-700">Penyusutan:</span> Penurunan nilai
+                  mesin seiring usia pakai.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filter Section */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-end">
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-end">
         <div className="flex-1 space-y-1.5 w-full">
-          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            Pilih Akun
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            Akun Rekening
           </label>
           <select
             name="akun_id"
             value={filter.akun_id}
             onChange={handleFilterChange}
-            className="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="w-full border border-slate-200 rounded-xl p-3 text-xs outline-none bg-slate-50 font-bold focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer"
           >
             <option value="">-- Pilih Akun --</option>
             {akunList.map((akun) => (
               <option key={akun.id} value={akun.id}>
-                {akun.kode_akun} - {akun.nama_akun}
+                {akun.kode_akun} - {akun.nama_akun} ({akun.kategori})
               </option>
             ))}
           </select>
         </div>
 
         <div className="flex-1 space-y-1.5 w-full">
-          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
-            <Calendar size={14} /> Tanggal Mulai
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+            <Calendar size={12} /> Tanggal Mulai
           </label>
           <input
             type="date"
             name="start_date"
             value={filter.start_date}
             onChange={handleFilterChange}
-            className="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="w-full border border-slate-200 rounded-xl p-2.5 text-xs outline-none bg-slate-50 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-bold"
           />
         </div>
 
         <div className="flex-1 space-y-1.5 w-full">
-          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
-            <Calendar size={14} /> Tanggal Akhir
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+            <Calendar size={12} /> Tanggal Akhir
           </label>
           <input
             type="date"
             name="end_date"
             value={filter.end_date}
             onChange={handleFilterChange}
-            className="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="w-full border border-slate-200 rounded-xl p-2.5 text-xs outline-none bg-slate-50 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-bold"
           />
         </div>
 
         <button
           onClick={fetchBukuBesar}
           disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:bg-blue-400 w-full md:w-auto justify-center"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl text-xs font-bold flex items-center gap-2 transition-all disabled:opacity-50 w-full md:w-auto justify-center cursor-pointer shadow-sm"
         >
           {loading ? (
             <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
           ) : (
-            <Filter size={18} />
+            <Filter size={14} />
           )}
           Tampilkan
         </button>
       </div>
 
+      {/* Account Info Summary Widget */}
+      {selectedAkunObj && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-slate-50 border border-slate-200 rounded-2xl p-5">
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Akun Aktif
+            </p>
+            <h4 className="text-base font-extrabold text-slate-800 truncate">
+              {selectedAkunObj.nama_akun}
+            </h4>
+            <p className="text-xs font-mono text-slate-500">Kode: {selectedAkunObj.kode_akun}</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Klasifikasi & Saldo Normal
+            </p>
+            <div>
+              <span
+                className={`inline-block border text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full ${getKategoriBadge(selectedAkunObj.kategori)}`}
+              >
+                {selectedAkunObj.kategori}
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-500 font-semibold">
+              Kenaikan dicatat di sisi{' '}
+              <span className="font-extrabold text-slate-700">
+                {isCreditNormal ? 'Kredit (-)' : 'Debit (+)'}
+              </span>
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Awal periode
+            </p>
+            <h4 className="text-sm font-extrabold text-slate-800">{formatRupiah(saldoAwal)}</h4>
+            <p className="text-[10px] text-slate-400">
+              Sebelum {dayjs(filter.start_date).format('DD MMM YYYY')}
+            </p>
+          </div>
+
+          <div className="space-y-1 bg-white border border-slate-200 p-3.5 rounded-xl shadow-sm">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Saldo Akhir
+            </p>
+            <h4
+              className={`text-base font-black ${saldoAkhir >= 0 ? 'text-blue-700' : 'text-rose-600'}`}
+            >
+              {formatRupiah(saldoAkhir)}
+            </h4>
+            <p className="text-[9px] text-slate-500 font-medium">
+              Akumulasi per {dayjs(filter.end_date).format('DD MMM YYYY')}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Tabel Buku Besar */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Tanggal</th>
-                <th className="px-4 py-3 font-semibold">No. Referensi</th>
-                <th className="px-4 py-3 font-semibold">Keterangan</th>
-                <th className="px-4 py-3 font-semibold text-right">Debit</th>
-                <th className="px-4 py-3 font-semibold text-right">Kredit</th>
-                <th className="px-4 py-3 font-semibold text-right">Saldo</th>
-                {isManagerOrOwner && (
-                  <th className="px-4 py-3 font-semibold text-center w-10">Aksi</th>
-                )}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <th className="px-5 py-3.5 w-32">Tanggal</th>
+                <th className="px-3 py-3.5 w-32">Ref</th>
+                <th className="px-4 py-3.5">Keterangan</th>
+                <th className="px-4 py-3.5 text-right w-40">Debit</th>
+                <th className="px-4 py-3.5 text-right w-40">Kredit</th>
+                <th className="px-5 py-3.5 text-right w-44">Saldo Akhir</th>
+                {isManagerOrOwner && <th className="px-5 py-3.5 text-center w-20">Aksi</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-600">
               {/* Baris Saldo Awal */}
               <tr className="bg-slate-50/50">
-                <td colSpan="5" className="px-4 py-3 font-bold text-right italic">
-                  Saldo Awal:
+                <td className="px-5 py-3 text-slate-400 italic">
+                  {dayjs(filter.start_date).format('DD MMM YYYY')}
                 </td>
-                <td className="px-4 py-3 font-bold text-right text-blue-700">
+                <td className="px-3 py-3 font-mono text-slate-400">-</td>
+                <td className="px-4 py-3 text-slate-400 font-bold italic text-right">Saldo Awal</td>
+                <td className="px-4 py-3 text-right text-slate-300">-</td>
+                <td className="px-4 py-3 text-right text-slate-300">-</td>
+                <td className="px-5 py-3 text-right font-black text-blue-700 bg-blue-50/20">
                   {formatRupiah(saldoAwal)}
                 </td>
-                {isManagerOrOwner && <td></td>}
+                {isManagerOrOwner && <td className="px-5 py-3"></td>}
               </tr>
 
               {bukuBesarData.length > 0 ? (
                 bukuBesarData.map((trx, index) => {
-                  // Perhitungan Saldo Berjalan (Asumsi Akun Normal Debit. Jika normal Kredit, logicnya dibalik)
-                  currentSaldo = currentSaldo + parseFloat(trx.debit) - parseFloat(trx.kredit);
+                  const d = parseFloat(trx.debit) || 0;
+                  const k = parseFloat(trx.kredit) || 0;
+
+                  // Perhitungan Saldo Berjalan sesuai normal balance kategori akun
+                  if (isCreditNormal) {
+                    currentSaldo = currentSaldo + k - d;
+                  } else {
+                    currentSaldo = currentSaldo + d - k;
+                  }
 
                   return (
-                    <tr key={index} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3">{dayjs(trx.tanggal).format('DD MMM YYYY')}</td>
-                      <td className="px-4 py-3 font-mono text-xs">{trx.no_referensi}</td>
-                      <td className="px-4 py-3">{trx.keterangan}</td>
-                      <td className="px-4 py-3 text-right text-emerald-600">
-                        {trx.debit > 0 ? formatRupiah(trx.debit) : '-'}
+                    <tr key={index} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-5 py-3.5">{dayjs(trx.tanggal).format('DD MMM YYYY')}</td>
+                      <td className="px-3 py-3.5 font-mono text-[10px] text-slate-400 uppercase tracking-wider">
+                        {trx.no_referensi || '-'}
                       </td>
-                      <td className="px-4 py-3 text-right text-red-600">
-                        {trx.kredit > 0 ? formatRupiah(trx.kredit) : '-'}
+                      <td className="px-4 py-3.5 text-slate-800 font-medium">{trx.keterangan}</td>
+                      <td className="px-4 py-3.5 text-right text-emerald-600 font-bold">
+                        {d > 0 ? formatRupiah(d) : '-'}
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold">
+                      <td className="px-4 py-3.5 text-right text-rose-500 font-bold">
+                        {k > 0 ? formatRupiah(k) : '-'}
+                      </td>
+                      <td className="px-5 py-3.5 text-right font-extrabold text-slate-850">
                         {formatRupiah(currentSaldo)}
                       </td>
                       {isManagerOrOwner && (
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-5 py-3.5 text-center">
                           <button
                             onClick={() => hapusTransaksi(trx.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer inline-flex items-center justify-center border border-transparent hover:border-rose-100"
                             title="Hapus Transaksi"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={13} />
                           </button>
                         </td>
                       )}
@@ -312,9 +587,14 @@ export default function BukuBesar() {
                 })
               ) : (
                 <tr>
-                  <td colSpan="6" className="px-4 py-8 text-center text-slate-400">
-                    <FileText className="mx-auto mb-2 opacity-50" size={32} />
-                    <p>Pilih filter dan klik Tampilkan untuk melihat data.</p>
+                  <td
+                    colSpan={isManagerOrOwner ? 7 : 6}
+                    className="px-5 py-12 text-center text-slate-400"
+                  >
+                    <FileText className="mx-auto mb-2 opacity-30" size={32} />
+                    <p className="text-xs">
+                      Tidak ada mutasi transaksi pada rentang tanggal terpilih.
+                    </p>
                   </td>
                 </tr>
               )}
@@ -326,73 +606,83 @@ export default function BukuBesar() {
       {/* Modal Tambah Transaksi */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-slide-up">
-            <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50">
-              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100">
+            <div className="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50">
+              <h3 className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
                 <Plus className="text-blue-600" size={16} /> Input Transaksi Manual
               </h3>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-red-500 transition-colors"
+                className="text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={submitTransaksi} className="p-4 space-y-4">
+            <form onSubmit={submitTransaksi} className="p-5 space-y-4 text-xs font-semibold">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Tanggal</label>
+                  <label className="text-slate-500 font-bold uppercase tracking-wider">
+                    Tanggal
+                  </label>
                   <input
                     required
                     type="date"
                     name="tanggal"
                     value={formData.tanggal}
                     onChange={handleFormChange}
-                    className="w-full border border-slate-300 rounded p-2 text-sm focus:border-blue-500 outline-none"
+                    className="w-full border border-slate-200 rounded-xl p-2.5 text-xs outline-none bg-slate-50 focus:bg-white focus:border-blue-500 transition-all font-bold"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">No Referensi</label>
+                  <label className="text-slate-500 font-bold uppercase tracking-wider">
+                    No Referensi (Ref)
+                  </label>
                   <input
                     type="text"
                     name="no_referensi"
                     value={formData.no_referensi}
                     onChange={handleFormChange}
-                    placeholder="Opsional"
-                    className="w-full border border-slate-300 rounded p-2 text-sm focus:border-blue-500 outline-none"
+                    placeholder="Misal: JU-001"
+                    className="w-full border border-slate-200 rounded-xl p-2.5 text-xs outline-none bg-slate-50 focus:bg-white focus:border-blue-500 transition-all font-mono"
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Keterangan</label>
+                <label className="text-slate-500 font-bold uppercase tracking-wider">
+                  Keterangan Transaksi
+                </label>
                 <input
                   required
                   type="text"
                   name="keterangan"
                   value={formData.keterangan}
                   onChange={handleFormChange}
-                  placeholder="Misal: Pembayaran ATK"
-                  className="w-full border border-slate-300 rounded p-2 text-sm focus:border-blue-500 outline-none"
+                  placeholder="Misal: Pembelian 10 Rim Kertas Art Carton"
+                  className="w-full border border-slate-200 rounded-xl p-2.5 text-xs outline-none bg-slate-50 focus:bg-white focus:border-blue-500 transition-all"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Jenis Transaksi</label>
+                  <label className="text-slate-500 font-bold uppercase tracking-wider">
+                    Jenis Transaksi
+                  </label>
                   <select
                     name="jenis"
                     value={formData.jenis}
                     onChange={handleFormChange}
-                    className="w-full border border-slate-300 rounded p-2 text-sm focus:border-blue-500 outline-none"
+                    className="w-full border border-slate-200 rounded-xl p-2.5 text-xs outline-none bg-slate-50 focus:bg-white focus:border-blue-500 transition-all cursor-pointer font-bold"
                   >
                     <option value="debit">Debit (+)</option>
                     <option value="kredit">Kredit (-)</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Nominal (Rp)</label>
+                  <label className="text-slate-500 font-bold uppercase tracking-wider">
+                    Nominal Transaksi (Rp)
+                  </label>
                   <input
                     required
                     type="number"
@@ -401,23 +691,23 @@ export default function BukuBesar() {
                     value={formData.nominal}
                     onChange={handleFormChange}
                     placeholder="0"
-                    className="w-full border border-slate-300 rounded p-2 text-sm focus:border-blue-500 outline-none font-mono"
+                    className="w-full border border-slate-200 rounded-xl p-2.5 text-xs outline-none bg-slate-50 focus:bg-white focus:border-blue-500 transition-all font-mono font-bold"
                   />
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-end gap-2 border-t border-slate-100 mt-4">
+              <div className="pt-3.5 flex justify-end gap-2 border-t border-slate-100 mt-5">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-slate-600 text-xs font-bold bg-slate-100 hover:bg-slate-200 rounded"
+                  className="px-4 py-2 text-slate-500 text-xs font-bold bg-slate-100 hover:bg-slate-250 rounded-xl transition-all cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={formLoading}
-                  className="px-4 py-2 text-white text-xs font-bold bg-blue-600 hover:bg-blue-700 rounded flex items-center gap-2"
+                  className="px-4 py-2 text-white text-xs font-bold bg-blue-600 hover:bg-blue-700 rounded-xl transition-all cursor-pointer shadow-sm disabled:opacity-50"
                 >
                   {formLoading ? 'Menyimpan...' : 'Simpan Transaksi'}
                 </button>

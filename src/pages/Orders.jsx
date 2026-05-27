@@ -2,13 +2,27 @@ import apiClient from '../api/apiClient';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
-  Download, Plus, FileText, FileClock, FileCheck,
-  CheckSquare, XCircle, Search, Calendar, Edit2, X, UserCheck, Trash2, Printer, Truck, DollarSign
+  Download,
+  Plus,
+  FileText,
+  FileClock,
+  FileCheck,
+  CheckSquare,
+  XCircle,
+  Search,
+  Calendar,
+  Edit2,
+  X,
+  UserCheck,
+  Trash2,
+  Printer,
+  Truck,
+  DollarSign,
 } from 'lucide-react';
 import OrderInputForm from '../components/orders/OrderInputForm';
 
 export default function Orders() {
-  const { user } = useAuth();
+  const { user, businessSettings } = useAuth();
   const [orders, setOrders] = useState([]);
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +48,7 @@ export default function Orders() {
       const res = await apiClient.get('/orders/');
       setOrders(res.data);
     } catch (err) {
-      console.error("Gagal menarik data:", err);
+      console.error('Gagal menarik data:', err);
     } finally {
       setLoading(false);
     }
@@ -43,16 +57,19 @@ export default function Orders() {
   useEffect(() => {
     fetchOrders();
     // Fetch daftar staff untuk dropdown assign
-    apiClient.get('/users/').then(res => {
-      setStaffList(res.data.filter(u => u.role === 'staff'));
-    }).catch(() => {});
+    apiClient
+      .get('/users/')
+      .then((res) => {
+        setStaffList(res.data.filter((u) => u.role === 'staff'));
+      })
+      .catch(() => {});
   }, []);
 
   // Tutup dropdown jika user klik di luar area tabel
   useEffect(() => {
     const handleClickOutside = () => setActiveDropdownId(null);
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
   const getStatusType = (statusText = '') => {
@@ -64,15 +81,23 @@ export default function Orders() {
   };
 
   const stats = useMemo(() => {
-    const counts = { pending: 0, progress: 0, ready: 0, completed: 0, cancelled: 0, piutang: 0, total_piutang_amount: 0 };
-    orders.forEach(order => {
+    const counts = {
+      pending: 0,
+      progress: 0,
+      ready: 0,
+      completed: 0,
+      cancelled: 0,
+      piutang: 0,
+      total_piutang_amount: 0,
+    };
+    orders.forEach((order) => {
       const type = getStatusType(order.status_global);
       if (type === 'pending') counts.pending++;
       if (type === 'printing') counts.progress++;
       if (type === 'ready') counts.ready++;
       if (type === 'completed') counts.completed++;
       if (type === 'cancelled') counts.cancelled++;
-      
+
       if (order.sisa_tagihan > 0 && order.status_global !== 'batal') {
         counts.piutang++;
         counts.total_piutang_amount += order.sisa_tagihan;
@@ -82,14 +107,17 @@ export default function Orders() {
   }, [orders]);
 
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
+    return orders.filter((order) => {
       const searchData = `${order.id} ${(order.nama || '').toLowerCase()} ${(order.nomor_wa || '').toLowerCase()}`;
       const matchesSearch = searchData.includes(searchQuery.toLowerCase());
-      
+
       const type = getStatusType(order.status_global);
-      const matchesTab = activeTab === 'all' 
-        || (activeTab === 'piutang' ? (order.sisa_tagihan > 0 && order.status_global !== 'batal') : type === activeTab);
-      
+      const matchesTab =
+        activeTab === 'all' ||
+        (activeTab === 'piutang'
+          ? order.sisa_tagihan > 0 && order.status_global !== 'batal'
+          : type === activeTab);
+
       return matchesSearch && matchesTab;
     });
   }, [orders, searchQuery, activeTab]);
@@ -97,19 +125,39 @@ export default function Orders() {
   const renderBadge = (statusText = '') => {
     const type = getStatusType(statusText);
     if (type === 'cancelled') {
-      return <span className="px-1.5 py-0.5 rounded-[4px] text-[8.5px] font-bold bg-red-100 text-red-700 uppercase tracking-wider flex items-center gap-1 w-max mx-auto"><X className="w-2.5 h-2.5" /> Cancelled</span>;
+      return (
+        <span className="px-1.5 py-0.5 rounded-[4px] text-[8.5px] font-bold bg-red-100 text-red-700 uppercase tracking-wider flex items-center gap-1 w-max mx-auto">
+          <X className="w-2.5 h-2.5" /> Cancelled
+        </span>
+      );
     }
     if (type === 'pending') {
-      return <span className="px-1.5 py-0.5 rounded-[4px] text-[8.5px] font-bold bg-slate-100 text-slate-600 uppercase tracking-wider">Pending</span>;
+      return (
+        <span className="px-1.5 py-0.5 rounded-[4px] text-[8.5px] font-bold bg-slate-100 text-slate-600 uppercase tracking-wider">
+          Pending
+        </span>
+      );
     }
     if (type === 'printing') {
-      return <span className="px-1.5 py-0.5 rounded-[4px] text-[8.5px] font-bold bg-orange-100 text-orange-700 uppercase tracking-wider">Printing</span>;
+      return (
+        <span className="px-1.5 py-0.5 rounded-[4px] text-[8.5px] font-bold bg-orange-100 text-orange-700 uppercase tracking-wider">
+          Printing
+        </span>
+      );
     }
     if (type === 'ready') {
-      return <span className="px-1.5 py-0.5 rounded-[4px] text-[8.5px] font-bold bg-emerald-100 text-emerald-700 uppercase tracking-wider">Ready</span>;
+      return (
+        <span className="px-1.5 py-0.5 rounded-[4px] text-[8.5px] font-bold bg-emerald-100 text-emerald-700 uppercase tracking-wider">
+          Ready
+        </span>
+      );
     }
     if (type === 'completed') {
-      return <span className="px-1.5 py-0.5 rounded-[4px] text-[8.5px] font-bold bg-blue-100 text-blue-700 uppercase tracking-wider">Completed</span>;
+      return (
+        <span className="px-1.5 py-0.5 rounded-[4px] text-[8.5px] font-bold bg-blue-100 text-blue-700 uppercase tracking-wider">
+          Completed
+        </span>
+      );
     }
     return null;
   };
@@ -128,18 +176,18 @@ export default function Orders() {
     const staffId = form.assign_staff?.value;
     const jumlahBayar = parseInt(form.jumlah_bayar?.value || '0');
     const metodePembayaran = form.metode_pembayaran?.value || 'tunai';
-    
+
     try {
       // 1. Update status global
       await apiClient.patch(`/orders/${editModalData.id}/`, {
-        status_global: newStatus
+        status_global: newStatus,
       });
 
       // 2. Tambah Pembayaran jika diisi
       if (jumlahBayar > 0) {
         await apiClient.post(`/orders/${editModalData.id}/bayar/`, {
           jumlah_bayar: jumlahBayar,
-          metode_pembayaran: metodePembayaran
+          metode_pembayaran: metodePembayaran,
         });
       }
 
@@ -147,7 +195,7 @@ export default function Orders() {
       let updatedOrderData = null;
       if (staffId && staffId !== '') {
         await apiClient.post(`/orders/${editModalData.id}/assign/`, {
-          staff_id: parseInt(staffId)
+          staff_id: parseInt(staffId),
         });
       }
 
@@ -170,7 +218,7 @@ export default function Orders() {
 
   const handleDeleteOrder = async (order) => {
     const konfirmasi = window.confirm(
-      `⚠️ HAPUS PERMANEN order ${order.id}?\n\nNama: ${order.nama}\n\nSemua item dan job terkait juga akan terhapus. Tindakan ini tidak dapat dibatalkan!`
+      `Apakah Anda yakin ingin menghapus permanen order ${order.id}?\n\nNama: ${order.nama}\n\nSemua item dan job terkait akan ikut terhapus. Tindakan ini tidak dapat dibatalkan.`
     );
     if (!konfirmasi) return;
     try {
@@ -208,11 +256,17 @@ export default function Orders() {
         </div>
         <div className="flex items-center gap-2">
           {isManager && (
-            <button onClick={handleExport} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-sm">
+            <button
+              onClick={handleExport}
+              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-sm"
+            >
               <Download className="w-3.5 h-3.5" /> Export Excel
             </button>
           )}
-          <button onClick={() => setIsManualModalOpen(true)} className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer">
+          <button
+            onClick={() => setIsManualModalOpen(true)}
+            className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+          >
             <Plus className="w-3.5 h-3.5" /> New Order
           </button>
         </div>
@@ -220,45 +274,73 @@ export default function Orders() {
 
       {/* Stats Cards */}
       <div className="grid gap-3 grid-cols-2 md:grid-cols-6">
-        <StatCard title="Pending" icon={FileText} count={stats.pending} iconColor="text-slate-400" />
-        <StatCard title="In Progress" icon={FileClock} count={stats.progress} iconColor="text-orange-500" />
+        <StatCard
+          title="Pending"
+          icon={FileText}
+          count={stats.pending}
+          iconColor="text-slate-400"
+        />
+        <StatCard
+          title="In Progress"
+          icon={FileClock}
+          count={stats.progress}
+          iconColor="text-orange-500"
+        />
         <StatCard title="Ready" icon={FileCheck} count={stats.ready} iconColor="text-emerald-500" />
-        <StatCard title="Completed" icon={CheckSquare} count={stats.completed} iconColor="text-blue-600" />
-        <StatCard title="Cancelled" icon={XCircle} count={stats.cancelled} iconColor="text-red-500" />
-        <StatCard 
-          title="Belum Lunas" 
-          icon={DollarSign} 
-          count={stats.piutang} 
-          iconColor="text-red-600" 
-          subtitle={formatRupiah(stats.total_piutang_amount)} 
+        <StatCard
+          title="Completed"
+          icon={CheckSquare}
+          count={stats.completed}
+          iconColor="text-blue-600"
+        />
+        <StatCard
+          title="Cancelled"
+          icon={XCircle}
+          count={stats.cancelled}
+          iconColor="text-red-500"
+        />
+        <StatCard
+          title="Belum Lunas"
+          icon={DollarSign}
+          count={stats.piutang}
+          iconColor="text-red-600"
+          subtitle={formatRupiah(stats.total_piutang_amount)}
         />
       </div>
 
       {/* Filters & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-1">
         <div className="flex gap-1 bg-slate-100/50 p-1 rounded-md border border-slate-200 overflow-x-auto">
-          {['all', 'pending', 'printing', 'ready', 'completed', 'cancelled', 'piutang'].map((tab) => (
-            <button 
-              key={tab} 
-              onClick={() => setActiveTab(tab)}
-              className={`px-3 py-1 rounded text-[10px] font-bold transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === tab 
-                  ? 'bg-white shadow-sm border border-slate-200 text-slate-900' 
-                  : tab === 'cancelled' || tab === 'piutang' ? 'text-red-500 hover:text-red-700' : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              {tab === 'all' ? 'All Jobs' : tab === 'piutang' ? 'Piutang' : tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </button>
-          ))}
+          {['all', 'pending', 'printing', 'ready', 'completed', 'cancelled', 'piutang'].map(
+            (tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-3 py-1 rounded text-[10px] font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === tab
+                    ? 'bg-white shadow-sm border border-slate-200 text-slate-900'
+                    : tab === 'cancelled' || tab === 'piutang'
+                      ? 'text-red-500 hover:text-red-700'
+                      : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                {tab === 'all'
+                  ? 'All Jobs'
+                  : tab === 'piutang'
+                    ? 'Piutang'
+                    : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            )
+          )}
         </div>
         <div className="relative w-full sm:w-56 shrink-0">
           <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-slate-400" />
-          <input 
-            type="text" 
+          <input
+            type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search orders..." 
-            className="w-full pl-8 pr-3 py-1 text-[11px] border border-slate-200 rounded-md focus:ring-1 focus:ring-slate-900 outline-none bg-slate-50/50" 
+            placeholder="Search orders..."
+            className="w-full pl-8 pr-3 py-1 text-[11px] border border-slate-200 rounded-md focus:ring-1 focus:ring-slate-900 outline-none bg-slate-50/50"
           />
         </div>
       </div>
@@ -266,9 +348,14 @@ export default function Orders() {
       {/* Table Section */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mt-1">
         <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <h3 className="text-[12px] font-bold text-slate-800">Job List <span className="text-[10px] text-slate-500 font-normal ml-1">({filteredOrders.length} items)</span></h3>
+          <h3 className="text-[12px] font-bold text-slate-800">
+            Job List{' '}
+            <span className="text-[10px] text-slate-500 font-normal ml-1">
+              ({filteredOrders.length} items)
+            </span>
+          </h3>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[300px]">
           <table className="w-full text-left text-[10px] border-collapse min-w-[800px]">
             <thead className="bg-white text-slate-500 border-b border-slate-200 font-bold">
               <tr>
@@ -286,39 +373,59 @@ export default function Orders() {
                 <SkeletonRow />
               ) : filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-3 py-6 text-center text-slate-400 text-[10px] italic">No jobs found matching your criteria.</td>
+                  <td
+                    colSpan="7"
+                    className="px-3 py-6 text-center text-slate-400 text-[10px] italic"
+                  >
+                    No jobs found matching your criteria.
+                  </td>
                 </tr>
               ) : (
-                filteredOrders.map(order => {
+                filteredOrders.map((order) => {
                   const type = getStatusType(order.status_global);
                   const isCancelled = type === 'cancelled';
-                  
+
                   return (
-                    <tr key={order.id} className={`hover:bg-slate-50/50 transition-colors ${isCancelled ? 'opacity-60 bg-red-50/20 hover:bg-red-50/40' : ''}`}>
-                      <td className={`px-3 py-2 font-bold ${isCancelled ? 'line-through text-slate-500' : 'text-slate-900'}`}>{order.id}</td>
+                    <tr
+                      key={order.id}
+                      className={`hover:bg-slate-50/50 transition-colors ${isCancelled ? 'opacity-60 bg-red-50/20 hover:bg-red-50/40' : ''}`}
+                    >
+                      <td
+                        className={`px-3 py-2 font-bold ${isCancelled ? 'line-through text-slate-500' : 'text-slate-900'}`}
+                      >
+                        {order.id}
+                      </td>
                       <td className="px-3 py-2">
-                        <p className={`font-bold ${isCancelled ? 'text-slate-600' : 'text-slate-900'}`}>{order.nama}</p>
+                        <p
+                          className={`font-bold ${isCancelled ? 'text-slate-600' : 'text-slate-900'}`}
+                        >
+                          {order.nama}
+                        </p>
                         <p className="text-[9px] text-slate-500">{order.nomor_wa}</p>
                       </td>
                       <td className="px-3 py-2 text-slate-600 truncate max-w-[12rem]">
                         <div className="font-medium text-indigo-700">
-                          {order.items?.map(i => i.jenis_produk).join(', ') || '-'}
+                          {order.items?.map((i) => i.jenis_produk).join(', ') || '-'}
                         </div>
-                        <div className="text-[10px] text-slate-400 mt-0.5 truncate" title={order.catatan_pelanggan}>
+                        <div
+                          className="text-[10px] text-slate-400 mt-0.5 truncate"
+                          title={order.catatan_pelanggan}
+                        >
                           {order.catatan_pelanggan || '-'}
                         </div>
                       </td>
                       <td className="px-3 py-2 text-slate-700">
                         {(() => {
                           const staffs = [];
-                          order.items?.forEach(item => {
-                            item.jobs?.forEach(job => {
+                          order.items?.forEach((item) => {
+                            item.jobs?.forEach((job) => {
                               if (job.pic_nama && !staffs.includes(job.pic_nama)) {
                                 staffs.push(job.pic_nama);
                               }
                             });
                           });
-                          if (staffs.length === 0) return <span className="text-slate-400 italic">Belum diset</span>;
+                          if (staffs.length === 0)
+                            return <span className="text-slate-400 italic">Belum diset</span>;
                           return <span className="font-bold">{staffs.join(', ')}</span>;
                         })()}
                       </td>
@@ -326,18 +433,23 @@ export default function Orders() {
                         <div className="font-bold text-slate-900">
                           {formatRupiah(order.total_harga)}
                         </div>
-                        <div className={`text-[9px] font-semibold ${order.sisa_tagihan <= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                          {order.sisa_tagihan <= 0 ? 'LUNAS' : `Sisa: ${formatRupiah(order.sisa_tagihan)}`}
+                        <div
+                          className={`text-[9px] font-semibold ${order.sisa_tagihan <= 0 ? 'text-emerald-500' : 'text-red-500'}`}
+                        >
+                          {order.sisa_tagihan <= 0
+                            ? 'LUNAS'
+                            : `Sisa: ${formatRupiah(order.sisa_tagihan)}`}
                         </div>
                       </td>
                       <td className="px-3 py-2 text-center">{renderBadge(order.status_global)}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center justify-center gap-1.5 relative">
-                          
                           {/* DROPDOWN TERPADU CETAK */}
                           <div className="relative" onClick={(e) => e.stopPropagation()}>
                             <button
-                              onClick={() => setActiveDropdownId(activeDropdownId === order.id ? null : order.id)}
+                              onClick={() =>
+                                setActiveDropdownId(activeDropdownId === order.id ? null : order.id)
+                              }
                               className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-[4px] text-[10px] font-bold flex items-center gap-1 transition-colors shadow-sm cursor-pointer"
                             >
                               <Printer className="w-3 h-3" /> Cetak
@@ -345,16 +457,40 @@ export default function Orders() {
 
                             {activeDropdownId === order.id && (
                               <div className="absolute right-0 mt-1 w-44 bg-white border border-slate-200 shadow-xl rounded-lg z-50 py-1 overflow-hidden animate-fade-in text-left">
-                                <button onClick={() => { setPrintOrder(order); setActiveDropdownId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-[11px] font-medium text-slate-700 flex items-center gap-2 border-b border-slate-100 cursor-pointer">
+                                <button
+                                  onClick={() => {
+                                    setPrintOrder(order);
+                                    setActiveDropdownId(null);
+                                  }}
+                                  className="w-full text-left px-4 py-2 hover:bg-slate-50 text-[11px] font-medium text-slate-700 flex items-center gap-2 border-b border-slate-100 cursor-pointer"
+                                >
                                   <Printer size={13} className="text-slate-400" /> Resi Thermal
                                 </button>
-                                <button onClick={() => { setPrintInvoiceOrder(order); setActiveDropdownId(null); }} className="w-full text-left px-4 py-2 hover:bg-blue-50 text-[11px] font-medium text-blue-700 flex items-center gap-2 border-b border-slate-100 cursor-pointer">
+                                <button
+                                  onClick={() => {
+                                    setPrintInvoiceOrder(order);
+                                    setActiveDropdownId(null);
+                                  }}
+                                  className="w-full text-left px-4 py-2 hover:bg-blue-50 text-[11px] font-medium text-blue-700 flex items-center gap-2 border-b border-slate-100 cursor-pointer"
+                                >
                                   <FileText size={13} className="text-blue-500" /> Invoice Resmi
                                 </button>
-                                <button onClick={() => { setPrintSuratJalanOrder(order); setActiveDropdownId(null); }} className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-[11px] font-medium text-emerald-700 flex items-center gap-2 border-b border-slate-100 cursor-pointer">
+                                <button
+                                  onClick={() => {
+                                    setPrintSuratJalanOrder(order);
+                                    setActiveDropdownId(null);
+                                  }}
+                                  className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-[11px] font-medium text-emerald-700 flex items-center gap-2 border-b border-slate-100 cursor-pointer"
+                                >
                                   <Truck size={13} className="text-emerald-500" /> Surat Jalan
                                 </button>
-                                <button onClick={() => { setPrintSpkOrder(order); setActiveDropdownId(null); }} className="w-full text-left px-4 py-2 hover:bg-orange-50 text-[11px] font-medium text-orange-700 flex items-center gap-2 cursor-pointer">
+                                <button
+                                  onClick={() => {
+                                    setPrintSpkOrder(order);
+                                    setActiveDropdownId(null);
+                                  }}
+                                  className="w-full text-left px-4 py-2 hover:bg-orange-50 text-[11px] font-medium text-orange-700 flex items-center gap-2 cursor-pointer"
+                                >
                                   <FileCheck size={13} className="text-orange-500" /> SPK Produksi
                                 </button>
                               </div>
@@ -364,17 +500,23 @@ export default function Orders() {
                           <div className="w-px h-4 bg-slate-200 mx-0.5"></div>
 
                           {/* ACTION ASLI (Edit, Cancel, Delete) */}
-                          <button onClick={() => setEditModalData(order)} title="Edit Status" className="p-1 bg-white border border-slate-200 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 rounded-[4px] transition-colors shadow-sm cursor-pointer">
+                          <button
+                            onClick={() => setEditModalData(order)}
+                            title="Edit Status"
+                            className="p-1 bg-white border border-slate-200 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 rounded-[4px] transition-colors shadow-sm cursor-pointer"
+                          >
                             <Edit2 className="w-3 h-3" />
                           </button>
                           {type !== 'cancelled' && type !== 'completed' && (
-                            <button 
-                              onClick={async () => { 
-                                if(window.confirm(`Batalkan pesanan ${order.id}?`)) {
-                                  await apiClient.patch(`/orders/${order.id}/`, { status_global: 'batal' });
+                            <button
+                              onClick={async () => {
+                                if (window.confirm(`Batalkan pesanan ${order.id}?`)) {
+                                  await apiClient.patch(`/orders/${order.id}/`, {
+                                    status_global: 'batal',
+                                  });
                                   fetchOrders();
                                 }
-                              }} 
+                              }}
                               title="Batalkan Order"
                               className="p-1 bg-white border border-slate-200 text-slate-400 hover:bg-red-50 hover:text-red-600 hover:border-red-200 rounded-[4px] transition-colors shadow-sm cursor-pointer"
                             >
@@ -402,9 +544,9 @@ export default function Orders() {
       </div>
 
       {/* COMPONENT FORM INPUT FULLSCREEN */}
-      <OrderInputForm 
-        isOpen={isManualModalOpen} 
-        onClose={() => setIsManualModalOpen(false)} 
+      <OrderInputForm
+        isOpen={isManualModalOpen}
+        onClose={() => setIsManualModalOpen(false)}
         onSuccess={() => {
           setIsManualModalOpen(false);
           fetchOrders(); // Refresh table
@@ -419,20 +561,32 @@ export default function Orders() {
               <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div>
                   <h3 className="text-[14px] font-bold text-slate-900">Update Job Status</h3>
-                  <p className="text-[11px] text-slate-500 font-mono">{editModalData.id} - {editModalData.nama}</p>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    {editModalData.id} - {editModalData.nama}
+                  </p>
                 </div>
-                <button type="button" onClick={() => setEditModalData(null)} className="text-slate-400 hover:text-slate-600">
+                <button
+                  type="button"
+                  onClick={() => setEditModalData(null)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
                   <X className="w-4 h-4" />
                 </button>
               </div>
               <div className="p-5 space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-[12px] font-bold text-slate-800">Job Status</label>
-                  <select name="status" defaultValue={editModalData.status_global} className="w-full text-[12px] border border-slate-200 bg-white rounded-md px-3 py-2 focus:ring-1 focus:ring-slate-900 outline-none">
+                  <select
+                    name="status"
+                    defaultValue={editModalData.status_global}
+                    className="w-full text-[12px] border border-slate-200 bg-white rounded-md px-3 py-2 focus:ring-1 focus:ring-slate-900 outline-none"
+                  >
                     <option value="review">Pending / Review</option>
                     <option value="proses">In Progress / Proses Cetak</option>
                     <option value="selesai">Completed / Selesai</option>
-                    <option value="batal" className="text-red-500 font-bold">Cancelled / Batal</option>
+                    <option value="batal" className="text-red-500 font-bold">
+                      Cancelled / Batal
+                    </option>
                   </select>
                 </div>
 
@@ -447,9 +601,10 @@ export default function Orders() {
                       className="w-full text-[12px] border border-slate-200 bg-white rounded-md px-3 py-2 focus:ring-1 focus:ring-slate-900 outline-none"
                     >
                       <option value="">-- Pilih Staff --</option>
-                      {staffList.map(staff => (
+                      {staffList.map((staff) => (
                         <option key={staff.id} value={staff.id}>
-                          {staff.username}{staff.divisi_nama ? ` (${staff.divisi_nama})` : ''}
+                          {staff.username}
+                          {staff.divisi_nama ? ` (${staff.divisi_nama})` : ''}
                         </option>
                       ))}
                     </select>
@@ -462,15 +617,19 @@ export default function Orders() {
                 {editModalData.sisa_tagihan > 0 && (
                   <div className="border-t border-slate-100 pt-4 space-y-3">
                     <div className="flex justify-between items-center">
-                      <label className="text-[12px] font-bold text-slate-800">Pembayaran & Pelunasan</label>
+                      <label className="text-[12px] font-bold text-slate-800">
+                        Pembayaran & Pelunasan
+                      </label>
                       <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded border border-red-200">
                         Piutang: {formatRupiah(editModalData.sisa_tagihan)}
                       </span>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-500">Bayar Cicilan / Pelunasan (Rp)</label>
+                        <label className="text-[10px] font-bold text-slate-500">
+                          Bayar Cicilan / Pelunasan (Rp)
+                        </label>
                         <div className="relative">
                           <input
                             type="number"
@@ -493,7 +652,9 @@ export default function Orders() {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-500">Metode Pembayaran</label>
+                        <label className="text-[10px] font-bold text-slate-500">
+                          Metode Pembayaran
+                        </label>
                         <select
                           name="metode_pembayaran"
                           defaultValue={editModalData.metode_pembayaran || 'tunai'}
@@ -509,8 +670,19 @@ export default function Orders() {
                 )}
               </div>
               <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
-                <button type="button" onClick={() => setEditModalData(null)} className="px-4 py-1.5 border border-slate-200 rounded-md text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
-                <button type="submit" className="px-4 py-1.5 bg-black text-white rounded-md text-[11px] font-bold hover:bg-slate-800 shadow-sm transition-colors">Save Changes</button>
+                <button
+                  type="button"
+                  onClick={() => setEditModalData(null)}
+                  className="px-4 py-1.5 border border-slate-200 rounded-md text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-black text-white rounded-md text-[11px] font-bold hover:bg-slate-800 shadow-sm transition-colors"
+                >
+                  Save Changes
+                </button>
               </div>
             </form>
           </div>
@@ -525,18 +697,23 @@ export default function Orders() {
               <h3 className="font-bold text-slate-800 text-[13px] flex items-center gap-2">
                 <Printer size={14} /> Cetak Resi
               </h3>
-              <button onClick={() => setPrintOrder(null)} className="text-slate-400 hover:text-slate-600">
+              <button
+                onClick={() => setPrintOrder(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
                 <X size={16} />
               </button>
             </div>
-            
+
             <div className="p-6 receipt-print-area text-slate-900 text-sm font-mono max-h-[70vh] overflow-y-auto bg-white">
               <div className="text-center border-b border-dashed border-slate-300 pb-4 mb-4">
-                <h2 className="font-extrabold text-[16px] uppercase tracking-widest text-slate-900">BINTANG ADVERTISING</h2>
-                <p className="text-[11px] text-slate-500 mt-1">Jl. Produksi No. 123, Kota</p>
-                <p className="text-[11px] text-slate-500">Telp: 0812-3456-7890</p>
+                <h2 className="font-extrabold text-[16px] uppercase tracking-widest text-slate-900">
+                  {businessSettings?.nama_bisnis || 'Brandy'}
+                </h2>
+                <p className="text-[11px] text-slate-500 mt-1">{businessSettings?.alamat || 'Jl. Produksi No. 123, Kota'}</p>
+                <p className="text-[11px] text-slate-500">Telp: {businessSettings?.no_telepon || '0812-3456-7890'}</p>
               </div>
-              
+
               <div className="space-y-1 mb-4 text-[11px]">
                 <div className="flex justify-between">
                   <span className="text-slate-500">No. Order:</span>
@@ -555,21 +732,25 @@ export default function Orders() {
                   <span>{printOrder.nomor_wa}</span>
                 </div>
               </div>
-              
+
               <div className="border-t border-b border-dashed border-slate-300 py-3 mb-4 space-y-3">
                 {printOrder.items?.map((item, idx) => (
                   <div key={idx} className="flex flex-col text-[11px]">
                     <div className="flex justify-between font-bold">
-                      <span>{item.qty}x {item.jenis_produk}</span>
+                      <span>
+                        {item.qty}x {item.jenis_produk}
+                      </span>
                       <span>{formatRupiah(item.harga_jual || 0)}</span>
                     </div>
                     {item.keterangan_detail && (
-                      <span className="text-[10px] text-slate-500 mt-0.5 max-w-[80%] break-words">{item.keterangan_detail}</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5 max-w-[80%] break-words">
+                        {item.keterangan_detail}
+                      </span>
                     )}
                   </div>
                 ))}
               </div>
-              
+
               <div className="space-y-1 text-[11px] font-bold">
                 <div className="flex justify-between">
                   <span>TOTAL:</span>
@@ -581,19 +762,31 @@ export default function Orders() {
                 </div>
                 <div className="flex justify-between pt-1 border-t border-dashed border-slate-300 text-indigo-700">
                   <span>SISA TAGIHAN:</span>
-                  <span>{printOrder.sisa_tagihan <= 0 ? 'LUNAS' : formatRupiah(printOrder.sisa_tagihan || 0)}</span>
+                  <span>
+                    {printOrder.sisa_tagihan <= 0
+                      ? 'LUNAS'
+                      : formatRupiah(printOrder.sisa_tagihan || 0)}
+                  </span>
                 </div>
               </div>
-              
+
               <div className="text-center mt-6 text-[10px] text-slate-500 italic">
                 <p>Terima kasih telah mempercayakan</p>
                 <p>kebutuhan advertising Anda pada kami.</p>
               </div>
             </div>
-            
+
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 no-print">
-              <button onClick={() => setPrintOrder(null)} className="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-md hover:bg-slate-100 cursor-pointer">Tutup</button>
-              <button onClick={() => window.print()} className="px-4 py-2 bg-indigo-600 text-white font-bold text-xs rounded-md hover:bg-indigo-700 flex items-center gap-2 shadow-sm cursor-pointer">
+              <button
+                onClick={() => setPrintOrder(null)}
+                className="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-md hover:bg-slate-100 cursor-pointer"
+              >
+                Tutup
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="px-4 py-2 bg-indigo-600 text-white font-bold text-xs rounded-md hover:bg-indigo-700 flex items-center gap-2 shadow-sm cursor-pointer"
+              >
                 <Printer size={14} /> Cetak Sekarang
               </button>
             </div>
@@ -609,7 +802,10 @@ export default function Orders() {
               <h3 className="font-bold text-slate-800 text-[13px] flex items-center gap-2">
                 <FileText size={14} /> Preview Invoice A4
               </h3>
-              <button onClick={() => setPrintInvoiceOrder(null)} className="text-slate-400 hover:text-slate-600">
+              <button
+                onClick={() => setPrintInvoiceOrder(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
                 <X size={16} />
               </button>
             </div>
@@ -617,32 +813,40 @@ export default function Orders() {
             <div className="p-8 print-area bg-white text-slate-800 text-[12px]">
               <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-6">
                 <div>
-                  <h1 className="text-2xl font-black tracking-widest uppercase text-slate-900">INVOICE</h1>
+                  <h1 className="text-2xl font-black tracking-widest uppercase text-slate-900">
+                    INVOICE
+                  </h1>
                   <p className="text-slate-500 font-mono mt-1">#{printInvoiceOrder.id}</p>
                 </div>
                 <div className="text-right">
-                  <h2 className="font-bold text-[14px]">BINTANG ADVERTISING</h2>
-                  <p className="text-slate-500 mt-0.5">Jl. Produksi No. 123, Kota</p>
-                  <p className="text-slate-500">WA: 0812-3456-7890</p>
+                  <h2 className="font-bold text-[14px]">{businessSettings?.nama_bisnis || 'Brandy'}</h2>
+                  <p className="text-slate-500 mt-0.5">{businessSettings?.alamat || 'Jl. Produksi No. 123, Kota'}</p>
+                  <p className="text-slate-500">WA: {businessSettings?.no_telepon || '0812-3456-7890'}</p>
                 </div>
               </div>
 
               <div className="flex justify-between mb-8">
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">DITAGIHKAN KEPADA:</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    DITAGIHKAN KEPADA:
+                  </p>
                   <p className="font-bold text-[14px]">{printInvoiceOrder.nama}</p>
                   <p className="text-slate-600">{printInvoiceOrder.nomor_wa}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">TANGGAL INVOICE:</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    TANGGAL INVOICE:
+                  </p>
                   <p className="font-bold">
                     {new Date(printInvoiceOrder.waktu).toLocaleDateString('id-ID', {
                       year: 'numeric',
                       month: 'long',
-                      day: 'numeric'
+                      day: 'numeric',
                     })}
                   </p>
-                  <p className="text-slate-500 text-[11px] mt-1 capitalize">Pembayaran: {printInvoiceOrder.metode_pembayaran || 'Tunai'}</p>
+                  <p className="text-slate-500 text-[11px] mt-1 capitalize">
+                    Pembayaran: {printInvoiceOrder.metode_pembayaran || 'Tunai'}
+                  </p>
                 </div>
               </div>
 
@@ -662,13 +866,19 @@ export default function Orders() {
                       <td className="py-3 px-2 text-center text-slate-500">{idx + 1}</td>
                       <td className="py-3 px-2">
                         <p className="font-bold text-slate-800">{item.jenis_produk}</p>
-                        <p className="text-[10px] text-slate-500 font-semibold">Bahan: {item.bahan || '-'}</p>
+                        <p className="text-[10px] text-slate-500 font-semibold">
+                          Bahan: {item.bahan || '-'}
+                        </p>
                         {item.keterangan_detail && (
-                          <p className="text-[10px] text-slate-400 italic mt-0.5">{item.keterangan_detail}</p>
+                          <p className="text-[10px] text-slate-400 italic mt-0.5">
+                            {item.keterangan_detail}
+                          </p>
                         )}
                       </td>
                       <td className="py-3 px-2 text-center">
-                        {item.panjang || 0} x {item.lebar || 0} m
+                        {parseFloat(item.panjang) > 0 && parseFloat(item.lebar) > 0
+                          ? `${item.panjang} x ${item.lebar} m`
+                          : '-'}
                       </td>
                       <td className="py-3 px-2 text-center font-bold">{item.qty}</td>
                       <td className="py-3 px-2 text-right font-bold">
@@ -692,8 +902,12 @@ export default function Orders() {
                   <div className="flex justify-between text-slate-600">
                     <span>Diskon ({printInvoiceOrder.diskon_persen || 0}%)</span>
                     <span>
-                      - {formatRupiah(
-                        (printInvoiceOrder.items?.reduce((s, i) => s + (i.harga_jual || 0), 0) || 0) * (printInvoiceOrder.diskon_persen || 0) / 100
+                      -{' '}
+                      {formatRupiah(
+                        ((printInvoiceOrder.items?.reduce((s, i) => s + (i.harga_jual || 0), 0) ||
+                          0) *
+                          (printInvoiceOrder.diskon_persen || 0)) /
+                          100
                       )}
                     </span>
                   </div>
@@ -707,8 +921,14 @@ export default function Orders() {
                   </div>
                   <div className="flex justify-between font-bold text-[14px] bg-slate-100 p-2 rounded border border-slate-200 mt-2">
                     <span>SISA TAGIHAN</span>
-                    <span className={printInvoiceOrder.sisa_tagihan <= 0 ? 'text-emerald-600' : 'text-red-600'}>
-                      {printInvoiceOrder.sisa_tagihan <= 0 ? 'LUNAS' : formatRupiah(printInvoiceOrder.sisa_tagihan)}
+                    <span
+                      className={
+                        printInvoiceOrder.sisa_tagihan <= 0 ? 'text-emerald-600' : 'text-red-600'
+                      }
+                    >
+                      {printInvoiceOrder.sisa_tagihan <= 0
+                        ? 'LUNAS'
+                        : formatRupiah(printInvoiceOrder.sisa_tagihan)}
                     </span>
                   </div>
                 </div>
@@ -717,7 +937,7 @@ export default function Orders() {
               <div className="flex justify-between items-end mt-10">
                 <div className="text-[10px] text-slate-500 space-y-1">
                   <p className="font-bold text-slate-700">Metode Pembayaran:</p>
-                  <p>Transfer BCA: 1234567890 a/n Bintang Adv</p>
+                  <p>{businessSettings?.deskripsi || `Transfer BCA: 1234567890 a/n ${businessSettings?.nama_bisnis || 'Brandy'}`}</p>
                 </div>
                 <div className="text-center w-40">
                   <p className="mb-12">Hormat Kami,</p>
@@ -727,8 +947,16 @@ export default function Orders() {
             </div>
 
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 no-print">
-              <button onClick={() => setPrintInvoiceOrder(null)} className="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-md hover:bg-slate-100 cursor-pointer">Tutup</button>
-              <button onClick={() => window.print()} className="px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-md hover:bg-blue-700 flex items-center gap-2 cursor-pointer">
+              <button
+                onClick={() => setPrintInvoiceOrder(null)}
+                className="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-md hover:bg-slate-100 cursor-pointer"
+              >
+                Tutup
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-md hover:bg-blue-700 flex items-center gap-2 cursor-pointer"
+              >
                 <Printer size={14} /> Cetak (Ctrl+P)
               </button>
             </div>
@@ -744,25 +972,36 @@ export default function Orders() {
               <h3 className="font-bold text-slate-800 text-[13px] flex items-center gap-2">
                 <Truck size={14} /> Preview Surat Jalan
               </h3>
-              <button onClick={() => setPrintSuratJalanOrder(null)} className="text-slate-400 hover:text-slate-600">
+              <button
+                onClick={() => setPrintSuratJalanOrder(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
                 <X size={16} />
               </button>
             </div>
 
             <div className="p-8 print-area bg-white text-slate-800 text-[12px]">
               <div className="text-center border-b-2 border-slate-800 pb-4 mb-6">
-                <h1 className="text-xl font-black tracking-widest uppercase text-slate-900">SURAT JALAN</h1>
-                <p className="text-slate-500 font-mono mt-1">Ref Order: #{printSuratJalanOrder.id}</p>
+                <h1 className="text-xl font-black tracking-widest uppercase text-slate-900">
+                  SURAT JALAN
+                </h1>
+                <p className="text-slate-500 font-mono mt-1">
+                  Ref Order: #{printSuratJalanOrder.id}
+                </p>
               </div>
 
               <div className="flex justify-between mb-8">
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">PENERIMA:</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    PENERIMA:
+                  </p>
                   <p className="font-bold text-[14px]">{printSuratJalanOrder.nama}</p>
                   <p className="text-slate-600">{printSuratJalanOrder.nomor_wa}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">TANGGAL KIRIM:</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    TANGGAL KIRIM:
+                  </p>
                   <p className="font-bold border-b border-slate-300 pb-1 w-32 ml-auto">&nbsp;</p>
                 </div>
               </div>
@@ -770,9 +1009,15 @@ export default function Orders() {
               <table className="w-full text-left border-collapse mb-16 border border-slate-300">
                 <thead>
                   <tr className="bg-slate-100 border-b border-slate-300">
-                    <th className="py-2 px-3 font-bold text-slate-700 w-10 text-center border-r border-slate-300">NO</th>
-                    <th className="py-2 px-3 font-bold text-slate-700 border-r border-slate-300">NAMA BARANG / DESKRIPSI</th>
-                    <th className="py-2 px-3 font-bold text-slate-700 text-center border-r border-slate-300">UKURAN</th>
+                    <th className="py-2 px-3 font-bold text-slate-700 w-10 text-center border-r border-slate-300">
+                      NO
+                    </th>
+                    <th className="py-2 px-3 font-bold text-slate-700 border-r border-slate-300">
+                      NAMA BARANG / DESKRIPSI
+                    </th>
+                    <th className="py-2 px-3 font-bold text-slate-700 text-center border-r border-slate-300">
+                      UKURAN
+                    </th>
                     <th className="py-2 px-3 font-bold text-slate-700 text-center">QTY</th>
                   </tr>
                 </thead>
@@ -782,10 +1027,14 @@ export default function Orders() {
                       <td className="py-3 px-3 text-center border-r border-slate-300">{idx + 1}</td>
                       <td className="py-3 px-3 border-r border-slate-300">
                         <p className="font-bold text-slate-800">{item.jenis_produk}</p>
-                        <p className="text-[10px] text-slate-500 font-semibold">Bahan: {item.bahan || '-'}</p>
+                        <p className="text-[10px] text-slate-500 font-semibold">
+                          Bahan: {item.bahan || '-'}
+                        </p>
                       </td>
                       <td className="py-3 px-3 text-center border-r border-slate-300">
-                        {item.panjang || 0} x {item.lebar || 0} m
+                        {parseFloat(item.panjang) > 0 && parseFloat(item.lebar) > 0
+                          ? `${item.panjang} x ${item.lebar} m`
+                          : '-'}
                       </td>
                       <td className="py-3 px-3 text-center font-bold text-[14px]">{item.qty}</td>
                     </tr>
@@ -796,7 +1045,9 @@ export default function Orders() {
               <div className="flex justify-between items-start mt-10">
                 <div className="text-center w-40">
                   <p className="mb-16">Penerima,</p>
-                  <p className="font-bold border-t border-slate-400 pt-1">( {printSuratJalanOrder.nama} )</p>
+                  <p className="font-bold border-t border-slate-400 pt-1">
+                    ( {printSuratJalanOrder.nama} )
+                  </p>
                 </div>
                 <div className="text-center w-40">
                   <p className="mb-16">Pengirim,</p>
@@ -804,14 +1055,22 @@ export default function Orders() {
                 </div>
                 <div className="text-center w-40">
                   <p className="mb-16">Mengetahui,</p>
-                  <p className="font-bold border-t border-slate-400 pt-1">Bintang Adv</p>
+                  <p className="font-bold border-t border-slate-400 pt-1">{businessSettings?.nama_bisnis || 'Brandy'}</p>
                 </div>
               </div>
             </div>
 
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 no-print">
-              <button onClick={() => setPrintSuratJalanOrder(null)} className="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-md hover:bg-slate-100 cursor-pointer">Tutup</button>
-              <button onClick={() => window.print()} className="px-4 py-2 bg-emerald-600 text-white font-bold text-xs rounded-md hover:bg-emerald-700 flex items-center gap-2 cursor-pointer">
+              <button
+                onClick={() => setPrintSuratJalanOrder(null)}
+                className="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-md hover:bg-slate-100 cursor-pointer"
+              >
+                Tutup
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="px-4 py-2 bg-emerald-600 text-white font-bold text-xs rounded-md hover:bg-emerald-700 flex items-center gap-2 cursor-pointer"
+              >
                 <Printer size={14} /> Cetak Surat Jalan
               </button>
             </div>
@@ -827,7 +1086,10 @@ export default function Orders() {
               <h3 className="font-bold text-slate-800 text-[13px] flex items-center gap-2">
                 <FileCheck size={14} className="text-orange-500" /> Preview SPK Produksi
               </h3>
-              <button onClick={() => setPrintSpkOrder(null)} className="text-slate-400 hover:text-slate-600">
+              <button
+                onClick={() => setPrintSpkOrder(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
                 <X size={16} />
               </button>
             </div>
@@ -835,25 +1097,31 @@ export default function Orders() {
             {/* Area SPK yang diprint (TANPA HARGA JUAL) */}
             <div className="p-8 print-area bg-white text-slate-800 text-[12px]">
               <div className="text-center border-b-2 border-slate-800 pb-4 mb-6">
-                <h1 className="text-xl font-black tracking-widest uppercase text-slate-900">SURAT PERINTAH KERJA (SPK)</h1>
+                <h1 className="text-xl font-black tracking-widest uppercase text-slate-900">
+                  SURAT PERINTAH KERJA (SPK)
+                </h1>
                 <p className="text-slate-500 font-mono mt-1">No. Order: #{printSpkOrder.id}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">NAMA PELANGGAN:</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                    NAMA PELANGGAN:
+                  </p>
                   <p className="font-bold text-[13px]">{printSpkOrder.nama}</p>
                   <p className="text-slate-500">{printSpkOrder.nomor_wa}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">TANGGAL ORDER / MASUK:</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                    TANGGAL ORDER / MASUK:
+                  </p>
                   <p className="font-bold">
                     {new Date(printSpkOrder.waktu).toLocaleDateString('id-ID', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric',
                       hour: '2-digit',
-                      minute: '2-digit'
+                      minute: '2-digit',
                     })}
                   </p>
                 </div>
@@ -861,18 +1129,30 @@ export default function Orders() {
 
               {printSpkOrder.catatan_pelanggan && (
                 <div className="bg-slate-50 border border-slate-200 rounded p-3 mb-6">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Catatan Global / Instruksi Khusus CS:</p>
-                  <p className="text-slate-700 whitespace-pre-wrap">{printSpkOrder.catatan_pelanggan}</p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                    Catatan Global / Instruksi Khusus CS:
+                  </p>
+                  <p className="text-slate-700 whitespace-pre-wrap">
+                    {printSpkOrder.catatan_pelanggan}
+                  </p>
                 </div>
               )}
 
               <table className="w-full text-left border-collapse mb-10 border border-slate-300">
                 <thead>
                   <tr className="bg-slate-100 border-b border-slate-300">
-                    <th className="py-2 px-3 font-bold text-slate-700 w-10 text-center border-r border-slate-300">NO</th>
-                    <th className="py-2 px-3 font-bold text-slate-700 border-r border-slate-300">BARANG / SPEK TEKNIS</th>
-                    <th className="py-2 px-3 font-bold text-slate-700 text-center border-r border-slate-300">UKURAN (PxL)</th>
-                    <th className="py-2 px-3 font-bold text-slate-700 text-center border-r border-slate-300">QTY</th>
+                    <th className="py-2 px-3 font-bold text-slate-700 w-10 text-center border-r border-slate-300">
+                      NO
+                    </th>
+                    <th className="py-2 px-3 font-bold text-slate-700 border-r border-slate-300">
+                      BARANG / SPEK TEKNIS
+                    </th>
+                    <th className="py-2 px-3 font-bold text-slate-700 text-center border-r border-slate-300">
+                      UKURAN (PxL)
+                    </th>
+                    <th className="py-2 px-3 font-bold text-slate-700 text-center border-r border-slate-300">
+                      QTY
+                    </th>
                     <th className="py-2 px-3 font-bold text-slate-700">KETERANGAN / FINISHING</th>
                   </tr>
                 </thead>
@@ -882,14 +1162,22 @@ export default function Orders() {
                       <td className="py-3 px-3 text-center border-r border-slate-300">{idx + 1}</td>
                       <td className="py-3 px-3 border-r border-slate-300">
                         <p className="font-bold text-slate-800">{item.jenis_produk}</p>
-                        <p className="text-[10px] text-slate-500 font-semibold">Bahan: {item.bahan || '-'}</p>
+                        <p className="text-[10px] text-slate-500 font-semibold">
+                          Bahan: {item.bahan || '-'}
+                        </p>
                       </td>
                       <td className="py-3 px-3 text-center border-r border-slate-300">
-                        {item.panjang || 0} x {item.lebar || 0} m
+                        {parseFloat(item.panjang) > 0 && parseFloat(item.lebar) > 0
+                          ? `${item.panjang} x ${item.lebar} m`
+                          : '-'}
                       </td>
-                      <td className="py-3 px-3 text-center font-bold text-[14px] border-r border-slate-300">{item.qty}</td>
+                      <td className="py-3 px-3 text-center font-bold text-[14px] border-r border-slate-300">
+                        {item.qty}
+                      </td>
                       <td className="py-3 px-3">
-                        <p className="text-[11px] text-slate-700 whitespace-pre-wrap">{item.keterangan_detail || '-'}</p>
+                        <p className="text-[11px] text-slate-700 whitespace-pre-wrap">
+                          {item.keterangan_detail || '-'}
+                        </p>
                       </td>
                     </tr>
                   ))}
@@ -898,25 +1186,35 @@ export default function Orders() {
 
               {/* Lembar Checklist Alur Produksi */}
               <div className="border border-slate-300 rounded p-4 mb-8">
-                <p className="text-[11px] font-bold text-slate-600 mb-3 uppercase tracking-wider">Lembar Checklist Alur Produksi:</p>
+                <p className="text-[11px] font-bold text-slate-600 mb-3 uppercase tracking-wider">
+                  Lembar Checklist Alur Produksi:
+                </p>
                 <div className="grid grid-cols-4 gap-4 text-center">
                   <div className="border border-slate-200 rounded p-2">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-4">1. Desain / Layout</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-4">
+                      1. Desain / Layout
+                    </p>
                     <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
                     <p className="text-[9px] text-slate-500">Nama & Paraf</p>
                   </div>
                   <div className="border border-slate-200 rounded p-2">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-4">2. Proses Cetak</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-4">
+                      2. Proses Cetak
+                    </p>
                     <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
                     <p className="text-[9px] text-slate-500">Nama & Paraf</p>
                   </div>
                   <div className="border border-slate-200 rounded p-2">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-4">3. Finishing</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-4">
+                      3. Finishing
+                    </p>
                     <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
                     <p className="text-[9px] text-slate-500">Nama & Paraf</p>
                   </div>
                   <div className="border border-slate-200 rounded p-2">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-4">4. Quality Control</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-4">
+                      4. Quality Control
+                    </p>
                     <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
                     <p className="text-[9px] text-slate-500">Nama & Paraf</p>
                   </div>
@@ -924,13 +1222,24 @@ export default function Orders() {
               </div>
 
               <div className="text-[10px] text-slate-400 italic text-center mt-6">
-                <p>Dokumen Internal Produksi Bintang Advertising. Harap kembalikan ke meja CS setelah selesai.</p>
+                <p>
+                  Dokumen Internal Produksi {businessSettings?.nama_bisnis || 'Brandy'}. Harap kembalikan ke meja CS setelah
+                  selesai.
+                </p>
               </div>
             </div>
 
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 no-print">
-              <button onClick={() => setPrintSpkOrder(null)} className="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-md hover:bg-slate-100 cursor-pointer">Tutup</button>
-              <button onClick={() => window.print()} className="px-4 py-2 bg-orange-600 text-white font-bold text-xs rounded-md hover:bg-orange-700 flex items-center gap-2 cursor-pointer">
+              <button
+                onClick={() => setPrintSpkOrder(null)}
+                className="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-md hover:bg-slate-100 cursor-pointer"
+              >
+                Tutup
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="px-4 py-2 bg-orange-600 text-white font-bold text-xs rounded-md hover:bg-orange-700 flex items-center gap-2 cursor-pointer"
+              >
                 <Printer size={14} /> Cetak SPK Produksi
               </button>
             </div>
@@ -951,7 +1260,9 @@ function StatCard({ title, icon: Icon, count, iconColor, subtitle }) {
       </div>
       <div>
         <h3 className="text-xl font-extrabold text-slate-900">{count}</h3>
-        {subtitle && <p className="text-[9px] text-red-500 font-bold truncate mt-0.5">{subtitle}</p>}
+        {subtitle && (
+          <p className="text-[9px] text-red-500 font-bold truncate mt-0.5">{subtitle}</p>
+        )}
       </div>
     </div>
   );
@@ -961,16 +1272,28 @@ function StatCard({ title, icon: Icon, count, iconColor, subtitle }) {
 function SkeletonRow() {
   return (
     <tr className="animate-pulse">
-      <td className="px-3 py-3"><div className="h-3 bg-slate-200 rounded w-16"></div></td>
+      <td className="px-3 py-3">
+        <div className="h-3 bg-slate-200 rounded w-16"></div>
+      </td>
       <td className="px-3 py-3">
         <div className="h-3 bg-slate-200 rounded w-20 mb-1"></div>
         <div className="h-2 bg-slate-200 rounded w-16"></div>
       </td>
-      <td className="px-3 py-3"><div className="h-3 bg-slate-200 rounded w-full"></div></td>
-      <td className="px-3 py-3"><div className="h-3 bg-slate-200 rounded w-16"></div></td>
-      <td className="px-3 py-3"><div className="h-3 bg-slate-200 rounded w-16 ms-auto"></div></td>
-      <td className="px-3 py-3"><div className="h-3 bg-slate-200 rounded w-16"></div></td>
-      <td className="px-3 py-3"><div className="h-5 bg-slate-200 rounded w-8 mx-auto"></div></td>
+      <td className="px-3 py-3">
+        <div className="h-3 bg-slate-200 rounded w-full"></div>
+      </td>
+      <td className="px-3 py-3">
+        <div className="h-3 bg-slate-200 rounded w-16"></div>
+      </td>
+      <td className="px-3 py-3">
+        <div className="h-3 bg-slate-200 rounded w-16 ms-auto"></div>
+      </td>
+      <td className="px-3 py-3">
+        <div className="h-3 bg-slate-200 rounded w-16"></div>
+      </td>
+      <td className="px-3 py-3">
+        <div className="h-5 bg-slate-200 rounded w-8 mx-auto"></div>
+      </td>
     </tr>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
+import { useAuth } from '../context/AuthContext';
 import {
   ShoppingCart,
   TrendingUp,
@@ -15,14 +16,75 @@ import {
   CheckCircle2,
   Circle,
   Activity,
+  CalendarClock,
 } from 'lucide-react';
 import AttendanceSessionManager from '../components/dashboard/AttendanceSessionManager';
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const isOwner = user?.role?.toLowerCase() === 'owner';
+
   const [data, setData] = useState(null);
   const [onlineStaff, setOnlineStaff] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [personalAttendance, setPersonalAttendance] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Update jam real-time setiap detik
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const fetchPersonalAttendance = async () => {
+    if (isOwner) return;
+    try {
+      const res = await apiClient.get('/hr/dashboard/staff/');
+      setPersonalAttendance(res.data);
+    } catch (err) {
+      console.error('Gagal mengambil status absensi personal:', err);
+    }
+  };
+
+  const playNotificationSound = (filename) => {
+    try {
+      const audioBaseUrl = import.meta.env.VITE_AUDIO_BASE_URL || '/audio';
+      const audio = new Audio(`${audioBaseUrl}/${filename}`);
+      audio.play().catch((e) => console.log('Autoplay blocked:', e));
+    } catch (error) {
+      console.log('Gagal memutar audio', error);
+    }
+  };
+
+  const handleClockIn = async () => {
+    try {
+      setActionLoading(true);
+      await apiClient.post('/hr/absensi/clock-in/', { catatan: '' });
+      playNotificationSound('checkin.mp3');
+      await fetchPersonalAttendance();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Gagal melakukan Clock-In');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleClockOut = async () => {
+    if (!window.confirm('Apakah Anda yakin ingin mengakhiri jam kerja hari ini?')) return;
+    try {
+      setActionLoading(true);
+      await apiClient.post('/hr/absensi/clock-out/', { catatan: '' });
+      playNotificationSound('selesai.mp3');
+      await fetchPersonalAttendance();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Gagal melakukan Clock-Out');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   useEffect(() => {
     Promise.all([
@@ -40,7 +102,11 @@ export default function Dashboard() {
       })
       .catch((err) => console.error('Error fetching dashboard:', err))
       .finally(() => setLoading(false));
-  }, []);
+
+    if (!isOwner) {
+      fetchPersonalAttendance();
+    }
+  }, [isOwner]);
 
   const formatRupiah = (angka) =>
     new Intl.NumberFormat('id-ID', {
@@ -206,10 +272,99 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
         {/* KIRI: Analytics (8 kolom) */}
         <div className="xl:col-span-8 flex flex-col gap-4">
-          {/* Attendance Session Manager (Dipindah ke atas) */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <AttendanceSessionManager />
-          </div>
+          {/* Sesi Absensi & Absensi Personal untuk Bawahan Owner */}
+          {!isOwner ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Widget Absensi Personal */}
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 flex flex-col justify-between min-h-[220px]">
+                <div>
+                  <div className="flex justify-between items-start border-b border-slate-100 pb-3 mb-3">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                        <CalendarClock size={12} className="text-indigo-500" /> Kehadiran Saya
+                      </p>
+                      <h3
+                        className={`text-lg font-black mt-1 uppercase ${
+                          !personalAttendance?.absensi_hari_ini ||
+                          personalAttendance?.absensi_hari_ini?.status === 'belum_absen'
+                            ? 'text-amber-600'
+                            : personalAttendance?.absensi_hari_ini?.jam_keluar
+                              ? 'text-slate-500'
+                              : 'text-emerald-600'
+                        }`}
+                      >
+                        {!personalAttendance?.absensi_hari_ini ||
+                        personalAttendance?.absensi_hari_ini?.status === 'belum_absen'
+                          ? 'Belum Masuk'
+                          : personalAttendance?.absensi_hari_ini?.status}
+                      </h3>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xl font-black text-slate-800 tracking-tight tabular-nums leading-none">
+                        {currentTime.toLocaleTimeString('id-ID', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-550 leading-relaxed mb-4">
+                    {personalAttendance?.absensi_hari_ini?.jam_masuk
+                      ? `Anda masuk kerja pada pukul ${new Date(personalAttendance.absensi_hari_ini.jam_masuk).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}.`
+                      : 'Pastikan Anda melakukan Clock In sebelum memulai pekerjaan hari ini.'}
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleClockIn}
+                    disabled={
+                      (personalAttendance?.absensi_hari_ini &&
+                        personalAttendance?.absensi_hari_ini?.status !== 'belum_absen') ||
+                      actionLoading
+                    }
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer
+                      ${
+                        personalAttendance?.absensi_hari_ini &&
+                        personalAttendance?.absensi_hari_ini?.status !== 'belum_absen'
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                          : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                      }`}
+                  >
+                    Clock In
+                  </button>
+                  <button
+                    onClick={handleClockOut}
+                    disabled={
+                      !personalAttendance?.absensi_hari_ini ||
+                      personalAttendance?.absensi_hari_ini?.status === 'belum_absen' ||
+                      personalAttendance?.absensi_hari_ini?.jam_keluar ||
+                      actionLoading
+                    }
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer
+                      ${
+                        !personalAttendance?.absensi_hari_ini ||
+                        personalAttendance?.absensi_hari_ini?.status === 'belum_absen' ||
+                        personalAttendance?.absensi_hari_ini?.jam_keluar
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                          : 'bg-rose-500 hover:bg-rose-600 text-white'
+                      }`}
+                  >
+                    Clock Out
+                  </button>
+                </div>
+              </div>
+
+              {/* Sesi Absensi Manager */}
+              <AttendanceSessionManager />
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+              <AttendanceSessionManager />
+            </div>
+          )}
 
           {/* Donut Chart + Pipeline (Dipindah ke bawah) */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">

@@ -1,6 +1,26 @@
-import { Search, Users, Circle, X, Globe, Maximize2, Minimize2, ExternalLink } from 'lucide-react';
+import {
+  Search,
+  Users,
+  Circle,
+  X,
+  Globe,
+  Square,
+  Minimize,
+  ExternalLink,
+  Play,
+  Pause,
+  SkipForward,
+  SkipBack,
+  Music,
+  BellRing,
+  Sparkles,
+  UserCheck,
+  AlertCircle,
+  Volume2,
+} from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useDynamicIsland } from '../context/DynamicIslandContext';
 import { useState, useEffect, useRef } from 'react';
 import apiClient from '../api/apiClient';
 
@@ -21,7 +41,7 @@ const PAGE_TITLES = {
 
 export default function Topbar() {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, businessSettings } = useAuth();
   const [currentDate, setCurrentDate] = useState('');
   const [liveTime, setLiveTime] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -32,7 +52,69 @@ export default function Topbar() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const dropdownRef = useRef(null);
 
-  const getPageTitle = () => PAGE_TITLES[location.pathname] || 'Bintang Advertising';
+  // States & Context untuk Dynamic Island
+  const {
+    activeNotification,
+    dismissNotification,
+    musicPlaying,
+    setMusicPlaying,
+    currentTrackIndex,
+    setCurrentTrackIndex,
+    currentTrack,
+    showMusicPlayer,
+    setShowMusicPlayer,
+    tracks,
+  } = useDynamicIsland();
+
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [musicTab, setMusicTab] = useState('lofi'); // 'lofi' | 'youtube' | 'spotify'
+  const [ytSearchQuery, setYtSearchQuery] = useState('');
+  const [ytEmbedUrl, setYtEmbedUrl] = useState('https://www.youtube.com/embed/jfKfPfyJRdk');
+  const [spotifyLink, setSpotifyLink] = useState('');
+  const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState(
+    'https://open.spotify.com/embed/playlist/37i9dQZF1DWWQRwui0ExPn?utm_source=generator&theme=0'
+  );
+  const searchInputRef = useRef(null);
+
+  const handleYtSearch = () => {
+    if (ytSearchQuery.trim()) {
+      setYtEmbedUrl(
+        `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(ytSearchQuery.trim())}`
+      );
+    }
+  };
+
+  const handleSpotifyLoad = () => {
+    const link = spotifyLink.trim();
+    if (!link) return;
+    try {
+      let cleanUrl = link;
+      if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+        cleanUrl = 'https://' + cleanUrl;
+      }
+      const parsedUrl = new URL(cleanUrl);
+      const paths = parsedUrl.pathname.split('/').filter(Boolean);
+      if (paths.length >= 2) {
+        const type = paths[0]; // playlist, track, album, artist
+        const id = paths[1];
+        setSpotifyEmbedUrl(
+          `https://open.spotify.com/embed/${type}/${id}?utm_source=generator&theme=0`
+        );
+      } else {
+        alert('Format URL Spotify tidak valid. Masukkan link share lagu/playlist dari Spotify.');
+      }
+    } catch {
+      alert('Tolong masukkan URL Spotify yang valid.');
+    }
+  };
+
+  useEffect(() => {
+    if (isSearchExpanded && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isSearchExpanded]);
+
+  const getPageTitle = () => PAGE_TITLES[location.pathname] || businessSettings?.nama_bisnis || 'Brandy';
 
   const getAvatarUrl = (path) => {
     if (!path) return null;
@@ -118,36 +200,179 @@ export default function Topbar() {
   };
 
   return (
-    <header className="h-[72px] bg-white border-b border-slate-200 shadow-sm flex items-center justify-between px-6 md:px-8 z-30 shrink-0 sticky top-0">
+    <header className="h-[72px] bg-white border-b border-slate-200 shadow-sm flex items-center justify-between px-4 md:px-8 z-30 shrink-0 sticky top-0">
       {/* Kiri: Judul & Tanggal */}
-      <div className="flex flex-col justify-center">
-        <h1 className="text-xl md:text-[22px] font-bold text-slate-800 leading-tight">
+      <div className="flex flex-col justify-center min-w-0">
+        <h1
+          className="font-bold text-slate-800 leading-tight truncate text-xl md:text-[22px]"
+          title={getPageTitle()}
+        >
           {getPageTitle()}
         </h1>
         <p className="text-xs text-slate-400 font-medium mt-0.5">{currentDate}</p>
       </div>
 
-      {/* Tengah: Search Bar */}
-      <div className="hidden md:flex items-center flex-1 max-w-lg mx-8">
-        <div className="relative w-full">
-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <Search size={16} className="text-slate-400" />
+      {/* Tengah: Dynamic Island */}
+      <div className="flex items-center justify-center flex-1 relative z-50 max-w-md mx-4">
+        <style>{`
+          @keyframes pulseBar {
+            0%, 100% { height: 4px; transform: scaleY(1); }
+            50% { height: 10px; transform: scaleY(1.4); }
+          }
+          .bar-1 { animation: pulseBar 1.4s ease-in-out infinite; }
+          .bar-2 { animation: pulseBar 1.0s ease-in-out infinite 0.15s; }
+          .bar-3 { animation: pulseBar 1.2s ease-in-out infinite 0.3s; }
+
+          @keyframes ecgScroll {
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(-120px, 0, 0); }
+          }
+          .animate-ecg-scroll {
+            animation: ecgScroll 4s linear infinite;
+          }
+        `}</style>
+
+        {activeNotification ? (
+          /* A. NOTIFICATION STATE */
+          <div className="flex items-center gap-3 bg-slate-950 text-white py-2 rounded-3xl shadow-2xl border border-slate-800 animate-zoom-in w-full transition-all duration-300 max-w-[380px] px-4">
+            <div
+              className={`p-2 rounded-xl shrink-0 ${
+                activeNotification.type === 'announcement'
+                  ? 'bg-blue-500/20 text-blue-400'
+                  : activeNotification.type === 'job'
+                    ? 'bg-purple-500/20 text-purple-400'
+                    : activeNotification.type === 'attendance'
+                      ? 'bg-emerald-500/20 text-emerald-400'
+                      : 'bg-amber-500/20 text-amber-400'
+              }`}
+            >
+              {activeNotification.type === 'announcement' && <BellRing size={16} />}
+              {activeNotification.type === 'job' && <Sparkles size={16} />}
+              {activeNotification.type === 'attendance' && <UserCheck size={16} />}
+              {activeNotification.type === 'permission' && <AlertCircle size={16} />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] font-black text-slate-200 tracking-wide uppercase leading-none truncate">
+                {activeNotification.title}
+              </div>
+              <div className="text-[9px] text-slate-400 truncate leading-snug mt-0.5">
+                {activeNotification.message}
+              </div>
+            </div>
+            <button
+              onClick={dismissNotification}
+              className="text-slate-500 hover:text-white shrink-0 p-1"
+            >
+              <X size={12} />
+            </button>
           </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={handleSearch}
-            placeholder="Cari di Google... (Enter)"
-            className="w-full pl-10 pr-4 py-2.5 rounded-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-sm text-slate-700 placeholder-slate-400"
-          />
-        </div>
+        ) : isSearchExpanded ? (
+          /* B. EXPANDED SEARCH STATE */
+          <div className="flex items-center w-full bg-slate-950 px-4 py-1.5 rounded-full border border-slate-800 shadow-xl transition-all duration-300 max-w-[380px]">
+            <Search size={14} className="text-slate-400 mr-2 shrink-0" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleSearch}
+              onBlur={() => {
+                // Shrink setelah delay singkat agar klik X sempat terdaftar
+                setTimeout(() => setIsSearchExpanded(false), 200);
+              }}
+              placeholder="Cari Google... (Enter)"
+              className="w-full bg-transparent text-white text-xs outline-none placeholder-slate-500 py-1"
+            />
+            <button
+              onClick={() => setIsSearchExpanded(false)}
+              className="text-slate-500 hover:text-white ml-2 shrink-0"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ) : (
+          /* C. IDLE / MUSIC STATE (UNIFIED PILL) */
+          <div className="flex items-center justify-between bg-slate-950 text-white h-9 px-4 rounded-full border border-slate-800 shadow-md select-none gap-3 transition-all duration-300 w-[300px]">
+            {/* Left: Search Trigger */}
+            <div
+              onClick={() => setIsSearchExpanded(true)}
+              className="flex items-center gap-1.5 cursor-pointer group shrink-0"
+              title="Klik untuk mencari Google"
+            >
+              <Search
+                size={12}
+                className="text-slate-400 group-hover:text-white transition-colors shrink-0"
+              />
+              <span className="text-[10px] font-bold text-slate-400 group-hover:text-white transition-colors">
+                Cari
+              </span>
+            </div>
+
+            {/* Middle: ECG Heartbeat Waveform Bridge (Replacing divider, made longer & continuous) */}
+            <div className="flex-1 flex items-center justify-center select-none pointer-events-none overflow-hidden relative h-4 max-w-[120px]">
+              <div className="flex w-[240px] animate-ecg-scroll shrink-0">
+                <svg
+                  className="w-[120px] h-4 text-emerald-500/80 shrink-0"
+                  viewBox="0 0 120 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M 0 8 H 20 L 23 2 L 26 14 L 29 8 H 60 L 63 2 L 66 14 L 69 8 H 100 L 103 2 L 106 14 L 109 8 H 120" />
+                </svg>
+                <svg
+                  className="w-[120px] h-4 text-emerald-500/80 shrink-0"
+                  viewBox="0 0 120 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M 0 8 H 20 L 23 2 L 26 14 L 29 8 H 60 L 63 2 L 66 14 L 69 8 H 100 L 103 2 L 106 14 L 109 8 H 120" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Right: Music Trigger & Visualizer */}
+            <div
+              onClick={() => setShowMusicPlayer(true)}
+              className="flex items-center gap-2 cursor-pointer group shrink-0"
+              title="Buka Pemutar Musik"
+            >
+              <Music
+                size={12}
+                className={`shrink-0 transition-colors ${musicPlaying ? 'text-indigo-400 animate-pulse' : 'text-slate-400 group-hover:text-indigo-400'}`}
+              />
+              <span
+                className={`text-[10px] font-bold transition-colors truncate max-w-[80px] ${musicPlaying ? 'text-indigo-300' : 'text-slate-400 group-hover:text-indigo-400'}`}
+              >
+                {musicPlaying ? 'Lofi Playing' : 'Musik'}
+              </span>
+
+              {/* Visualizer Bars (Animating when playing, Static when paused) */}
+              <div className="flex items-end gap-0.5 h-3 ml-1 shrink-0">
+                <span
+                  className={`w-0.5 bg-indigo-400 rounded-full transition-all duration-300 ${musicPlaying ? 'bar-1' : 'h-1'}`}
+                ></span>
+                <span
+                  className={`w-0.5 bg-indigo-400 rounded-full transition-all duration-300 ${musicPlaying ? 'bar-2' : 'h-2'}`}
+                ></span>
+                <span
+                  className={`w-0.5 bg-indigo-400 rounded-full transition-all duration-300 ${musicPlaying ? 'bar-3' : 'h-1.5'}`}
+                ></span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Kanan: Notifikasi + Online Staff Dropdown + Profil */}
       <div className="flex items-center gap-3 md:gap-4">
-        {/* Live Digital Clock (menggantikan Bell) */}
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 shadow-inner border border-slate-700 select-none">
+        {/* Live Digital Clock */}
+        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 shadow-inner border border-slate-700 select-none">
           <span
             className="font-mono font-black tracking-widest text-sm leading-none"
             style={{
@@ -175,14 +400,14 @@ export default function Topbar() {
         {/* Tombol Fullscreen Toggle */}
         <button
           onClick={toggleFullscreen}
-          className="p-2 text-slate-400 hover:text-blue-600 transition-colors rounded-full hover:bg-blue-50"
+          className="hidden sm:block p-2 text-slate-400 hover:text-blue-600 transition-colors rounded-full hover:bg-blue-50"
           title={isFullscreen ? 'Keluar Layar Penuh' : 'Mode Layar Penuh'}
         >
-          {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+          {isFullscreen ? <Minimize size={20} /> : <Square size={20} />}
         </button>
 
         {/* Online Staff Dropdown */}
-        <div className="relative" ref={dropdownRef}>
+        <div className="hidden sm:block relative" ref={dropdownRef}>
           <button
             onClick={() => setShowOnlineStaff(!showOnlineStaff)}
             className="relative p-2 text-slate-400 hover:text-emerald-600 transition-colors rounded-full hover:bg-emerald-50"
@@ -258,7 +483,7 @@ export default function Topbar() {
         </div>
 
         {/* Divider */}
-        <div className="h-8 w-px bg-slate-200"></div>
+        <div className="hidden sm:block h-8 w-px bg-slate-200"></div>
 
         {/* Profil User */}
         <div className="flex items-center gap-3 cursor-pointer group">
@@ -324,6 +549,261 @@ export default function Topbar() {
                 sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
               ></iframe>
             </div>
+          </div>
+        </div>
+      )}
+      {/* 4. Glassmorphism Music Player Modal */}
+      {showMusicPlayer && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 backdrop-blur-md animate-fade-in">
+          <div className="bg-slate-900/90 text-white border border-slate-800 rounded-[32px] p-6 w-[320px] shadow-2xl flex flex-col items-center relative overflow-hidden">
+            {/* Background glowing aura */}
+            <div className="absolute -top-10 -left-10 w-32 h-32 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+            {/* Header */}
+            <div className="w-full flex items-center justify-between mb-4 z-10">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Pusat Musik Lofi
+              </span>
+              <button
+                onClick={() => setShowMusicPlayer(false)}
+                className="p-1 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Tab Switcher */}
+            <div className="flex bg-slate-950/80 p-1 rounded-xl w-full gap-1 mb-4 z-10 border border-slate-800">
+              {[
+                { id: 'lofi', label: 'Lofi Lokal' },
+                { id: 'youtube', label: 'YouTube' },
+                { id: 'spotify', label: 'Spotify' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setMusicTab(tab.id);
+                    if (tab.id !== 'lofi') {
+                      // Hentikan pemutar lokal agar tidak bertumpuk
+                      setMusicPlaying(false);
+                    }
+                  }}
+                  className={`flex-1 text-[10px] font-bold py-1.5 rounded-lg capitalize transition ${
+                    musicTab === tab.id
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {musicTab === 'lofi' && (
+              <>
+                {/* Vinyl Record */}
+                <div className="relative my-2 flex items-center justify-center z-10">
+                  <div
+                    className={`w-28 h-28 rounded-full bg-slate-950 border-4 border-slate-800 flex items-center justify-center shadow-lg relative ${musicPlaying ? 'animate-spin' : ''}`}
+                    style={{ animationDuration: '12s' }}
+                  >
+                    {/* Center label */}
+                    <div className="w-9 h-9 rounded-full bg-indigo-600 border border-slate-950 flex items-center justify-center overflow-hidden">
+                      <img
+                        src={currentTrack.cover}
+                        alt=""
+                        className="w-full h-full object-cover opacity-80"
+                      />
+                    </div>
+                    <div className="w-2 h-2 rounded-full bg-slate-950 absolute"></div>
+                  </div>
+                </div>
+
+                {/* Track Info */}
+                <div className="text-center w-full z-10 mb-2">
+                  <h3 className="font-extrabold text-xs text-white truncate px-2">
+                    {currentTrack.title}
+                  </h3>
+                  <p className="text-[9px] text-indigo-300 font-semibold mt-0.5">
+                    {currentTrack.artist}
+                  </p>
+                </div>
+
+                {/* Controls */}
+                <div className="flex items-center gap-5 z-10 mb-4">
+                  <button
+                    onClick={() => {
+                      setCurrentTrackIndex((prev) => (prev === 0 ? 2 : prev - 1));
+                      setMusicPlaying(true);
+                    }}
+                    className="text-slate-400 hover:text-white transition active:scale-95"
+                  >
+                    <SkipBack size={16} />
+                  </button>
+
+                  <button
+                    onClick={() => setMusicPlaying(!musicPlaying)}
+                    className="w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg transition active:scale-90"
+                  >
+                    {musicPlaying ? (
+                      <Pause size={16} fill="currentColor" />
+                    ) : (
+                      <Play size={16} fill="currentColor" className="ml-0.5" />
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setCurrentTrackIndex((prev) => (prev === 2 ? 0 : prev + 1));
+                      setMusicPlaying(true);
+                    }}
+                    className="text-slate-400 hover:text-white transition active:scale-95"
+                  >
+                    <SkipForward size={16} />
+                  </button>
+                </div>
+
+                {/* Song list selection */}
+                <div className="w-full z-10 bg-slate-950/40 rounded-xl p-2 border border-slate-800/60 max-h-32 overflow-y-auto">
+                  <div className="space-y-1">
+                    {(tracks || []).map((trackItem, index) => {
+                      const isCurrent = currentTrackIndex === index;
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setCurrentTrackIndex(index);
+                            setMusicPlaying(true);
+                          }}
+                          className={`w-full text-left px-2 py-1 rounded-lg text-[9px] font-semibold flex items-center justify-between transition ${
+                            isCurrent
+                              ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/20'
+                              : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                          }`}
+                        >
+                          <span className="truncate">{trackItem.title}</span>
+                          {isCurrent && musicPlaying && (
+                            <Volume2 size={10} className="text-indigo-400 animate-pulse" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {musicTab === 'youtube' && (
+              <div className="w-full z-10 flex flex-col items-center animate-fade-in">
+                {/* Kolom Pencarian Musik YouTube */}
+                <div className="flex gap-1.5 w-full mb-3">
+                  <input
+                    type="text"
+                    value={ytSearchQuery}
+                    onChange={(e) => setYtSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleYtSearch();
+                    }}
+                    placeholder="Cari lagu/lofi di YouTube..."
+                    className="flex-1 bg-slate-950 text-white text-[11px] px-3 py-1.5 rounded-xl border border-slate-800 outline-none placeholder-slate-500"
+                  />
+                  <button
+                    onClick={handleYtSearch}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-xl transition shrink-0"
+                  >
+                    Cari
+                  </button>
+                </div>
+
+                <div className="w-full aspect-video rounded-2xl overflow-hidden border border-slate-800 shadow-inner bg-black mb-3">
+                  <iframe
+                    src={ytEmbedUrl}
+                    title="YouTube Music Player"
+                    className="w-full h-full border-none"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  ></iframe>
+                </div>
+                <p className="text-[9px] text-slate-400 text-center leading-relaxed mb-4">
+                  Hasil pencarian YouTube diputar langsung di atas.
+                </p>
+                <button
+                  onClick={() => setMusicPlaying(!musicPlaying)}
+                  className={`w-full py-2 rounded-xl text-[10px] font-bold transition flex items-center justify-center gap-2 border ${
+                    musicPlaying
+                      ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/20'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Music size={12} className={musicPlaying ? 'animate-spin' : ''} />
+                  {musicPlaying
+                    ? 'Matikan Efek Visualizer Island'
+                    : 'Aktifkan Efek Visualizer Island'}
+                </button>
+              </div>
+            )}
+
+            {musicTab === 'spotify' && (
+              <div className="w-full z-10 flex flex-col items-center animate-fade-in">
+                {/* Kolom Link Musik Spotify */}
+                <div className="flex gap-1.5 w-full mb-3">
+                  <input
+                    type="text"
+                    value={spotifyLink}
+                    onChange={(e) => setSpotifyLink(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSpotifyLoad();
+                    }}
+                    placeholder="Tempel link share lagu/playlist Spotify..."
+                    className="flex-1 bg-slate-950 text-white text-[11px] px-3 py-1.5 rounded-xl border border-slate-800 outline-none placeholder-slate-500"
+                  />
+                  <button
+                    onClick={handleSpotifyLoad}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-xl transition shrink-0"
+                  >
+                    Putar
+                  </button>
+                </div>
+
+                <div className="w-full h-[180px] rounded-2xl overflow-hidden border border-slate-800 shadow-inner bg-slate-950 mb-3">
+                  <iframe
+                    src={spotifyEmbedUrl}
+                    width="100%"
+                    height="180"
+                    frameBorder="0"
+                    allowFullScreen=""
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy"
+                    className="border-none"
+                  ></iframe>
+                </div>
+                <p className="text-[9px] text-slate-400 text-center leading-relaxed mb-4">
+                  Tempel link Spotify dari aplikasi Spotify untuk memutar.
+                </p>
+                <button
+                  onClick={() => setMusicPlaying(!musicPlaying)}
+                  className={`w-full py-2 rounded-xl text-[10px] font-bold transition flex items-center justify-center gap-2 border ${
+                    musicPlaying
+                      ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/20'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Music size={12} className={musicPlaying ? 'animate-spin' : ''} />
+                  {musicPlaying
+                    ? 'Matikan Efek Visualizer Island'
+                    : 'Aktifkan Efek Visualizer Island'}
+                </button>
+              </div>
+            )}
+
+            {/* Minimise button */}
+            <button
+              onClick={() => setShowMusicPlayer(false)}
+              className="mt-4 text-[10px] font-black uppercase text-indigo-400 hover:text-indigo-300 transition tracking-wider"
+            >
+              Simpan ke Dynamic Island
+            </button>
           </div>
         </div>
       )}

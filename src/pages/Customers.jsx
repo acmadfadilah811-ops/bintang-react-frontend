@@ -34,10 +34,10 @@ export default function Customers() {
     try {
       setLoadingOrders(true);
       const res = await apiClient.get('/orders/');
-      const filtered = res.data.filter(o => o.nomor_wa === phone);
+      const filtered = res.data.filter((o) => o.nomor_wa === phone);
       setCustomerOrders(filtered);
     } catch (err) {
-      console.error("Gagal memuat history order:", err);
+      console.error('Gagal memuat history order:', err);
     } finally {
       setLoadingOrders(false);
     }
@@ -64,15 +64,16 @@ export default function Customers() {
     fetchCustomers();
   }, []);
 
-  const filteredCustomers = customers.filter(
-    (customer) => {
-      const matchesSearch = customer.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.nomor_wa.includes(searchTerm) ||
-        (customer.keterangan || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesTab = activeCustomerTab === 'all' || (activeCustomerTab === 'piutang' && (customer.total_piutang || 0) > 0);
-      return matchesSearch && matchesTab;
-    }
-  );
+  const filteredCustomers = customers.filter((customer) => {
+    const matchesSearch =
+      customer.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.nomor_wa.includes(searchTerm) ||
+      (customer.keterangan || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesTab =
+      activeCustomerTab === 'all' ||
+      (activeCustomerTab === 'piutang' && (customer.total_piutang || 0) > 0);
+    return matchesSearch && matchesTab;
+  });
 
   const topCustomers = customers.slice(0, 5);
   const totalRevenue = customers.reduce((sum, c) => sum + (c.total_spent || 0), 0);
@@ -104,7 +105,7 @@ export default function Customers() {
 
   const handleDelete = async (customer) => {
     const konfirmasi = window.confirm(
-      `🗑️ Hapus pelanggan "${customer.nama}" (${customer.nomor_wa})?\n\nPastikan data sudah di-backup sebelum menghapus.\nTindakan ini tidak dapat dibatalkan.`
+      `Apakah Anda yakin ingin menghapus pelanggan "${customer.nama}" (${customer.nomor_wa})?\n\nPastikan data sudah di-backup sebelum menghapus.\nTindakan ini tidak dapat dibatalkan.`
     );
     if (!konfirmasi) return;
     try {
@@ -121,7 +122,7 @@ export default function Customers() {
       setSyncing(true);
       const res = await apiClient.post('/contacts/sync/');
       await fetchCustomers();
-      alert(`✅ Sinkronisasi selesai! ${res.data.synced} pelanggan diperbarui.`);
+      alert(`Sinkronisasi selesai. ${res.data.synced} pelanggan diperbarui.`);
     } catch (err) {
       console.error('Gagal sinkronisasi:', err);
       alert('Gagal sinkronisasi data pelanggan.');
@@ -514,7 +515,7 @@ export default function Customers() {
                         className="text-[10px] text-slate-400 italic truncate mt-0.5"
                         title={customer.keterangan}
                       >
-                        📝 {customer.keterangan}
+                        {customer.keterangan}
                       </p>
                     )}
                     <div className="flex items-center gap-1.5 mt-1.5">
@@ -543,11 +544,11 @@ export default function Customers() {
                 <h3 className="font-bold text-sm text-slate-900">Detail Pelanggan</h3>
                 <p className="text-[10px] text-slate-500 font-mono">{selectedCustomer.nomor_wa}</p>
               </div>
-              <button 
+              <button
                 onClick={() => {
                   setSelectedCustomer(null);
                   setCustomerOrders([]);
-                }} 
+                }}
                 className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -564,8 +565,13 @@ export default function Customers() {
                   </div>
                   <div>
                     <h4 className="font-bold text-slate-900 text-sm">{selectedCustomer.nama}</h4>
-                    <button 
-                      onClick={() => window.open(`https://wa.me/${selectedCustomer.nomor_wa.replace(/^0/, '62')}`, '_blank')}
+                    <button
+                      onClick={() =>
+                        window.open(
+                          `https://wa.me/${selectedCustomer.nomor_wa.replace(/^0/, '62')}`,
+                          '_blank'
+                        )
+                      }
                       className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1 mt-0.5"
                     >
                       <Phone size={10} className="inline mr-1" /> {selectedCustomer.nomor_wa}
@@ -581,15 +587,21 @@ export default function Customers() {
                 <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200">
                   <div className="text-center">
                     <p className="text-[9px] font-bold text-slate-400 uppercase">Orders</p>
-                    <p className="text-sm font-extrabold text-slate-800 mt-0.5">{selectedCustomer.total_order}</p>
+                    <p className="text-sm font-extrabold text-slate-800 mt-0.5">
+                      {selectedCustomer.total_order}
+                    </p>
                   </div>
                   <div className="text-center">
                     <p className="text-[9px] font-bold text-slate-400 uppercase">Total Spent</p>
-                    <p className="text-sm font-extrabold text-slate-800 mt-0.5">{formatCurrency(selectedCustomer.total_spent || 0)}</p>
+                    <p className="text-sm font-extrabold text-slate-800 mt-0.5">
+                      {formatCurrency(selectedCustomer.total_spent || 0)}
+                    </p>
                   </div>
                   <div className="text-center">
                     <p className="text-[9px] font-bold text-slate-400 uppercase">Piutang</p>
-                    <p className={`text-sm font-extrabold mt-0.5 ${selectedCustomer.total_piutang > 0 ? 'text-red-600' : 'text-slate-800'}`}>
+                    <p
+                      className={`text-sm font-extrabold mt-0.5 ${selectedCustomer.total_piutang > 0 ? 'text-red-600' : 'text-slate-800'}`}
+                    >
                       {formatCurrency(selectedCustomer.total_piutang || 0)}
                     </p>
                   </div>
@@ -598,39 +610,51 @@ export default function Customers() {
 
               {/* Order History Section */}
               <div className="space-y-3">
-                <h4 className="font-bold text-slate-900 text-[12px] uppercase tracking-wider">Histori Pesanan</h4>
-                
+                <h4 className="font-bold text-slate-900 text-[12px] uppercase tracking-wider">
+                  Histori Pesanan
+                </h4>
+
                 {loadingOrders ? (
                   <div className="text-center py-8 text-slate-400 text-xs">
                     <div className="w-5 h-5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
                     Memuat histori pesanan...
                   </div>
                 ) : customerOrders.length === 0 ? (
-                  <p className="text-center py-8 text-slate-400 text-[11px] italic">Belum ada pesanan.</p>
+                  <p className="text-center py-8 text-slate-400 text-[11px] italic">
+                    Belum ada pesanan.
+                  </p>
                 ) : (
                   <div className="space-y-2.5">
-                    {customerOrders.map(order => {
+                    {customerOrders.map((order) => {
                       const isUnpaid = order.sisa_tagihan > 0 && order.status_global !== 'batal';
                       return (
-                        <div 
-                          key={order.id} 
+                        <div
+                          key={order.id}
                           className={`p-3 rounded-lg border bg-white transition-all shadow-sm ${
-                            isUnpaid ? 'border-red-200 bg-red-50/10 hover:bg-red-50/20' : 'border-slate-200 hover:bg-slate-50/50'
+                            isUnpaid
+                              ? 'border-red-200 bg-red-50/10 hover:bg-red-50/20'
+                              : 'border-slate-200 hover:bg-slate-50/50'
                           }`}
                         >
                           <div className="flex justify-between items-start">
                             <div>
                               <p className="text-[11px] font-bold text-slate-900">{order.id}</p>
                               <p className="text-[9px] text-slate-500 mt-0.5">
-                                {new Date(order.waktu).toLocaleDateString('id-ID')} - {order.items?.map(i => i.jenis_produk).join(', ') || '-'}
+                                {new Date(order.waktu).toLocaleDateString('id-ID')} -{' '}
+                                {order.items?.map((i) => i.jenis_produk).join(', ') || '-'}
                               </p>
                             </div>
-                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
-                              order.status_global === 'batal' ? 'bg-red-100 text-red-700' :
-                              order.status_global === 'selesai' ? 'bg-blue-100 text-blue-700' :
-                              order.status_global === 'proses' ? 'bg-orange-100 text-orange-700' :
-                              'bg-slate-100 text-slate-600'
-                            }`}>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
+                                order.status_global === 'batal'
+                                  ? 'bg-red-100 text-red-700'
+                                  : order.status_global === 'selesai'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : order.status_global === 'proses'
+                                      ? 'bg-orange-100 text-orange-700'
+                                      : 'bg-slate-100 text-slate-600'
+                              }`}
+                            >
                               {order.status_global}
                             </span>
                           </div>
@@ -638,24 +662,37 @@ export default function Customers() {
                           <div className="mt-2.5 pt-2 border-t border-dashed border-slate-200 flex justify-between items-center text-[10px]">
                             <div>
                               <span className="text-slate-500">Total:</span>{' '}
-                              <span className="font-bold text-slate-900">{formatCurrency(order.total_harga)}</span>
+                              <span className="font-bold text-slate-900">
+                                {formatCurrency(order.total_harga)}
+                              </span>
                               {order.dp_dibayar > 0 && (
-                                <span className="text-slate-400 ml-1.5">(DP: {formatCurrency(order.dp_dibayar)})</span>
+                                <span className="text-slate-400 ml-1.5">
+                                  (DP: {formatCurrency(order.dp_dibayar)})
+                                </span>
                               )}
                             </div>
-                            
+
                             {isUnpaid ? (
                               <div className="flex items-center gap-2">
-                                <span className="font-bold text-red-650">Sisa: {formatCurrency(order.sisa_tagihan)}</span>
+                                <span className="font-bold text-red-650">
+                                  Sisa: {formatCurrency(order.sisa_tagihan)}
+                                </span>
                                 <button
-                                  onClick={() => setPaymentModalData({ orderId: order.id, sisa_tagihan: order.sisa_tagihan })}
+                                  onClick={() =>
+                                    setPaymentModalData({
+                                      orderId: order.id,
+                                      sisa_tagihan: order.sisa_tagihan,
+                                    })
+                                  }
                                   className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[9px] font-bold shadow-sm transition-colors cursor-pointer"
                                 >
                                   Bayar
                                 </button>
                               </div>
                             ) : (
-                              <span className="font-bold text-emerald-600 uppercase text-[9px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">Lunas</span>
+                              <span className="font-bold text-emerald-600 uppercase text-[9px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                Lunas
+                              </span>
                             )}
                           </div>
                         </div>
@@ -676,53 +713,62 @@ export default function Customers() {
             <div className="px-4 py-3.5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
               <div>
                 <h3 className="font-bold text-xs text-slate-955">Catat Pembayaran / Pelunasan</h3>
-                <p className="text-[9px] text-slate-500 font-mono mt-0.5">Order: {paymentModalData.orderId}</p>
+                <p className="text-[9px] text-slate-500 font-mono mt-0.5">
+                  Order: {paymentModalData.orderId}
+                </p>
               </div>
-              <button onClick={() => setPaymentModalData(null)} className="text-slate-400 hover:text-slate-600">
+              <button
+                onClick={() => setPaymentModalData(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              const form = e.target;
-              const jumlah = parseInt(form.jumlah.value || '0');
-              const metode = form.metode.value;
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const form = e.target;
+                const jumlah = parseInt(form.jumlah.value || '0');
+                const metode = form.metode.value;
 
-              if (jumlah <= 0) {
-                alert("Jumlah pembayaran harus lebih besar dari 0!");
-                return;
-              }
+                if (jumlah <= 0) {
+                  alert('Jumlah pembayaran harus lebih besar dari 0!');
+                  return;
+                }
 
-              try {
-                await apiClient.post(`/orders/${paymentModalData.orderId}/bayar/`, {
-                  jumlah_bayar: jumlah,
-                  metode_pembayaran: metode
-                });
-                
-                // Refresh data
-                await fetchCustomers();
-                
-                // Refresh data list histori order
-                fetchCustomerOrders(selectedCustomer.nomor_wa);
-                
-                // Update selectedCustomer piutang client-side agar instan
-                setSelectedCustomer(prev => {
-                  if (!prev) return prev;
-                  const updatedDebt = (prev.total_piutang || 0) - jumlah;
-                  return { ...prev, total_piutang: Math.max(0, updatedDebt) };
-                });
-                
-                setPaymentModalData(null);
-                alert("Pembayaran berhasil dicatat!");
-              } catch (err) {
-                console.error("Gagal bayar:", err);
-                alert("Gagal mencatat pembayaran.");
-              }
-            }}>
+                try {
+                  await apiClient.post(`/orders/${paymentModalData.orderId}/bayar/`, {
+                    jumlah_bayar: jumlah,
+                    metode_pembayaran: metode,
+                  });
+
+                  // Refresh data
+                  await fetchCustomers();
+
+                  // Refresh data list histori order
+                  fetchCustomerOrders(selectedCustomer.nomor_wa);
+
+                  // Update selectedCustomer piutang client-side agar instan
+                  setSelectedCustomer((prev) => {
+                    if (!prev) return prev;
+                    const updatedDebt = (prev.total_piutang || 0) - jumlah;
+                    return { ...prev, total_piutang: Math.max(0, updatedDebt) };
+                  });
+
+                  setPaymentModalData(null);
+                  alert('Pembayaran berhasil dicatat!');
+                } catch (err) {
+                  console.error('Gagal bayar:', err);
+                  alert('Gagal mencatat pembayaran.');
+                }
+              }}
+            >
               <div className="p-4 space-y-4">
                 <div className="bg-red-50/50 p-2.5 rounded border border-red-200 flex justify-between items-center text-xs">
                   <span className="font-medium text-red-950">Tagihan Yang Harus Dibayar:</span>
-                  <span className="font-extrabold text-red-600">{formatCurrency(paymentModalData.sisa_tagihan)}</span>
+                  <span className="font-extrabold text-red-600">
+                    {formatCurrency(paymentModalData.sisa_tagihan)}
+                  </span>
                 </div>
 
                 <div className="space-y-1.5">
@@ -764,8 +810,19 @@ export default function Customers() {
               </div>
 
               <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
-                <button type="button" onClick={() => setPaymentModalData(null)} className="px-3.5 py-1.5 border border-slate-200 rounded text-xs font-bold text-slate-600 hover:bg-slate-100">Batal</button>
-                <button type="submit" className="px-3.5 py-1.5 bg-slate-950 hover:bg-slate-800 text-white rounded text-xs font-bold shadow-sm">Simpan</button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentModalData(null)}
+                  className="px-3.5 py-1.5 border border-slate-200 rounded text-xs font-bold text-slate-600 hover:bg-slate-100"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-3.5 py-1.5 bg-slate-950 hover:bg-slate-800 text-white rounded text-xs font-bold shadow-sm"
+                >
+                  Simpan
+                </button>
               </div>
             </form>
           </div>

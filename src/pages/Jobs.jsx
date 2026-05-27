@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Kanban, Download } from 'lucide-react';
+import apiClient from '../api/apiClient';
 
 // ─── Hook & Komponen ──────────────────────────────────────
 import { useJobsData } from '../components/jobs/useJobsData';
@@ -12,6 +13,10 @@ import ForwardJobModal from '../components/jobs/modals/ForwardJobModal';
 import WorkspaceModal from '../components/jobs/modals/WorkspaceModal';
 import AdminOtpModal from '../components/jobs/modals/AdminOtpModal';
 import StaffOtpModal from '../components/jobs/modals/StaffOtpModal';
+import QueueStartModal from '../components/jobs/modals/QueueStartModal';
+import FailedDetailModal from '../components/jobs/modals/FailedDetailModal';
+import FailedReasonModal from '../components/jobs/modals/FailedReasonModal';
+import WorkspaceReviewModal from '../components/jobs/modals/WorkspaceReviewModal';
 
 export default function Jobs() {
   const { user } = useAuth();
@@ -27,6 +32,7 @@ export default function Jobs() {
     tahapList,
     staffList,
     groupedByStatus,
+    fetchData,
     handleModalSave,
     handleForward,
     handleWorkspaceSave,
@@ -39,11 +45,90 @@ export default function Jobs() {
   const [workspaceJob, setWorkspaceJob] = useState(null); // { job, orderItemData, fromStart }
   const [adminOtpModal, setAdminOtpModal] = useState(null); // { job, otpCode }
   const [staffOtpModal, setStaffOtpModal] = useState(null); // { job }
+  const [queueStartJob, setQueueStartJob] = useState(null); // { job, orderInfo }
+  const [failedDetailJob, setFailedDetailJob] = useState(null); // { job, orderInfo }
+  const [failedReasonJob, setFailedReasonJob] = useState(null); // { job, orderInfo, pendingData }
+  const [workspaceReviewJob, setWorkspaceReviewJob] = useState(null); // { job, orderItemData }
+
+  // ─── Sync Modal States ──────────────────────────────
+  useEffect(() => {
+    if (staffOtpModal) {
+      const updatedJob = jobs.find((j) => j.id === staffOtpModal.job.id);
+      if (updatedJob && JSON.stringify(updatedJob) !== JSON.stringify(staffOtpModal.job)) {
+        setStaffOtpModal((prev) => ({ ...prev, job: updatedJob }));
+      }
+    }
+    if (adminOtpModal) {
+      const updatedJob = jobs.find((j) => j.id === adminOtpModal.job.id);
+      if (updatedJob && JSON.stringify(updatedJob) !== JSON.stringify(adminOtpModal.job)) {
+        setAdminOtpModal((prev) => ({ ...prev, job: updatedJob }));
+      }
+    }
+    if (workspaceJob) {
+      const updatedJob = jobs.find((j) => j.id === workspaceJob.job.id);
+      if (updatedJob && JSON.stringify(updatedJob) !== JSON.stringify(workspaceJob.job)) {
+        setWorkspaceJob((prev) => ({ ...prev, job: updatedJob }));
+      }
+    }
+    if (workspaceReviewJob) {
+      const updatedJob = jobs.find((j) => j.id === workspaceReviewJob.job.id);
+      if (updatedJob && JSON.stringify(updatedJob) !== JSON.stringify(workspaceReviewJob.job)) {
+        setWorkspaceReviewJob((prev) => ({ ...prev, job: updatedJob }));
+      }
+    }
+  }, [jobs]);
 
   // ─── OTP Generator ───────────────────────────────────
-  const generateAdminOtp = (job) => {
-    const otpCode = Math.floor(100000 + Math.random() * 900000);
-    setAdminOtpModal({ job, otpCode });
+  const generateAdminOtp = async (job) => {
+    const otpCode = String(Math.floor(100000 + Math.random() * 900000));
+    try {
+      await apiClient.patch(`/jobs/${job.id}/`, { otp_code: otpCode });
+      await fetchData(true);
+      setAdminOtpModal({ job, otpCode });
+    } catch (err) {
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.detail ||
+        JSON.stringify(err.response?.data) ||
+        err.message;
+      alert(`Gagal menyimpan kode OTP ke database: ${errorMsg}`);
+    }
+  };
+
+  // ─── Clear OTP Request when Sent ─────────────────────
+  const handleSendOtp = async (jobId) => {
+    try {
+      await apiClient.patch(`/jobs/${jobId}/`, { otp_sent: true, otp_requested: false });
+      await fetchData(true);
+      setAdminOtpModal(null);
+    } catch (err) {
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.detail ||
+        JSON.stringify(err.response?.data) ||
+        err.message;
+      alert(`Gagal mengirim OTP: ${errorMsg}`);
+    }
+  };
+
+  // ─── Staff request OTP ────────────────────────────────
+  const handleRequestOtp = async (jobId) => {
+    try {
+      await apiClient.patch(`/jobs/${jobId}/`, {
+        otp_requested: true,
+        otp_sent: false,
+        otp_code: '',
+      });
+      await fetchData(true);
+      alert('Permintaan OTP berhasil dikirim ke Admin!');
+    } catch (err) {
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.detail ||
+        JSON.stringify(err.response?.data) ||
+        err.message;
+      alert(`Gagal meminta OTP: ${errorMsg}`);
+    }
   };
 
   // ─── Staff OTP verify → buka ForwardModal ────────────
@@ -52,10 +137,69 @@ export default function Jobs() {
     setForwardJob(job);
   };
 
-  // ─── Buka workspace ──────────────────────────────────
-  const openWorkspace = (job, fromStart = false) => {
+  // ─── Buka workspace sesuai kolom status ──────────────
+  const openWorkspace = (job) => {
     const orderItemId = typeof job.order_item === 'object' ? job.order_item?.id : job.order_item;
-    setWorkspaceJob({ job, orderItemData: orderMap[orderItemId], fromStart });
+    const orderInfo = orderMap[orderItemId];
+
+    if (job.status_pekerjaan === 'antrean') {
+      setQueueStartJob({ job, orderInfo });
+    } else if (job.status_pekerjaan === 'gagal') {
+      setFailedDetailJob({ job, orderInfo });
+    } else if (job.status_pekerjaan === 'selesai') {
+      setWorkspaceReviewJob({ job, orderItemData: orderInfo });
+    } else {
+      setWorkspaceJob({ job, orderItemData: orderInfo, fromStart: false });
+    }
+  };
+
+  // ─── Memulai Pekerjaan dari Papan Antrean ─────────────
+  const handleStartJob = async (job) => {
+    try {
+      await apiClient.patch(`/jobs/${job.id}/`, { status_pekerjaan: 'dikerjakan' });
+      await fetchData(true);
+      setQueueStartJob(null);
+      // Buka workspace modal dikerjakan secara langsung
+      const orderItemId = typeof job.order_item === 'object' ? job.order_item?.id : job.order_item;
+      setWorkspaceJob({ job, orderItemData: orderMap[orderItemId], fromStart: false });
+    } catch (err) {
+      alert('Gagal memulai pekerjaan.');
+    }
+  };
+
+  // ─── Menyimpan Alasan Gagal & Form Data Workspace ─────
+  const handleSaveFailedReason = async (reason) => {
+    if (!failedReasonJob) return;
+    const data = {
+      ...failedReasonJob.pendingData,
+      statusPekerjaan: 'gagal',
+      alasanGagal: reason,
+    };
+    const result = await handleWorkspaceSave(data);
+    if (result.ok) {
+      setFailedReasonJob(null);
+    } else {
+      alert(result.error);
+    }
+  };
+
+  // ─── Mengajukan Revisi (Pekerjaan Selesai -> Dikerjakan) ──
+  const handleRequestRevision = async (job) => {
+    try {
+      await apiClient.patch(`/jobs/${job.id}/`, {
+        status_pekerjaan: 'dikerjakan',
+        otp_code: '',
+        otp_sent: false,
+        otp_requested: false,
+      });
+      await fetchData(true);
+      setWorkspaceReviewJob(null);
+      // Buka workspace modal dikerjakan secara langsung untuk editing
+      const orderItemId = typeof job.order_item === 'object' ? job.order_item?.id : job.order_item;
+      setWorkspaceJob({ job, orderItemData: orderMap[orderItemId], fromStart: false });
+    } catch (err) {
+      alert('Gagal memproses revisi pekerjaan.');
+    }
   };
 
   // ─── Loading & Error state ────────────────────────────────────
@@ -151,9 +295,7 @@ export default function Jobs() {
                             typeof job.order_item === 'object' ? job.order_item?.id : job.order_item
                           ]
                         }
-                        onOpenWorkspace={(fromStart) => openWorkspace(job, fromStart)}
-                        onEdit={() => setEditJob(job)}
-                        onVerifyOtp={() => setStaffOtpModal({ job })}
+                        onOpenWorkspace={() => openWorkspace(job)}
                       />
                     ))
                   )}
@@ -171,6 +313,8 @@ export default function Jobs() {
       <AdminOtpModal
         modal={adminOtpModal}
         orderMap={orderMap}
+        staffList={staffList}
+        onSendOtp={handleSendOtp}
         onClose={() => setAdminOtpModal(null)}
       />
 
@@ -178,6 +322,7 @@ export default function Jobs() {
         modal={staffOtpModal}
         orderMap={orderMap}
         onSubmit={handleStaffVerifyOtp}
+        onRequestOtp={handleRequestOtp}
         onClose={() => setStaffOtpModal(null)}
       />
 
@@ -215,11 +360,66 @@ export default function Jobs() {
           workspaceJob={workspaceJob}
           saving={saving}
           onSubmit={async (data) => {
-            const result = await handleWorkspaceSave(data);
-            if (result.ok) setWorkspaceJob(null);
-            else alert(result.error);
+            if (data.statusPekerjaan === 'gagal') {
+              setFailedReasonJob({
+                job: workspaceJob.job,
+                orderInfo: workspaceJob.orderItemData,
+                pendingData: data,
+              });
+              setWorkspaceJob(null);
+            } else {
+              const result = await handleWorkspaceSave(data);
+              if (result.ok) setWorkspaceJob(null);
+              else alert(result.error);
+            }
+          }}
+          onRequestOtp={handleRequestOtp}
+          onVerifySuccess={(job) => {
+            setWorkspaceJob(null);
+            setForwardJob(job);
           }}
           onClose={() => setWorkspaceJob(null)}
+        />
+      )}
+
+      {queueStartJob && (
+        <QueueStartModal
+          job={queueStartJob.job}
+          orderInfo={queueStartJob.orderInfo}
+          onSubmit={() => handleStartJob(queueStartJob.job)}
+          onClose={() => setQueueStartJob(null)}
+        />
+      )}
+
+      {failedDetailJob && (
+        <FailedDetailModal
+          job={failedDetailJob.job}
+          orderInfo={failedDetailJob.orderInfo}
+          onClose={() => setFailedDetailJob(null)}
+        />
+      )}
+
+      {failedReasonJob && (
+        <FailedReasonModal
+          job={failedReasonJob.job}
+          orderInfo={failedReasonJob.orderInfo}
+          onSubmit={handleSaveFailedReason}
+          onClose={() => {
+            setWorkspaceJob({
+              job: failedReasonJob.job,
+              orderItemData: failedReasonJob.orderInfo,
+              fromStart: false,
+            });
+            setFailedReasonJob(null);
+          }}
+        />
+      )}
+
+      {workspaceReviewJob && (
+        <WorkspaceReviewModal
+          workspaceJob={workspaceReviewJob}
+          onRevisi={handleRequestRevision}
+          onClose={() => setWorkspaceReviewJob(null)}
         />
       )}
     </div>

@@ -43,16 +43,18 @@ export default function Pricelist() {
   }, []);
 
   const handleSeedPrices = async () => {
-    const confirmSeed = window.confirm("⚠️ Daftar harga kosong. Impor data awal dari db_harga.json?");
+    const confirmSeed = window.confirm(
+      'Daftar harga kosong. Apakah Anda ingin mengimpor data awal dari db_harga.json?'
+    );
     if (!confirmSeed) return;
     setPriceLoading(true);
     try {
       await apiClient.post('/product-prices/seed/');
       fetchPrices();
-      alert("Berhasil mengimpor harga default!");
+      alert('Berhasil mengimpor harga default!');
     } catch (err) {
       console.error(err);
-      alert("Gagal mengimpor harga.");
+      alert('Gagal mengimpor harga.');
     } finally {
       setPriceLoading(false);
     }
@@ -70,20 +72,20 @@ export default function Pricelist() {
     setPriceFormLoading(true);
     setPriceFormError('');
     setPriceFormSuccess('');
-    
+
     const form = e.target;
     const name = form.nama_produk.value;
     const material = form.material.value || null;
     const category = form.kategori.value;
     const priceType = form.price_type.value;
     const price = parseInt(form.harga.value) || 0;
-    
+
     let tiersVal = null;
     if (priceType === 'tiered') {
       const text = form.tiers_text.value;
       const obj = {};
       const lines = text.split('\n');
-      lines.forEach(line => {
+      lines.forEach((line) => {
         const parts = line.split(':');
         if (parts.length >= 2) {
           const key = parts[0].trim();
@@ -119,12 +121,19 @@ export default function Pricelist() {
   };
 
   const formatRupiah = (angka) =>
-    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
+    new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+    }).format(angka || 0);
 
   const filteredPrices = useMemo(() => {
-    return dbPrices.filter(p => {
+    return dbPrices.filter((p) => {
       const matchesCategory = priceCategoryFilter === 'all' || p.kategori === priceCategoryFilter;
-      const matchesSearch = `${(p.nama_produk || '').toLowerCase()} ${(p.material || '').toLowerCase()}`.includes(priceSearchQuery.toLowerCase());
+      const matchesSearch =
+        `${(p.nama_produk || '').toLowerCase()} ${(p.material || '').toLowerCase()}`.includes(
+          priceSearchQuery.toLowerCase()
+        );
       return matchesCategory && matchesSearch;
     });
   }, [dbPrices, priceCategoryFilter, priceSearchQuery]);
@@ -179,7 +188,9 @@ export default function Pricelist() {
           >
             <option value="all">Semua Kategori</option>
             {Object.entries(priceCategories).map(([key, val]) => (
-              <option key={key} value={key}>{val}</option>
+              <option key={key} value={key}>
+                {val}
+              </option>
             ))}
           </select>
         </div>
@@ -192,11 +203,21 @@ export default function Pricelist() {
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
               <tr>
                 <th className="px-6 py-3.5 font-bold uppercase tracking-wider text-xs">Kategori</th>
-                <th className="px-6 py-3.5 font-bold uppercase tracking-wider text-xs">Nama Produk</th>
-                <th className="px-6 py-3.5 font-bold uppercase tracking-wider text-xs">Material / Bahan</th>
-                <th className="px-6 py-3.5 font-bold uppercase tracking-wider text-xs">Tipe Harga</th>
-                <th className="px-6 py-3.5 font-bold uppercase tracking-wider text-xs text-right">Harga Satuan</th>
-                <th className="px-6 py-3.5 font-bold uppercase tracking-wider text-xs text-center w-24">Aksi</th>
+                <th className="px-6 py-3.5 font-bold uppercase tracking-wider text-xs">
+                  Nama Produk
+                </th>
+                <th className="px-6 py-3.5 font-bold uppercase tracking-wider text-xs">
+                  Material / Bahan
+                </th>
+                <th className="px-6 py-3.5 font-bold uppercase tracking-wider text-xs">
+                  Tipe Harga
+                </th>
+                <th className="px-6 py-3.5 font-bold uppercase tracking-wider text-xs text-right">
+                  Harga Satuan
+                </th>
+                <th className="px-6 py-3.5 font-bold uppercase tracking-wider text-xs text-center w-24">
+                  Aksi
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -216,9 +237,13 @@ export default function Pricelist() {
                       {priceCategories[item.kategori] || item.kategori}
                     </td>
                     <td className="px-6 py-4 font-bold text-slate-900">{item.nama_produk}</td>
-                    <td className="px-6 py-4 text-slate-500 font-semibold">{item.material || '–'}</td>
+                    <td className="px-6 py-4 text-slate-500 font-semibold">
+                      {item.material || '–'}
+                    </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${item.price_type === 'flat' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${item.price_type === 'flat' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}
+                      >
                         {item.price_type}
                       </span>
                     </td>
@@ -226,7 +251,9 @@ export default function Pricelist() {
                       {item.price_type === 'flat' ? (
                         formatRupiah(item.harga)
                       ) : (
-                        <span className="text-amber-600 font-bold">Bertingkat ({Object.keys(item.tiers || {}).length} tier)</span>
+                        <span className="text-amber-600 font-bold">
+                          Bertingkat ({Object.keys(item.tiers || {}).length} tier)
+                        </span>
                       )}
                     </td>
                     <td className="px-6 py-4 text-center">
@@ -283,7 +310,9 @@ export default function Pricelist() {
                     className="w-full border border-slate-300 rounded p-2 text-sm focus:border-blue-500 outline-none bg-slate-50"
                   >
                     {Object.entries(priceCategories).map(([key, val]) => (
-                      <option key={key} value={key}>{val}</option>
+                      <option key={key} value={key}>
+                        {val}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -324,7 +353,9 @@ export default function Pricelist() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase">Material / Bahan (Opsional)</label>
+                <label className="text-xs font-bold text-slate-700 uppercase">
+                  Material / Bahan (Opsional)
+                </label>
                 <input
                   type="text"
                   name="material"
@@ -333,8 +364,14 @@ export default function Pricelist() {
                 />
               </div>
 
-              <div id="modal_price_flat_container" style={{ display: editingPrice.price_type === 'flat' ? 'block' : 'none' }} className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase">Harga Satuan (Rp)</label>
+              <div
+                id="modal_price_flat_container"
+                style={{ display: editingPrice.price_type === 'flat' ? 'block' : 'none' }}
+                className="space-y-1.5"
+              >
+                <label className="text-xs font-bold text-slate-700 uppercase">
+                  Harga Satuan (Rp)
+                </label>
                 <input
                   type="number"
                   name="harga"
@@ -343,16 +380,27 @@ export default function Pricelist() {
                 />
               </div>
 
-              <div id="modal_price_tier_container" style={{ display: editingPrice.price_type === 'tiered' ? 'block' : 'none' }} className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase">Tier Harga (Format: `key: harga` per baris)</label>
+              <div
+                id="modal_price_tier_container"
+                style={{ display: editingPrice.price_type === 'tiered' ? 'block' : 'none' }}
+                className="space-y-1.5"
+              >
+                <label className="text-xs font-bold text-slate-700 uppercase">
+                  Tier Harga (Format: `key: harga` per baris)
+                </label>
                 <textarea
                   name="tiers_text"
                   rows="4"
-                  defaultValue={Object.entries(editingPrice.tiers || {}).map(([k, v]) => `${k}: ${v}`).join('\n')}
+                  defaultValue={Object.entries(editingPrice.tiers || {})
+                    .map(([k, v]) => `${k}: ${v}`)
+                    .join('\n')}
                   placeholder="Contoh:&#10;1-25 lbr: 4200&#10;26-50 lbr: 4000&#10;>100 lbr: 3500"
                   className="w-full border border-slate-300 rounded p-2 text-sm focus:border-blue-500 outline-none font-mono resize-none"
                 />
-                <p className="text-[10px] text-slate-400 font-bold">Pemisah key dan harga adalah tanda titik dua (:). Jangan menyertakan titik pada nominal harga.</p>
+                <p className="text-[10px] text-slate-400 font-bold">
+                  Pemisah key dan harga adalah tanda titik dua (:). Jangan menyertakan titik pada
+                  nominal harga.
+                </p>
               </div>
 
               <div className="pt-2 flex justify-end gap-2 border-t border-slate-100 mt-4">

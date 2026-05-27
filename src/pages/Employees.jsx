@@ -73,7 +73,7 @@ export default function Employees() {
   const handleUpdateEmployment = async () => {
     try {
       setIsUpdating(true);
-      
+
       const data = new FormData();
       data.append('status_karyawan', formData.status_karyawan);
       data.append('jenis_kontrak', formData.jenis_kontrak);

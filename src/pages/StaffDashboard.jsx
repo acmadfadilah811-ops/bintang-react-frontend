@@ -25,6 +25,7 @@ export default function StaffDashboard() {
 
   // State untuk mengontrol tampilan Full Screen Info Karyawan
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
 
   // Update jam real-time setiap detik
   useEffect(() => {
@@ -152,10 +153,10 @@ export default function StaffDashboard() {
           </div>
           <div>
             <h1 className="text-sm font-bold text-slate-800 leading-tight">
-              Halo, {user?.username} 👋
+              Selamat datang, {user?.username}
             </h1>
             <p className="text-[10px] text-slate-500 font-medium capitalize">
-              {user?.divisi_nama || user?.role} - Selamat Bekerja!
+              {user?.divisi_nama || user?.role}
             </p>
           </div>
         </div>
@@ -180,9 +181,14 @@ export default function StaffDashboard() {
                 <CalendarClock size={12} /> Status Kehadiran
               </p>
               <h3
-                className={`text-lg font-extrabold mt-0.5 uppercase ${!isClockedIn ? 'text-amber-600' : isClockedOut ? 'text-slate-600' : 'text-emerald-600'}`}
+                className={`text-lg font-extrabold mt-0.5 uppercase ${!isClockedIn ? 'text-amber-600' : isClockedOut ? 'text-slate-600' : 'text-emerald-600'} flex items-center gap-1.5`}
               >
-                {!isClockedIn ? 'Belum Masuk' : absensi_hari_ini?.status}
+                <span>{!isClockedIn ? 'Belum Masuk' : absensi_hari_ini?.status}</span>
+                {absensi_hari_ini?.workspace_unlocked && (
+                  <span className="text-[9px] bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold px-1.5 py-0.5 rounded-full normal-case tracking-normal">
+                    Papan Kerja Dibuka
+                  </span>
+                )}
               </h3>
             </div>
             <div className="text-right">
@@ -235,14 +241,28 @@ export default function StaffDashboard() {
           </div>
         </div>
 
-        <div className="md:col-span-3 bg-blue-600 rounded-lg p-3 text-white shadow-sm flex flex-col justify-center relative overflow-hidden">
-          <div className="relative z-10">
-            <p className="text-blue-200 text-[10px] font-bold uppercase tracking-wider mb-1">
-              Pekerjaan Aktif
-            </p>
-            <h3 className="text-4xl font-extrabold leading-none">{total_job_aktif || 0}</h3>
+        <div className="md:col-span-3 bg-gradient-to-br from-indigo-700 to-indigo-950 rounded-lg p-3 text-white shadow-sm flex flex-col justify-between relative overflow-hidden">
+          <p className="text-indigo-200 text-[10px] font-bold uppercase tracking-wider mb-2 border-b border-indigo-600/40 pb-1">
+            Status Pekerjaan Anda
+          </p>
+          <div className="grid grid-cols-3 gap-2 text-center my-auto">
+            <div>
+              <h4 className="text-xl font-black text-amber-300">{total_job_aktif || 0}</h4>
+              <p className="text-[8px] text-indigo-100 font-bold uppercase">Proses</p>
+            </div>
+            <div>
+              <h4 className="text-xl font-black text-emerald-300">
+                {dashboardData?.total_job_selesai || 0}
+              </h4>
+              <p className="text-[8px] text-indigo-100 font-bold uppercase">Selesai</p>
+            </div>
+            <div>
+              <h4 className="text-xl font-black text-rose-300">
+                {dashboardData?.total_job_gagal || 0}
+              </h4>
+              <p className="text-[8px] text-indigo-100 font-bold uppercase">Gagal</p>
+            </div>
           </div>
-          <Package className="absolute -right-4 -bottom-4 text-blue-500/30" size={100} />
         </div>
       </div>
 
@@ -340,7 +360,8 @@ export default function StaffDashboard() {
                 pengumuman.map((item) => (
                   <div
                     key={item.id}
-                    className="p-2.5 bg-slate-50 hover:bg-blue-50/30 transition-colors rounded border border-slate-100"
+                    onClick={() => setSelectedAnnouncement(item)}
+                    className="p-2.5 bg-slate-50 hover:bg-blue-50/30 hover:border-blue-300 transition-colors rounded border border-slate-100 cursor-pointer"
                   >
                     <div className="flex justify-between items-start mb-1">
                       <h4 className="font-bold text-slate-800 text-[11px] leading-tight">
@@ -357,7 +378,7 @@ export default function StaffDashboard() {
                       {item.isi}
                     </p>
                     <div className="flex items-center gap-1 text-[9px] text-slate-400 font-medium">
-                      <div className="w-3 h-3 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 font-bold">
+                      <div className="w-3 h-3 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 font-bold font-mono">
                         {item.dibuat_oleh_nama?.charAt(0)}
                       </div>
                       {item.dibuat_oleh_nama}
@@ -459,6 +480,57 @@ export default function StaffDashboard() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* FULL SCREEN MODAL TRANSISI - DETAIL PENGUMUMAN */}
+      <div
+        className={`fixed inset-0 z-50 flex justify-center bg-slate-900/40 backdrop-blur-sm transition-all duration-300 ${
+          selectedAnnouncement ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+      >
+        <div
+          className={`w-full max-w-lg bg-white h-full relative flex flex-col shadow-2xl transition-transform duration-300 ${
+            selectedAnnouncement ? 'translate-y-0' : 'translate-y-full'
+          }`}
+        >
+          {/* Header Mobile Style */}
+          <div className="bg-[#1565c0] text-white px-4 py-4 flex items-center gap-4 shadow-md z-10 shrink-0">
+            <button
+              onClick={() => setSelectedAnnouncement(null)}
+              className="hover:bg-white/10 p-1 rounded-full transition-colors cursor-pointer"
+            >
+              <ArrowLeft size={24} />
+            </button>
+            <h1 className="text-lg font-medium tracking-wide">Detail Pengumuman</h1>
+          </div>
+
+          {/* Konten (Bisa Di-scroll) */}
+          <div className="flex-1 overflow-y-auto px-5 py-6 flex flex-col gap-4">
+            <div className="border-b border-slate-100 pb-3">
+              <h2 className="text-xl font-bold text-slate-950 leading-tight">
+                {selectedAnnouncement?.judul}
+              </h2>
+              <div className="flex items-center gap-2 mt-2 text-xs text-slate-500">
+                <span className="font-semibold text-[#1565c0]">
+                  Oleh: {selectedAnnouncement?.dibuat_oleh_nama}
+                </span>
+                <span>&bull;</span>
+                <span>
+                  {selectedAnnouncement &&
+                    new Date(selectedAnnouncement.dibuat_pada).toLocaleDateString('id-ID', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                </span>
+              </div>
+            </div>
+
+            <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
+              {selectedAnnouncement?.isi}
+            </div>
           </div>
         </div>
       </div>

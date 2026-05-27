@@ -65,6 +65,18 @@ export default function Attendance() {
     }
   };
 
+  const handleToggleWorkspaceLock = async (id, currentStatus) => {
+    try {
+      await apiClient.patch(`/hr/absensi/${id}/`, {
+        workspace_unlocked: !currentStatus,
+      });
+      fetchData();
+    } catch (err) {
+      console.error('Gagal mengubah kunci papan kerja:', err);
+      alert('Gagal memperbarui status kunci papan kerja.');
+    }
+  };
+
   // Filter data berdasarkan input pencarian & divisi
   const filteredList = absensiList.filter((item) => {
     const query = searchQuery.toLowerCase();
@@ -132,6 +144,7 @@ export default function Attendance() {
       totalJam: totalJam,
       errorTotal: item.jam_masuk && !item.jam_keluar,
       textStatus: item.status === 'alpha' ? 'text-red-500' : 'text-slate-600',
+      workspace_unlocked: item.workspace_unlocked,
     };
   });
 
@@ -384,7 +397,26 @@ export default function Attendance() {
 
                       {/* Action Buttons */}
                       <td className="py-2 px-2 text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end gap-1 items-center">
+                          {row.masuk !== '-' && (
+                            <button
+                              onClick={() =>
+                                handleToggleWorkspaceLock(row.id, row.workspace_unlocked)
+                              }
+                              className={`border px-2 py-1 rounded text-[10px] font-bold shadow-sm transition-all ${
+                                row.workspace_unlocked
+                                  ? 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                              }`}
+                              title={
+                                row.workspace_unlocked
+                                  ? 'Kunci kembali papan kerja staff'
+                                  : 'Buka kunci papan kerja staff'
+                              }
+                            >
+                              {row.workspace_unlocked ? 'Papan Terbuka' : 'Buka Papan'}
+                            </button>
+                          )}
                           <button
                             onClick={() => setDetailData(row)}
                             className="border border-slate-200 bg-white text-slate-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-slate-50 shadow-sm"

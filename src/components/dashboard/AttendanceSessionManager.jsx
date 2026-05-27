@@ -1,23 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import apiClient from '../../api/apiClient';
 import { Clock, Play, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function AttendanceSessionManager() {
+  const { user } = useAuth();
   const [sessionData, setSessionData] = useState(null);
   const [unlockRequests, setUnlockRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [waktuMulai, setWaktuMulai] = useState('08:00');
   const [batasMaksimal, setBatasMaksimal] = useState('09:00');
+  const [repeatDaily, setRepeatDaily] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const fetchData = async () => {
+  const canManageSession = ['owner', 'manager'].includes(user?.role?.toLowerCase());
+
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [sessionRes, requestsRes] = await Promise.all([
         apiClient.get('/hr/attendance-session/'),
-        apiClient.get('/hr/unlock-requests/'),
+        canManageSession ? apiClient.get('/hr/unlock-requests/') : Promise.resolve({ data: [] }),
       ]);
       setSessionData(sessionRes.data);
+      setRepeatDaily(sessionRes.data?.repeat_daily || false);
       if (sessionRes.data?.batas_maksimal) {
         const dateBatas = new Date(sessionRes.data.batas_maksimal);
         setBatasMaksimal(
@@ -36,11 +42,11 @@ export default function AttendanceSessionManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [canManageSession]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const handleStartSession = async () => {
     try {
@@ -48,6 +54,7 @@ export default function AttendanceSessionManager() {
       await apiClient.post('/hr/attendance-session/', {
         waktu_mulai: waktuMulai,
         batas_maksimal: batasMaksimal,
+        repeat_daily: repeatDaily,
       });
       await fetchData();
     } catch (err) {
@@ -80,85 +87,118 @@ export default function AttendanceSessionManager() {
   const isActive = sessionData?.is_active;
 
   return (
-    <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
-      <div className="px-3 py-2 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-        <h2 className="text-slate-800 font-extrabold text-[11px] flex items-center gap-1.5">
-          <Clock size={14} className="text-blue-600" /> Sesi Absensi
-        </h2>
-        {isActive && (
-          <span className="text-[8px] font-black px-1.5 py-0.5 rounded border border-emerald-200 bg-emerald-50 text-emerald-600 uppercase tracking-widest flex items-center gap-1">
-            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-            Aktif
-          </span>
-        )}
-      </div>
+    <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden flex flex-col h-full justify-between">
+      <div>
+        <div className="px-3 py-2 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+          <h2 className="text-slate-800 font-extrabold text-[11px] flex items-center gap-1.5">
+            <Clock size={14} className="text-blue-600" /> Sesi Absensi
+          </h2>
+          {isActive && (
+            <span className="text-[8px] font-black px-1.5 py-0.5 rounded border border-emerald-200 bg-emerald-50 text-emerald-600 uppercase tracking-widest flex items-center gap-1">
+              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+              Aktif
+            </span>
+          )}
+        </div>
 
-      <div className="p-3">
-        {/* Kontrol Sesi - Dibuat vertikal agar tidak melebar */}
-        <div
-          className={`p-3 rounded-lg border ${isActive ? 'bg-blue-50/30 border-blue-100' : 'bg-slate-50 border-slate-200'} mb-4`}
-        >
-          <div className="flex flex-col gap-3">
-            <div>
-              <h3 className="text-xs font-bold text-slate-800">
-                {isActive ? 'Sesi Hari Ini Berjalan' : 'Sesi Belum Dimulai'}
-              </h3>
-              <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
-                {isActive
-                  ? `Batas akhir absen ditetapkan pada jam ${new Date(sessionData.batas_maksimal).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`
-                  : 'Tentukan batas maksimal absensi untuk hari ini.'}
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2 pt-2 border-t border-slate-200/50">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex flex-col">
-                  <span className="text-[8px] font-bold text-slate-500 uppercase mb-0.5">
-                    Jam Mulai
-                  </span>
-                  <input
-                    type="time"
-                    value={waktuMulai}
-                    onChange={(e) => setWaktuMulai(e.target.value)}
-                    className="w-full text-xs font-bold px-2 py-1.5 border border-slate-300 rounded focus:outline-none focus:border-blue-500 bg-white"
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[8px] font-bold text-slate-500 uppercase mb-0.5">
-                    Batas Telat
-                  </span>
-                  <input
-                    type="time"
-                    value={batasMaksimal}
-                    onChange={(e) => setBatasMaksimal(e.target.value)}
-                    className="w-full text-xs font-bold px-2 py-1.5 border border-slate-300 rounded focus:outline-none focus:border-blue-500 bg-white"
-                  />
-                </div>
+        <div className="p-3">
+          {/* Kontrol Sesi */}
+          <div
+            className={`p-3 rounded-lg border ${isActive ? 'bg-blue-50/30 border-blue-100' : 'bg-slate-50 border-slate-200'} mb-4`}
+          >
+            <div className="flex flex-col gap-3">
+              <div>
+                <h3 className="text-xs font-bold text-slate-800">
+                  {isActive ? 'Sesi Hari Ini Berjalan' : 'Sesi Belum Dimulai'}
+                </h3>
+                <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                  {isActive
+                    ? `Batas akhir absen ditetapkan pada jam ${new Date(sessionData.batas_maksimal).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`
+                    : 'Tentukan batas maksimal absensi untuk hari ini.'}
+                </p>
               </div>
-              <button
-                onClick={handleStartSession}
-                disabled={actionLoading}
-                className="w-full justify-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50 transition-colors mt-1"
-              >
-                {isActive ? (
-                  'Update Waktu'
-                ) : (
+
+              <div className="flex flex-col gap-2 pt-2 border-t border-slate-200/50">
+                {canManageSession ? (
                   <>
-                    <Play size={12} /> Mulai Sesi
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex flex-col">
+                        <span className="text-[8px] font-bold text-slate-500 uppercase mb-0.5">
+                          Jam Mulai
+                        </span>
+                        <input
+                          type="time"
+                          value={waktuMulai}
+                          onChange={(e) => setWaktuMulai(e.target.value)}
+                          className="w-full text-xs font-bold px-2 py-1.5 border border-slate-300 rounded focus:outline-none focus:border-blue-500 bg-white"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[8px] font-bold text-slate-500 uppercase mb-0.5">
+                          Batas Telat
+                        </span>
+                        <input
+                          type="time"
+                          value={batasMaksimal}
+                          onChange={(e) => setBatasMaksimal(e.target.value)}
+                          className="w-full text-xs font-bold px-2 py-1.5 border border-slate-300 rounded focus:outline-none focus:border-blue-500 bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 py-1">
+                      <input
+                        type="checkbox"
+                        id="repeatDaily"
+                        checked={repeatDaily}
+                        onChange={(e) => setRepeatDaily(e.target.checked)}
+                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                      />
+                      <label
+                        htmlFor="repeatDaily"
+                        className="text-[10px] font-semibold text-slate-600 cursor-pointer select-none"
+                      >
+                        Terapkan Jadwal Ini Setiap Hari (Otomatis)
+                      </label>
+                    </div>
+
+                    <button
+                      onClick={handleStartSession}
+                      disabled={actionLoading}
+                      className="w-full justify-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50 transition-colors mt-1 cursor-pointer"
+                    >
+                      {isActive ? (
+                        'Update Waktu'
+                      ) : (
+                        <>
+                          <Play size={12} /> Mulai Sesi
+                        </>
+                      )}
+                    </button>
                   </>
+                ) : (
+                  <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-[10px] text-slate-500 leading-normal flex items-start gap-1.5">
+                    <AlertCircle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                    <span>
+                      Jadwal absensi dikontrol oleh Owner dan Manager. Silakan hubungi mereka jika
+                      terdapat kendala waktu absensi.
+                    </span>
+                  </div>
                 )}
-              </button>
+              </div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Permohonan Izin Buka Akun */}
-        <div>
+      {/* Permohonan Izin Buka Akun (Hanya untuk Owner & Manager) */}
+      {canManageSession && (
+        <div className="p-3 border-t border-slate-100">
           <h3 className="text-[10px] font-bold uppercase text-slate-400 mb-2 tracking-wider flex items-center gap-1">
             <AlertCircle size={12} /> Permohonan Izin
           </h3>
 
-          <div className="space-y-2 max-h-[180px] overflow-y-auto custom-scrollbar pr-1">
+          <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
             {unlockRequests.length > 0 ? (
               unlockRequests.map((req) => (
                 <div
@@ -185,14 +225,14 @@ export default function AttendanceSessionManager() {
                     <button
                       onClick={() => handleAction(req.id, 'approve')}
                       disabled={actionLoading}
-                      className="flex-1 flex items-center justify-center gap-1 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded border border-emerald-200 text-[10px] font-bold transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded border border-emerald-200 text-[10px] font-bold transition-colors cursor-pointer"
                     >
                       <CheckCircle2 size={14} /> Setuju
                     </button>
                     <button
                       onClick={() => handleAction(req.id, 'reject')}
                       disabled={actionLoading}
-                      className="flex-1 flex items-center justify-center gap-1 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded border border-red-200 text-[10px] font-bold transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded border border-red-200 text-[10px] font-bold transition-colors cursor-pointer"
                     >
                       <XCircle size={14} /> Tolak
                     </button>
@@ -206,7 +246,7 @@ export default function AttendanceSessionManager() {
             )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
