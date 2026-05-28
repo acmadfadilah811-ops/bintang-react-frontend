@@ -70,6 +70,7 @@ export default function Announcements() {
 
   const submitAnnouncement = async (e) => {
     e.preventDefault();
+    if (formLoading) return; // Mencegah double submit pengumuman
     if (!formData.judul || !formData.isi) return alert('Judul dan isi wajib diisi!');
 
     if (formData.target === 'divisi' && !formData.divisi) {

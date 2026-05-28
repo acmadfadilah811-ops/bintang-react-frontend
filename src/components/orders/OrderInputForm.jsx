@@ -181,6 +181,8 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return; // Mencegah double submit jika user klik ganda tombol simpan
+
     if (!formData.nomor_wa || !formData.nama) return alert('Data pelanggan wajib diisi!');
     if (formData.items.some((item) => !item.jenis_produk))
       return alert('Pastikan semua item memiliki jenis produk!');

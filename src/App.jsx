@@ -1,6 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AlertCircle, CheckCircle, Info, X } from 'lucide-react';
 import { AuthProvider } from './context/AuthContext';
+
+let globalAlertTrigger = null;
+
+// Override native window.alert globally
+const nativeAlert = window.alert;
+window.alert = (message) => {
+  if (globalAlertTrigger) {
+    globalAlertTrigger(message);
+  } else {
+    nativeAlert(message);
+  }
+};
 import { DynamicIslandProvider } from './context/DynamicIslandContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
@@ -46,6 +59,44 @@ function DashboardRouter() {
 }
 
 function App() {
+  const [customAlert, setCustomAlert] = useState({
+    open: false,
+    message: '',
+    type: 'info'
+  });
+
+  useEffect(() => {
+    globalAlertTrigger = (message) => {
+      let type = 'info';
+      const msgLower = String(message || '').toLowerCase();
+      if (
+        msgLower.includes('gagal') || 
+        msgLower.includes('error') || 
+        msgLower.includes('salah') || 
+        msgLower.includes('tidak valid') ||
+        msgLower.includes('kosong')
+      ) {
+        type = 'error';
+      } else if (
+        msgLower.includes('berhasil') || 
+        msgLower.includes('sukses') || 
+        msgLower.includes('selesai') || 
+        msgLower.includes('terkirim') ||
+        msgLower.includes('cocok')
+      ) {
+        type = 'success';
+      }
+      setCustomAlert({
+        open: true,
+        message: String(message || ''),
+        type
+      });
+    };
+    return () => {
+      globalAlertTrigger = null;
+    };
+  }, []);
+
   // Global Click Sound Effect
   useEffect(() => {
     const clickSoundUrl = import.meta.env.VITE_CLICK_SOUND_URL;
@@ -141,6 +192,56 @@ function App() {
           </Routes>
         </BrowserRouter>
       </DynamicIslandProvider>
+      
+      {/* Premium Enterprise Custom Alert Modal */}
+      {customAlert.open && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-sm w-full p-6 relative flex flex-col items-center text-center transform scale-100 transition-all duration-300 shadow-indigo-500/10">
+            {/* Close Button */}
+            <button
+              onClick={() => setCustomAlert(prev => ({ ...prev, open: false }))}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 rounded-full p-1 hover:bg-slate-50 transition-all cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+
+            {/* Icon */}
+            <div className={`p-4 rounded-full mb-4 ${
+              customAlert.type === 'success' ? 'bg-emerald-50 text-emerald-500' :
+              customAlert.type === 'error' ? 'bg-rose-50 text-rose-500' :
+              'bg-indigo-50 text-indigo-500'
+            }`}>
+              {customAlert.type === 'success' && <CheckCircle size={32} />}
+              {customAlert.type === 'error' && <AlertCircle size={32} />}
+              {customAlert.type === 'info' && <Info size={32} />}
+            </div>
+
+            {/* Title */}
+            <h3 className="text-base font-extrabold text-slate-900 mb-2">
+              {customAlert.type === 'success' ? 'Berhasil' :
+               customAlert.type === 'error' ? 'Pemberitahuan Sistem' :
+               'Informasi'}
+            </h3>
+
+            {/* Message */}
+            <p className="text-slate-600 text-xs font-semibold leading-relaxed mb-5 max-h-40 overflow-y-auto px-1 w-full whitespace-pre-wrap">
+              {customAlert.message}
+            </p>
+
+            {/* Action Button */}
+            <button
+              onClick={() => setCustomAlert(prev => ({ ...prev, open: false }))}
+              className={`w-full py-2.5 rounded-xl font-bold text-xs text-white shadow-md transition-all transform active:scale-95 cursor-pointer ${
+                customAlert.type === 'success' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-emerald-500/20' :
+                customAlert.type === 'error' ? 'bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 shadow-rose-500/20' :
+                'bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-600 hover:to-blue-600 shadow-indigo-500/20'
+              }`}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </AuthProvider>
   );
 }

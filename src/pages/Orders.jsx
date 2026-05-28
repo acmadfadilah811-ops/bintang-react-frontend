@@ -937,13 +937,19 @@ export default function Orders() {
               </div>
 
               <div className="flex justify-between items-end mt-10">
-                <div className="text-[10px] text-slate-500 space-y-1">
-                  <p className="font-bold text-slate-700">Metode Pembayaran:</p>
-                  <p>{businessSettings?.deskripsi || `Transfer BCA: 1234567890 a/n ${businessSettings?.nama_bisnis || 'Brandy'}`}</p>
+                <div className="flex gap-12">
+                  <div className="text-[10px] text-slate-500 space-y-1 self-start">
+                    <p className="font-bold text-slate-700">Metode Pembayaran:</p>
+                    <p className="max-w-[220px]">{businessSettings?.deskripsi || `Transfer BCA: 1234567890 a/n ${businessSettings?.nama_bisnis || 'Brandy'}`}</p>
+                  </div>
+                  <div className="text-center w-36">
+                    <p className="mb-12 text-slate-500">Tanda Terima,</p>
+                    <p className="font-bold border-t border-slate-400 pt-1 text-slate-800">Pelanggan</p>
+                  </div>
                 </div>
-                <div className="text-center w-40">
-                  <p className="mb-12">Hormat Kami,</p>
-                  <p className="font-bold border-t border-slate-400 pt-1">Finance Dept.</p>
+                <div className="text-center w-36">
+                  <p className="mb-12 text-slate-500">Hormat Kami,</p>
+                  <p className="font-bold border-t border-slate-400 pt-1 text-slate-800">Finance Dept.</p>
                 </div>
               </div>
             </div>
@@ -1096,138 +1102,200 @@ export default function Orders() {
               </button>
             </div>
 
-            {/* Area SPK yang diprint (TANPA HARGA JUAL) */}
+            {/* Area SPK yang diprint */}
             <div className="p-8 print-area bg-white text-slate-800 text-[12px]">
-              <div className="text-center border-b-2 border-slate-800 pb-4 mb-6">
-                <h1 className="text-xl font-black tracking-widest uppercase text-slate-900">
-                  SURAT PERINTAH KERJA (SPK)
-                </h1>
-                <p className="text-slate-500 font-mono mt-1">No. Order: #{printSpkOrder.id}</p>
+              {/* Header SPK (seperti gambar) */}
+              <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-slate-900 rounded-lg flex items-center justify-center text-white font-black text-xl">
+                    {businessSettings?.nama_bisnis?.slice(0, 2).toUpperCase() || 'SA'}
+                  </div>
+                  <div>
+                    <h2 className="font-black text-sm tracking-wide uppercase text-slate-900 leading-tight">
+                      {businessSettings?.nama_bisnis || 'STAR ADVERTISING'}
+                    </h2>
+                    <p className="text-[10px] text-slate-500 font-bold mt-0.5">
+                      (WA: {businessSettings?.no_telepon || '0878 37 333 992'})
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-center self-center bg-slate-100 px-3 py-1 rounded border border-slate-200">
+                  <span className="text-slate-500 font-extrabold text-[10px] uppercase tracking-wider block">No Order</span>
+                  <h2 className="text-sm font-black text-red-650 font-mono tracking-wider">
+                    {printSpkOrder.id}
+                  </h2>
+                </div>
+
+                <table className="border-collapse border border-slate-400 text-[9px] font-bold text-slate-700 w-64">
+                  <thead>
+                    <tr className="bg-slate-100 divide-x divide-slate-400 border-b border-slate-400 text-center">
+                      <th className="py-1 px-1">Tgl. Terima</th>
+                      <th className="py-1 px-1">Tgl. Lihat Edit</th>
+                      <th className="py-1 px-1">OK Cetak</th>
+                      <th className="py-1 px-1">Tgl. Selesai</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="divide-x divide-slate-400 text-center font-black text-slate-900">
+                      <td className="py-2 px-1">
+                        {new Date(printSpkOrder.waktu).toLocaleDateString('id-ID', {
+                          day: '2-digit',
+                          month: '2-digit',
+                        })}
+                      </td>
+                      <td className="py-2 px-1"></td>
+                      <td className="py-2 px-1"></td>
+                      <td className="py-2 px-1"></td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-                    NAMA PELANGGAN:
-                  </p>
-                  <p className="font-bold text-[13px]">{printSpkOrder.nama}</p>
-                  <p className="text-slate-500">{printSpkOrder.nomor_wa}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-                    TANGGAL ORDER / MASUK:
-                  </p>
-                  <p className="font-bold">
-                    {new Date(printSpkOrder.waktu).toLocaleDateString('id-ID', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </p>
+              {/* Data Customer (seperti gambar) */}
+              <div className="grid grid-cols-2 gap-4 text-[11px] font-bold text-slate-700 mb-6">
+                <div className="space-y-1.5">
+                  <div className="flex border-b border-slate-200 pb-0.5">
+                    <span className="w-16 text-slate-400 uppercase tracking-wider">Nama :</span>
+                    <span className="text-slate-900 font-extrabold">{printSpkOrder.nama}</span>
+                  </div>
+                  <div className="flex border-b border-slate-200 pb-0.5">
+                    <span className="w-16 text-slate-400 uppercase tracking-wider">Tlp/WA :</span>
+                    <span className="text-slate-900 font-extrabold">{printSpkOrder.nomor_wa}</span>
+                  </div>
+                  <div className="flex border-b border-slate-200 pb-0.5">
+                    <span className="w-16 text-slate-400 uppercase tracking-wider">Email :</span>
+                    <span className="text-slate-900 font-extrabold">-</span>
+                  </div>
                 </div>
               </div>
 
-              {printSpkOrder.catatan_pelanggan && (
-                <div className="bg-slate-50 border border-slate-200 rounded p-3 mb-6">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                    Catatan Global / Instruksi Khusus CS:
-                  </p>
-                  <p className="text-slate-700 whitespace-pre-wrap">
-                    {printSpkOrder.catatan_pelanggan}
-                  </p>
-                </div>
-              )}
-
-              <table className="w-full text-left border-collapse mb-10 border border-slate-300">
+              {/* Tabel SPK (seperti gambar) */}
+              <table className="w-full text-left border-collapse mb-6 border border-slate-400">
                 <thead>
-                  <tr className="bg-slate-100 border-b border-slate-300">
-                    <th className="py-2 px-3 font-bold text-slate-700 w-10 text-center border-r border-slate-300">
-                      NO
-                    </th>
-                    <th className="py-2 px-3 font-bold text-slate-700 border-r border-slate-300">
-                      BARANG / SPEK TEKNIS
-                    </th>
-                    <th className="py-2 px-3 font-bold text-slate-700 text-center border-r border-slate-300">
-                      UKURAN (PxL)
-                    </th>
-                    <th className="py-2 px-3 font-bold text-slate-700 text-center border-r border-slate-300">
-                      QTY
-                    </th>
-                    <th className="py-2 px-3 font-bold text-slate-700">KETERANGAN / FINISHING</th>
+                  <tr className="bg-slate-100 border-b border-slate-400 divide-x divide-slate-400 text-[10px] uppercase font-black text-slate-700">
+                    <th className="py-2 px-3">Order</th>
+                    <th className="py-2 px-3 text-center w-28">Ukuran</th>
+                    <th className="py-2 px-3 text-center w-28">Finishing</th>
+                    <th className="py-2 px-3 text-center w-20">Bentuk</th>
+                    <th className="py-2 px-3 text-center w-24">Jml/Pcs/Lembar</th>
+                    <th className="py-2 px-3 text-right w-32">Harga</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-300">
-                  {printSpkOrder.items?.map((item, idx) => (
-                    <tr key={idx}>
-                      <td className="py-3 px-3 text-center border-r border-slate-300">{idx + 1}</td>
-                      <td className="py-3 px-3 border-r border-slate-300">
-                        <p className="font-bold text-slate-800">{item.jenis_produk}</p>
-                        <p className="text-[10px] text-slate-500 font-semibold">
-                          Bahan: {item.bahan || '-'}
-                        </p>
+                  {printSpkOrder.items?.map((item, idx) => {
+                    const formatUkuran = (parseFloat(item.panjang) > 0 && parseFloat(item.lebar) > 0)
+                      ? `${parseFloat(item.panjang)} x ${parseFloat(item.lebar)} m`
+                      : '-';
+
+                    return (
+                      <tr key={idx} className="divide-x divide-slate-300 font-semibold text-slate-800 text-[11px] hover:bg-slate-50/50">
+                        <td className="py-3 px-3">
+                          <p className="font-extrabold text-slate-900">{item.jenis_produk}</p>
+                          <p className="text-[9px] text-slate-500 font-medium">Bahan: {item.bahan || '-'}</p>
+                        </td>
+                        <td className="py-3 px-3 text-center">{formatUkuran}</td>
+                        <td className="py-3 px-3 text-center">{item.keterangan_detail || '-'}</td>
+                        <td className="py-3 px-3 text-center">
+                          {/* Bentuk Checkbox: 2 Kotak Kosong seperti di gambar */}
+                          <div className="flex justify-center gap-1.5">
+                            <span className="inline-block w-3.5 h-3.5 border border-slate-400 rounded-sm"></span>
+                            <span className="inline-block w-3.5 h-3.5 border border-slate-400 rounded-sm"></span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-center font-extrabold text-[12px]">{item.qty}</td>
+                        <td className="py-3 px-3 text-right font-extrabold">
+                          {formatRupiah(item.harga_jual || 0)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {/* Kosongkan sisa baris agar mirip nota kertas fisik (minimal 8 baris total) */}
+                  {Array.from({ length: Math.max(0, 8 - (printSpkOrder.items?.length || 0)) }).map((_, emptyIdx) => (
+                    <tr key={`empty-${emptyIdx}`} className="divide-x divide-slate-200 border-b border-slate-200 h-9 bg-slate-50/5">
+                      <td className="py-3 px-3"></td>
+                      <td className="py-3 px-3"></td>
+                      <td className="py-3 px-3"></td>
+                      <td className="py-3 px-3 text-center">
+                        <div className="flex justify-center gap-1.5 opacity-30">
+                          <span className="inline-block w-3.5 h-3.5 border border-slate-400 rounded-sm"></span>
+                          <span className="inline-block w-3.5 h-3.5 border border-slate-400 rounded-sm"></span>
+                        </div>
                       </td>
-                      <td className="py-3 px-3 text-center border-r border-slate-300">
-                        {parseFloat(item.panjang) > 0 && parseFloat(item.lebar) > 0
-                          ? `${item.panjang} x ${item.lebar} m`
-                          : '-'}
-                      </td>
-                      <td className="py-3 px-3 text-center font-bold text-[14px] border-r border-slate-300">
-                        {item.qty}
-                      </td>
-                      <td className="py-3 px-3">
-                        <p className="text-[11px] text-slate-700 whitespace-pre-wrap">
-                          {item.keterangan_detail || '-'}
-                        </p>
-                      </td>
+                      <td className="py-3 px-3"></td>
+                      <td className="py-3 px-3"></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
 
-              {/* Lembar Checklist Alur Produksi */}
-              <div className="border border-slate-300 rounded p-4 mb-8">
-                <p className="text-[11px] font-bold text-slate-600 mb-3 uppercase tracking-wider">
-                  Lembar Checklist Alur Produksi:
-                </p>
-                <div className="grid grid-cols-4 gap-4 text-center">
-                  <div className="border border-slate-200 rounded p-2">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-4">
-                      1. Desain / Layout
+              {/* Rincian Notes, Total, DP, Sisa, & Pembayaran */}
+              <div className="grid grid-cols-5 border border-slate-400 rounded-md overflow-hidden text-[11px] mb-6">
+                <div className="col-span-3 p-3 border-r border-slate-400 flex flex-col justify-between bg-slate-50/30">
+                  <div>
+                    <p className="font-extrabold text-slate-500 uppercase tracking-wider mb-1.5">Note :</p>
+                    <p className="text-slate-700 font-bold whitespace-pre-wrap leading-relaxed">
+                      {printSpkOrder.catatan_pelanggan || '-'}
                     </p>
-                    <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
-                    <p className="text-[9px] text-slate-500">Nama & Paraf</p>
                   </div>
-                  <div className="border border-slate-200 rounded p-2">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-4">
-                      2. Proses Cetak
-                    </p>
-                    <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
-                    <p className="text-[9px] text-slate-500">Nama & Paraf</p>
+                  <div className="text-[9px] text-slate-400 italic mt-4 border-t border-slate-200 pt-1.5">
+                    Dokumen cetak SPK & Nota Star Advertising.
                   </div>
-                  <div className="border border-slate-200 rounded p-2">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-4">
-                      3. Finishing
-                    </p>
-                    <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
-                    <p className="text-[9px] text-slate-500">Nama & Paraf</p>
+                </div>
+
+                <div className="col-span-2 divide-y divide-slate-400 font-bold text-slate-700">
+                  <div className="grid grid-cols-3 p-2 bg-slate-50/50">
+                    <span className="col-span-1 text-slate-500 uppercase tracking-wider">Total</span>
+                    <span className="col-span-2 text-right font-black text-slate-900">
+                      {formatRupiah(printSpkOrder.total_harga || 0)}
+                    </span>
                   </div>
-                  <div className="border border-slate-200 rounded p-2">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-4">
-                      4. Quality Control
+                  <div className="grid grid-cols-3 p-2">
+                    <span className="col-span-1 text-slate-500 uppercase tracking-wider">DP</span>
+                    <span className="col-span-2 text-right font-black text-indigo-700">
+                      {printSpkOrder.dp_dibayar > 0 ? formatRupiah(printSpkOrder.dp_dibayar) : '-'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 p-2 bg-red-50/30">
+                    <span className="col-span-1 text-red-950 uppercase tracking-wider">Sisa</span>
+                    <span className={`col-span-2 text-right font-black ${printSpkOrder.sisa_tagihan <= 0 ? 'text-emerald-600' : 'text-red-650'}`}>
+                      {printSpkOrder.sisa_tagihan <= 0 ? 'LUNAS' : formatRupiah(printSpkOrder.sisa_tagihan)}
+                    </span>
+                  </div>
+                  <div className="p-2 text-[10px] space-y-1">
+                    <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Pembayaran :</p>
+                    <p className="font-extrabold capitalize text-slate-800">
+                      {printSpkOrder.metode_pembayaran || 'Cash / EDC / Transfer'}
                     </p>
-                    <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
-                    <p className="text-[9px] text-slate-500">Nama & Paraf</p>
                   </div>
                 </div>
               </div>
 
-              <div className="text-[10px] text-slate-400 italic text-center mt-6">
-                <p>
-                  Dokumen Internal Produksi {businessSettings?.nama_bisnis || 'Brandy'}. Harap kembalikan ke meja CS setelah
-                  selesai.
-                </p>
+              {/* Lembar Checklist Alur Produksi (8 Kotak TTD seperti di gambar) */}
+              <div className="grid grid-cols-8 gap-2 text-center mt-6">
+                {[
+                  { label: 'Ord. Service', checked: true },
+                  { label: 'Editor 1' },
+                  { label: 'Editor 2' },
+                  { label: 'Review' },
+                  { label: 'Cetak' },
+                  { label: 'QC' },
+                  { label: 'Approval' },
+                  { label: 'QC' },
+                ].map((box, index) => (
+                  <div key={index} className="border border-slate-400 rounded p-1 flex flex-col justify-between h-14 bg-slate-50/10">
+                    <p className="text-[8px] font-black text-slate-500 truncate border-b border-slate-200 pb-0.5 uppercase tracking-wide">
+                      {box.label}
+                    </p>
+                    <div className="h-6 flex items-center justify-center">
+                      {box.checked ? (
+                        <span className="text-[9px] font-black text-blue-600 font-mono">✓ CS</span>
+                      ) : (
+                        <span className="text-slate-300 font-mono text-[8px]">—</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 

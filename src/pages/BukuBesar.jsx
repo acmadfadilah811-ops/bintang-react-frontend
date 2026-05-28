@@ -95,6 +95,7 @@ export default function BukuBesar() {
 
   const submitTransaksi = async (e) => {
     e.preventDefault();
+    if (formLoading) return; // Mencegah double submit transaksi
     if (!filter.akun_id)
       return alert('Pilih akun di filter terlebih dahulu sebelum menambah transaksi!');
     if (!formData.nominal || formData.nominal <= 0) return alert('Nominal harus lebih dari 0!');

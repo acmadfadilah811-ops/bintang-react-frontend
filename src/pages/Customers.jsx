@@ -46,6 +46,8 @@ export default function Customers() {
   // Dialog State
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', keterangan: '' });
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
+  const [isSavingPayment, setIsSavingPayment] = useState(false);
 
   const fetchCustomers = async () => {
     try {
@@ -85,7 +87,9 @@ export default function Customers() {
 
   const handleAddCustomer = async () => {
     if (!newCustomer.name || !newCustomer.phone) return;
+    if (isSavingCustomer) return;
     try {
+      setIsSavingCustomer(true);
       await apiClient.post('/contacts/', {
         nama: newCustomer.name,
         nomor_wa: newCustomer.phone,
@@ -100,6 +104,8 @@ export default function Customers() {
     } catch (err) {
       console.error('Gagal menambah pelanggan', err);
       alert('Gagal menambahkan pelanggan. Nomor WA mungkin sudah ada.');
+    } finally {
+      setIsSavingCustomer(false);
     }
   };
 
@@ -729,6 +735,7 @@ export default function Customers() {
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
+                if (isSavingPayment) return;
                 const form = e.target;
                 const jumlah = parseInt(form.jumlah.value || '0');
                 const metode = form.metode.value;
@@ -739,6 +746,7 @@ export default function Customers() {
                 }
 
                 try {
+                  setIsSavingPayment(true);
                   await apiClient.post(`/orders/${paymentModalData.orderId}/bayar/`, {
                     jumlah_bayar: jumlah,
                     metode_pembayaran: metode,
@@ -762,6 +770,8 @@ export default function Customers() {
                 } catch (err) {
                   console.error('Gagal bayar:', err);
                   alert('Gagal mencatat pembayaran.');
+                } finally {
+                  setIsSavingPayment(false);
                 }
               }}
             >
