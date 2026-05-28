@@ -3,15 +3,20 @@ import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
+// Baca business_settings dari localStorage sejak deklarasi —
+// supaya state awal sudah berisi logo tanpa harus menunggu useEffect.
+const _loadCachedSettings = () => {
+  try {
+    const raw = localStorage.getItem('business_settings');
+    if (raw) return JSON.parse(raw);
+  } catch (_) { /* ignore */ }
+  return { nama_bisnis: 'Brandy', no_telepon: '', alamat: '', logo_url: '', deskripsi: '' };
+};
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [businessSettings, setBusinessSettings] = useState({
-    nama_bisnis: 'Brandy',
-    no_telepon: '',
-    alamat: '',
-    logo_url: '',
-    deskripsi: '',
-  });
+  // Inisiasi langsung dari cache — tidak pernah flash default
+  const [businessSettings, setBusinessSettings] = useState(_loadCachedSettings);
   const [loading, setLoading] = useState(true);
 
   const fetchBusinessSettings = async (token) => {
@@ -31,18 +36,8 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    // Cek apakah ada token tersimpan saat pertama buka
     const token = localStorage.getItem('access_token');
     const savedUser = localStorage.getItem('user_data');
-    const savedSettings = localStorage.getItem('business_settings');
-
-    if (savedSettings) {
-      try {
-        setBusinessSettings(JSON.parse(savedSettings));
-      } catch (e) {
-        console.error('Gagal parsing saved business settings:', e);
-      }
-    }
 
     if (token && savedUser) {
       setUser(JSON.parse(savedUser));
@@ -61,7 +56,7 @@ export function AuthProvider({ children }) {
         })
         .catch((err) => console.error('Gagal sinkronisasi data user:', err));
 
-      // Ambil juga data bisnis terbaru
+      // Ambil juga data bisnis terbaru dari server
       fetchBusinessSettings(token);
     }
     setLoading(false);
@@ -72,6 +67,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('refresh_token', refreshToken);
     localStorage.setItem('user_data', JSON.stringify(userData));
     setUser(userData);
+    // Settings sudah ada di state dari cache, langsung fetch untuk sinkron
     fetchBusinessSettings(accessToken);
   };
 
@@ -79,15 +75,10 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user_data');
-    localStorage.removeItem('business_settings');
+    // business_settings TIDAK dihapus dari localStorage maupun state —
+    // itu data bisnis (logo, nama toko) yang sama untuk semua user,
+    // bukan data sensitif. Logo tetap tampil saat login kembali.
     setUser(null);
-    setBusinessSettings({
-      nama_bisnis: 'Brandy',
-      no_telepon: '',
-      alamat: '',
-      logo_url: '',
-      deskripsi: '',
-    });
   };
 
   const updateUser = (newData) => {

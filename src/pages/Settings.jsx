@@ -277,13 +277,33 @@ export default function Settings() {
       setLogoError(false);
       
       setBisnisMsg({ type: 'success', text: 'Pengaturan bisnis berhasil disimpan.' });
-    } catch {
-      setBisnisMsg({ type: 'error', text: 'Gagal menyimpan. Coba lagi.' });
+    } catch (err) {
+      // Deteksi error spesifik
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail || err?.response?.data?.logo_file?.[0] || '';
+      
+      let errMsg = 'Gagal menyimpan. Coba lagi.';
+      if (detail.toLowerCase().includes('storage') || detail.toLowerCase().includes('s3') || detail.toLowerCase().includes('connection')) {
+        errMsg = 'Gagal upload logo: storage cloud tidak terhubung. Hubungi administrator untuk konfigurasi R2/S3.';
+      } else if (status === 413) {
+        errMsg = 'Ukuran file terlalu besar. Maksimal 2MB.';
+      } else if (status === 415 || detail.toLowerCase().includes('image')) {
+        errMsg = 'Format file tidak didukung. Gunakan PNG, JPG, atau WEBP.';
+      } else if (status === 500) {
+        errMsg = logoFile
+          ? 'Gagal upload logo ke server. Pastikan konfigurasi storage sudah benar di VPS.'
+          : 'Terjadi kesalahan server. Coba lagi.';
+      } else if (detail) {
+        errMsg = detail;
+      }
+      
+      setBisnisMsg({ type: 'error', text: errMsg });
     } finally {
       setBisnisSaving(false);
-      setTimeout(() => setBisnisMsg(null), 3500);
+      setTimeout(() => setBisnisMsg(null), 5000);
     }
   };
+
 
   // ── Handler Akun Saya ──────────────────────────────────
   const handleSaveProfil = async (e) => {
