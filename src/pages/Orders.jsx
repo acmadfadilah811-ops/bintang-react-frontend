@@ -76,6 +76,7 @@ export default function Orders() {
     if (statusText === 'batal') return 'cancelled';
     if (statusText === 'review') return 'pending';
     if (statusText === 'proses') return 'printing';
+    if (statusText === 'ready') return 'ready';
     if (statusText === 'selesai') return 'completed';
     return 'other';
   };
@@ -583,6 +584,7 @@ export default function Orders() {
                   >
                     <option value="review">Pending / Review</option>
                     <option value="proses">In Progress / Proses Cetak</option>
+                    <option value="ready">Ready / Siap Diambil</option>
                     <option value="selesai">Completed / Selesai</option>
                     <option value="batal" className="text-red-500 font-bold">
                       Cancelled / Batal

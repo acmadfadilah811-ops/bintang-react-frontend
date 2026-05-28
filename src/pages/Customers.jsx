@@ -650,9 +650,11 @@ export default function Customers() {
                                   ? 'bg-red-100 text-red-700'
                                   : order.status_global === 'selesai'
                                     ? 'bg-blue-100 text-blue-700'
-                                    : order.status_global === 'proses'
-                                      ? 'bg-orange-100 text-orange-700'
-                                      : 'bg-slate-100 text-slate-600'
+                                    : order.status_global === 'ready'
+                                      ? 'bg-teal-100 text-teal-700'
+                                      : order.status_global === 'proses'
+                                        ? 'bg-orange-100 text-orange-700'
+                                        : 'bg-slate-100 text-slate-600'
                               }`}
                             >
                               {order.status_global}

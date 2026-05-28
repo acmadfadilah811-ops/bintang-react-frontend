@@ -129,6 +129,7 @@ export default function Dashboard() {
     const map = {
       review: 'bg-blue-50 text-blue-600 border-blue-200',
       proses: 'bg-amber-50 text-amber-600 border-amber-200',
+      ready: 'bg-teal-50 text-teal-600 border-teal-200',
       selesai: 'bg-emerald-50 text-emerald-600 border-emerald-200',
       batal: 'bg-red-50 text-red-600 border-red-200',
     };
@@ -423,6 +424,7 @@ export default function Dashboard() {
                     const colors = {
                       review: { bar: 'bg-blue-500', text: 'text-blue-600' },
                       proses: { bar: 'bg-amber-400', text: 'text-amber-600' },
+                      ready: { bar: 'bg-teal-500', text: 'text-teal-600' },
                       selesai: { bar: 'bg-emerald-500', text: 'text-emerald-600' },
                       batal: { bar: 'bg-red-400', text: 'text-red-500' },
                     };

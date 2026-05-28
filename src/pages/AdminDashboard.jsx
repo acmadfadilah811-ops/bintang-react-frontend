@@ -128,6 +128,7 @@ export default function AdminDashboard() {
     const map = {
       review: 'bg-blue-50 text-blue-600 border-blue-200',
       proses: 'bg-amber-50 text-amber-600 border-amber-200',
+      ready: 'bg-teal-50 text-teal-600 border-teal-200',
       selesai: 'bg-emerald-50 text-emerald-600 border-emerald-200',
       batal: 'bg-red-50 text-red-600 border-red-200',
     };
