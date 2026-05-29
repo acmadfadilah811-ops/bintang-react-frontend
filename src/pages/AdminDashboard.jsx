@@ -11,6 +11,9 @@ import {
   Circle,
   ClipboardList,
   Hourglass,
+  CheckCircle2,
+  AlertTriangle,
+  ArrowLeft,
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -25,6 +28,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showClockOutModal, setShowClockOutModal] = useState(false);
 
   // Jam real-time
   useEffect(() => {
@@ -103,7 +107,6 @@ export default function AdminDashboard() {
   };
 
   const handleClockOut = async () => {
-    if (!window.confirm('Yakin ingin Clock Out sekarang?')) return;
     try {
       setActionLoading(true);
       await apiClient.post('/hr/absensi/clock-out/', { catatan: '' });
@@ -112,6 +115,7 @@ export default function AdminDashboard() {
       alert(err.response?.data?.detail || 'Gagal Clock-Out');
     } finally {
       setActionLoading(false);
+      setShowClockOutModal(false);
     }
   };
 
@@ -127,12 +131,25 @@ export default function AdminDashboard() {
   const getStatusStyle = (status) => {
     const map = {
       review: 'bg-blue-50 text-blue-600 border-blue-200',
+      desain: 'bg-purple-50 text-purple-600 border-purple-200',
       proses: 'bg-amber-50 text-amber-600 border-amber-200',
       ready: 'bg-teal-50 text-teal-600 border-teal-200',
       selesai: 'bg-emerald-50 text-emerald-600 border-emerald-200',
       batal: 'bg-red-50 text-red-600 border-red-200',
     };
     return map[status] || 'bg-slate-50 text-slate-500 border-slate-200';
+  };
+
+  const getStatusLabel = (status) => {
+    const map = {
+      review: 'Menunggu Review',
+      desain: 'Proses Desain',
+      proses: 'Proses Produksi',
+      ready: 'Siap Diambil',
+      selesai: 'Selesai',
+      batal: 'Dibatalkan',
+    };
+    return map[status] || status;
   };
 
   const absensiHariIni = personalAttendance?.absensi_hari_ini;
@@ -268,15 +285,6 @@ export default function AdminDashboard() {
                       {!sudahClockIn ? 'Belum Masuk' : absensiHariIni?.status}
                     </h3>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xl font-black text-slate-800 tracking-tight tabular-nums leading-none">
-                      {currentTime.toLocaleTimeString('id-ID', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                      })}
-                    </div>
-                  </div>
                 </div>
                 <p className="text-xs text-slate-500 leading-relaxed mb-4">
                   {absensiHariIni?.jam_masuk
@@ -297,7 +305,7 @@ export default function AdminDashboard() {
                   Clock In
                 </button>
                 <button
-                  onClick={handleClockOut}
+                  onClick={() => setShowClockOutModal(true)}
                   disabled={!sudahClockIn || sudahClockOut || actionLoading}
                   className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer ${
                     !sudahClockIn || sudahClockOut
@@ -351,7 +359,7 @@ export default function AdminDashboard() {
                         className={`inline-flex items-center mt-1.5 gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wide ${getStatusStyle(order.status_global)}`}
                       >
                         <Circle size={5} className="fill-current" />
-                        {order.status_global}
+                        {getStatusLabel(order.status_global)}
                       </span>
                     </div>
                   </div>
@@ -415,6 +423,69 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+    {/* MODAL KONFIRMASI CLOCK OUT CUSTOM (PREMIUM STYLE) */}
+      {showClockOutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 flex flex-col animate-scale-up text-left">
+            {/* Header / Ikon Peringatan */}
+            <div className="bg-gradient-to-r from-red-500 to-rose-600 px-6 py-8 flex flex-col items-center text-center text-white relative">
+              <div className="absolute top-4 right-4">
+                <button
+                  onClick={() => setShowClockOutModal(false)}
+                  className="text-white/80 hover:text-white hover:bg-white/10 p-1.5 rounded-full transition-colors cursor-pointer"
+                >
+                  <ArrowLeft size={18} className="rotate-95" />
+                </button>
+              </div>
+              <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center border border-white/20 mb-3 shadow-inner">
+                <CalendarClock size={32} className="text-white" />
+              </div>
+              <h3 className="font-extrabold text-lg tracking-wide uppercase">Konfirmasi Keluar Jam Kerja</h3>
+              <p className="text-xs text-rose-100 mt-1">Sistem Absensi &amp; Kepegawaian Bintang Advertising</p>
+            </div>
+
+            {/* Konten Detail Peringatan */}
+            <div className="px-6 py-6 space-y-4">
+              <div className="flex gap-3 items-start bg-amber-50 border border-amber-200 rounded-xl p-3.5">
+                <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={20} />
+                <div className="text-xs text-amber-800 leading-relaxed font-medium">
+                  <span className="font-extrabold block text-amber-900 mb-1">⚠️ PERINGATAN PENTING:</span>
+                  Setelah menekan tombol Clock-Out, akses Anda ke <strong>Papan Produksi (Kanban Kerja) akan otomatis TERKUNCI</strong> untuk hari ini.
+                </div>
+              </div>
+
+              <div className="text-xs text-slate-500 leading-relaxed text-center">
+                Apakah Anda yakin telah menyelesaikan semua tugas admin hari ini dan ingin melakukan Clock-Out?
+              </div>
+            </div>
+
+            {/* Tombol Aksi */}
+            <div className="px-6 pb-6 pt-2 flex flex-col gap-2">
+              <button
+                onClick={handleClockOut}
+                disabled={actionLoading}
+                className="w-full bg-[#f0442c] hover:bg-[#d32f2f] text-white font-extrabold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer text-sm disabled:opacity-50"
+              >
+                {actionLoading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} />
+                    <span>Ya, Clock-Out Sekarang</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setShowClockOutModal(false)}
+                disabled={actionLoading}
+                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-4 rounded-xl transition-all cursor-pointer text-sm text-center disabled:opacity-50"
+              >
+                Batalkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

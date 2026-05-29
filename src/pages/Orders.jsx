@@ -18,6 +18,7 @@ import {
   Printer,
   Truck,
   DollarSign,
+  Palette,
 } from 'lucide-react';
 import OrderInputForm from '../components/orders/OrderInputForm';
 
@@ -31,6 +32,18 @@ export default function Orders() {
 
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [editModalData, setEditModalData] = useState(null);
+  const [selectedStatus, setSelectedStatus] = useState('');
+  
+  const openEditModal = (order) => {
+    setEditModalData(order);
+    setSelectedStatus(order.status_global);
+  };
+  
+  const closeEditModal = () => {
+    setEditModalData(null);
+    setSelectedStatus('');
+  };
+
   const [printOrder, setPrintOrder] = useState(null); // Resi Thermal
   const [printInvoiceOrder, setPrintInvoiceOrder] = useState(null); // Invoice A4
   const [printSuratJalanOrder, setPrintSuratJalanOrder] = useState(null); // Surat Jalan
@@ -75,6 +88,7 @@ export default function Orders() {
   const getStatusType = (statusText = '') => {
     if (statusText === 'batal') return 'cancelled';
     if (statusText === 'review') return 'pending';
+    if (statusText === 'desain') return 'desain';
     if (statusText === 'proses') return 'printing';
     if (statusText === 'ready') return 'ready';
     if (statusText === 'selesai') return 'completed';
@@ -84,6 +98,7 @@ export default function Orders() {
   const stats = useMemo(() => {
     const counts = {
       pending: 0,
+      desain: 0,
       progress: 0,
       ready: 0,
       completed: 0,
@@ -94,6 +109,7 @@ export default function Orders() {
     orders.forEach((order) => {
       const type = getStatusType(order.status_global);
       if (type === 'pending') counts.pending++;
+      if (type === 'desain') counts.desain++;
       if (type === 'printing') counts.progress++;
       if (type === 'ready') counts.ready++;
       if (type === 'completed') counts.completed++;
@@ -136,6 +152,13 @@ export default function Orders() {
       return (
         <span className="px-1.5 py-0.5 rounded-[4px] text-[8.5px] font-bold bg-slate-100 text-slate-600 uppercase tracking-wider">
           Pending
+        </span>
+      );
+    }
+    if (type === 'desain') {
+      return (
+        <span className="px-1.5 py-0.5 rounded-[4px] text-[8.5px] font-bold bg-purple-100 text-purple-700 uppercase tracking-wider">
+          Desain
         </span>
       );
     }
@@ -197,6 +220,7 @@ export default function Orders() {
       if (staffId && staffId !== '') {
         await apiClient.post(`/orders/${editModalData.id}/assign/`, {
           staff_id: parseInt(staffId),
+          status_global: newStatus,
         });
       }
 
@@ -204,7 +228,7 @@ export default function Orders() {
       const orderRes = await apiClient.get(`/orders/${editModalData.id}/`);
       updatedOrderData = orderRes.data;
 
-      setEditModalData(null);
+      closeEditModal();
       fetchOrders();
 
       // Jika ada PIC yang di-assign, otomatis tampilkan SPK cetak
@@ -274,12 +298,18 @@ export default function Orders() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-6">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 lg:grid-cols-7">
         <StatCard
           title="Pending"
           icon={FileText}
           count={stats.pending}
           iconColor="text-slate-400"
+        />
+        <StatCard
+          title="Desain"
+          icon={Palette}
+          count={stats.desain}
+          iconColor="text-purple-500"
         />
         <StatCard
           title="In Progress"
@@ -312,24 +342,28 @@ export default function Orders() {
       {/* Filters & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-1">
         <div className="flex gap-1 bg-slate-100/50 p-1 rounded-md border border-slate-200 overflow-x-auto">
-          {['all', 'pending', 'printing', 'ready', 'completed', 'cancelled', 'piutang'].map(
+          {['all', 'pending', 'desain', 'printing', 'ready', 'completed', 'cancelled', 'piutang'].map(
             (tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-3 py-1 rounded text-[10px] font-bold transition-all whitespace-nowrap cursor-pointer ${
+                className={`px-3 py-1 rounded text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer ${
                   activeTab === tab
-                    ? 'bg-white shadow-sm border border-slate-200 text-slate-900'
+                    ? 'bg-slate-900 text-white shadow-sm border border-slate-900'
                     : tab === 'cancelled' || tab === 'piutang'
-                      ? 'text-red-500 hover:text-red-700'
-                      : 'text-slate-500 hover:text-slate-900'
+                      ? 'text-red-600 hover:text-red-800'
+                      : 'text-slate-500 hover:text-slate-950'
                 }`}
               >
                 {tab === 'all'
                   ? 'All Jobs'
                   : tab === 'piutang'
                     ? 'Piutang'
-                    : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    : tab === 'printing'
+                      ? 'Printing'
+                      : tab === 'desain'
+                        ? 'Desain'
+                        : tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             )
           )}
@@ -502,7 +536,7 @@ export default function Orders() {
 
                           {/* ACTION ASLI (Edit, Cancel, Delete) */}
                           <button
-                            onClick={() => setEditModalData(order)}
+                            onClick={() => openEditModal(order)}
                             title="Edit Status"
                             className="p-1 bg-white border border-slate-200 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 rounded-[4px] transition-colors shadow-sm cursor-pointer"
                           >
@@ -568,7 +602,7 @@ export default function Orders() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setEditModalData(null)}
+                  onClick={closeEditModal}
                   className="text-slate-400 hover:text-slate-600"
                 >
                   <X className="w-4 h-4" />
@@ -579,10 +613,12 @@ export default function Orders() {
                   <label className="text-[12px] font-bold text-slate-800">Job Status</label>
                   <select
                     name="status"
-                    defaultValue={editModalData.status_global}
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
                     className="w-full text-[12px] border border-slate-200 bg-white rounded-md px-3 py-2 focus:ring-1 focus:ring-slate-900 outline-none"
                   >
                     <option value="review">Pending / Review</option>
+                    <option value="desain">Proses Desain</option>
                     <option value="proses">In Progress / Proses Cetak</option>
                     <option value="ready">Ready / Siap Diambil</option>
                     <option value="selesai">Completed / Selesai</option>
@@ -592,7 +628,7 @@ export default function Orders() {
                   </select>
                 </div>
 
-                {isManager && (
+                {isManager && ['review', 'desain', 'proses'].includes(selectedStatus) && (
                   <div className="space-y-1.5">
                     <label className="text-[12px] font-bold text-slate-800 flex items-center gap-1.5">
                       <UserCheck className="w-3.5 h-3.5 text-indigo-500" />
@@ -674,7 +710,7 @@ export default function Orders() {
               <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setEditModalData(null)}
+                  onClick={closeEditModal}
                   className="px-4 py-1.5 border border-slate-200 rounded-md text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors"
                 >
                   Cancel

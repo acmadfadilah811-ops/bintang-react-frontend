@@ -128,12 +128,25 @@ export default function Dashboard() {
   const getStatusStyle = (status) => {
     const map = {
       review: 'bg-blue-50 text-blue-600 border-blue-200',
+      desain: 'bg-purple-50 text-purple-600 border-purple-200',
       proses: 'bg-amber-50 text-amber-600 border-amber-200',
       ready: 'bg-teal-50 text-teal-600 border-teal-200',
       selesai: 'bg-emerald-50 text-emerald-600 border-emerald-200',
       batal: 'bg-red-50 text-red-600 border-red-200',
     };
     return map[status] || 'bg-slate-50 text-slate-500 border-slate-200';
+  };
+
+  const getStatusLabel = (status) => {
+    const map = {
+      review: 'Menunggu Review',
+      desain: 'Proses Desain',
+      proses: 'Proses Produksi',
+      ready: 'Siap Diambil',
+      selesai: 'Selesai',
+      batal: 'Dibatalkan',
+    };
+    return map[status] || status;
   };
 
   if (loading)
@@ -487,7 +500,7 @@ export default function Dashboard() {
                       className={`inline-flex items-center mt-1.5 gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wide ${getStatusStyle(order.status_global)}`}
                     >
                       <Circle size={5} className="fill-current" />
-                      {order.status_global}
+                      {getStatusLabel(order.status_global)}
                     </span>
                   </div>
                 </div>
