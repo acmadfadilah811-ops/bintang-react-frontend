@@ -15,19 +15,18 @@ const _loadCachedSettings = () => {
   return { nama_bisnis: 'Brandy', no_telepon: '', alamat: '', logo_url: '', deskripsi: '' };
 };
 
+import apiClient from '../api/apiClient';
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   // Inisiasi langsung dari cache — tidak pernah flash default
   const [businessSettings, setBusinessSettings] = useState(_loadCachedSettings);
   const [loading, setLoading] = useState(true);
 
-  const fetchBusinessSettings = async (token) => {
-    const apiBase = import.meta.env.VITE_API_URL || 'https://bintang-adv.duckdns.org/api';
+  const fetchBusinessSettings = async () => {
     try {
-      const res = await fetch(`${apiBase}/business-settings/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
+      const res = await apiClient.get('/business-settings/');
+      const data = res.data;
       if (data && data.nama_bisnis) {
         setBusinessSettings(data);
         localStorage.setItem('business_settings', JSON.stringify(data));
@@ -43,14 +42,11 @@ export function AuthProvider({ children }) {
 
     if (token && savedUser) {
       setUser(JSON.parse(savedUser));
-      const apiBase = import.meta.env.VITE_API_URL || 'https://bintang-adv.duckdns.org/api';
 
       // Ambil data terbaru dari server di background agar foto dll selalu sinkron
-      fetch(`${apiBase}/users/me/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((res) => res.json())
-        .then((data) => {
+      apiClient.get('/users/me/')
+        .then((res) => {
+          const data = res.data;
           if (data.id) {
             setUser(data);
             localStorage.setItem('user_data', JSON.stringify(data));
@@ -59,7 +55,7 @@ export function AuthProvider({ children }) {
         .catch((err) => console.error('Gagal sinkronisasi data user:', err));
 
       // Ambil juga data bisnis terbaru dari server
-      fetchBusinessSettings(token);
+      fetchBusinessSettings();
     }
     setLoading(false);
   }, []);
@@ -70,7 +66,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('user_data', JSON.stringify(userData));
     setUser(userData);
     // Settings sudah ada di state dari cache, langsung fetch untuk sinkron
-    fetchBusinessSettings(accessToken);
+    fetchBusinessSettings();
   };
 
   const logout = () => {

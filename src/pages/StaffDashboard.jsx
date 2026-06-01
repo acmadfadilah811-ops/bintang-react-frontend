@@ -52,8 +52,9 @@ export default function StaffDashboard() {
 
   const playNotificationSound = (filename) => {
     try {
-      const audioBaseUrl = import.meta.env.VITE_AUDIO_BASE_URL || '/audio';
-      const audio = new Audio(`${audioBaseUrl}/${filename}`);
+      const baseUrl = import.meta.env.BASE_URL || '/';
+      const cleanBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+      const audio = new Audio(`${cleanBase}audio/${filename}`);
       audio.play().catch((e) => console.log('Autoplay dicegah oleh browser, abaikan.', e));
     } catch (error) {
       console.log('Gagal memutar audio', error);

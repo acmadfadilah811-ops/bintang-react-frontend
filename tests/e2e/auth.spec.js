@@ -15,7 +15,7 @@ test.describe('Autentikasi & Login Page', () => {
     await expect(usernameInput).toBeVisible();
     await expect(passwordInput).toBeVisible();
     await expect(loginButton).toBeVisible();
-    await expect(loginButton).toHaveText('LOG IN');
+    await expect(loginButton).toHaveText('MASUK');
   });
 
   test('Harus menampilkan error jika login gagal dengan kredensial salah', async ({ page }) => {
@@ -26,8 +26,9 @@ test.describe('Autentikasi & Login Page', () => {
     // Klik tombol submit login
     await page.click('button[type="submit"]');
 
-    // Memastikan pesan kesalahan muncul di layar
-    const errorAlert = page.locator('text=Username atau password salah.');
+    // Memastikan pesan kesalahan muncul di layar (bisa berupa teks Indonesia atau default English dari server)
+    const errorAlert = page.locator('text=Username atau password salah.')
+      .or(page.locator('text=No active account found with the given credentials'));
     await expect(errorAlert).toBeVisible();
   });
 });

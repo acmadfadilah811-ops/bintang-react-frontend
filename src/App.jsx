@@ -4,18 +4,6 @@ import { AlertCircle, CheckCircle, Info, X } from 'lucide-react';
 import { AuthProvider } from './context/AuthContext';
 
 import { DynamicIslandProvider } from './context/DynamicIslandContext';
-
-let globalAlertTrigger = null;
-
-// Override native window.alert globally
-const nativeAlert = window.alert;
-window.alert = (message) => {
-  if (globalAlertTrigger) {
-    globalAlertTrigger(message);
-  } else {
-    nativeAlert(message);
-  }
-};
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -37,6 +25,18 @@ import Divisi from './pages/Divisi';
 import Reports from './pages/Reports';
 import { useAuth } from './context/AuthContext';
 import ProductionApp from './pages/produksi/ProductionApp';
+
+let globalAlertTrigger = null;
+
+// Override native window.alert globally
+const nativeAlert = window.alert;
+window.alert = (message) => {
+  if (globalAlertTrigger) {
+    globalAlertTrigger(message);
+  } else {
+    nativeAlert(message);
+  }
+};
 
 function HomeRedirect() {
   const { user } = useAuth();

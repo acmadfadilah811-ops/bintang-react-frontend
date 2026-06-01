@@ -70,7 +70,7 @@ apiClient.interceptors.response.use(
 
       try {
         // Minta access token baru pakai refresh token
-        const { data } = await axios.post(`${BASE_URL.replace('/api', '')}/api/auth/refresh/`, {
+        const { data } = await axios.post(`${BASE_URL.replace(/\/api$/, '')}/api/auth/refresh/`, {
           refresh: refreshToken,
         });
 
