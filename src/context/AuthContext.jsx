@@ -9,7 +9,9 @@ const _loadCachedSettings = () => {
   try {
     const raw = localStorage.getItem('business_settings');
     if (raw) return JSON.parse(raw);
-  } catch (_) { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return { nama_bisnis: 'Brandy', no_telepon: '', alamat: '', logo_url: '', deskripsi: '' };
 };
 
@@ -42,7 +44,7 @@ export function AuthProvider({ children }) {
     if (token && savedUser) {
       setUser(JSON.parse(savedUser));
       const apiBase = import.meta.env.VITE_API_URL || 'https://bintang-adv.duckdns.org/api';
-      
+
       // Ambil data terbaru dari server di background agar foto dll selalu sinkron
       fetch(`${apiBase}/users/me/`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -94,7 +96,9 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateUser, businessSettings, updateBusinessSettings, loading }}>
+    <AuthContext.Provider
+      value={{ user, login, logout, updateUser, businessSettings, updateBusinessSettings, loading }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -104,4 +108,3 @@ export function AuthProvider({ children }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
-

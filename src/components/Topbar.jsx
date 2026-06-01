@@ -114,7 +114,8 @@ export default function Topbar() {
     }
   }, [isSearchExpanded]);
 
-  const getPageTitle = () => PAGE_TITLES[location.pathname] || businessSettings?.nama_bisnis || 'Brandy';
+  const getPageTitle = () =>
+    PAGE_TITLES[location.pathname] || businessSettings?.nama_bisnis || 'Brandy';
 
   const getAvatarUrl = (path) => {
     if (!path) return null;

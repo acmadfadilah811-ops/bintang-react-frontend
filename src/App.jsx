@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AlertCircle, CheckCircle, Info, X } from 'lucide-react';
 import { AuthProvider } from './context/AuthContext';
 
+import { DynamicIslandProvider } from './context/DynamicIslandContext';
+
 let globalAlertTrigger = null;
 
 // Override native window.alert globally
@@ -14,7 +16,6 @@ window.alert = (message) => {
     nativeAlert(message);
   }
 };
-import { DynamicIslandProvider } from './context/DynamicIslandContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -32,16 +33,10 @@ import Attendance from './pages/Attendance';
 import BukuBesar from './pages/BukuBesar';
 import Announcements from './pages/Announcements';
 import Pricelist from './pages/Pricelist';
+import Divisi from './pages/Divisi';
 import Reports from './pages/Reports';
 import { useAuth } from './context/AuthContext';
-
-// Halaman placeholder untuk route yang belum ada halamannya
-const PageNotReady = ({ name }) => (
-  <div className="flex items-center justify-center h-64 text-gray-500 flex-col gap-2">
-    <p className="text-lg font-bold">🚧 {name}</p>
-    <p className="text-xs">Halaman ini sedang dalam pengembangan.</p>
-  </div>
-);
+import ProductionApp from './pages/produksi/ProductionApp';
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -62,7 +57,7 @@ function App() {
   const [customAlert, setCustomAlert] = useState({
     open: false,
     message: '',
-    type: 'info'
+    type: 'info',
   });
 
   useEffect(() => {
@@ -70,17 +65,17 @@ function App() {
       let type = 'info';
       const msgLower = String(message || '').toLowerCase();
       if (
-        msgLower.includes('gagal') || 
-        msgLower.includes('error') || 
-        msgLower.includes('salah') || 
+        msgLower.includes('gagal') ||
+        msgLower.includes('error') ||
+        msgLower.includes('salah') ||
         msgLower.includes('tidak valid') ||
         msgLower.includes('kosong')
       ) {
         type = 'error';
       } else if (
-        msgLower.includes('berhasil') || 
-        msgLower.includes('sukses') || 
-        msgLower.includes('selesai') || 
+        msgLower.includes('berhasil') ||
+        msgLower.includes('sukses') ||
+        msgLower.includes('selesai') ||
         msgLower.includes('terkirim') ||
         msgLower.includes('cocok')
       ) {
@@ -89,7 +84,7 @@ function App() {
       setCustomAlert({
         open: true,
         message: String(message || ''),
-        type
+        type,
       });
     };
     return () => {
@@ -171,6 +166,7 @@ function App() {
                 <Route path="/orders" element={<Orders />} />
                 <Route path="/orders/create" element={<Orders />} />
                 <Route path="/jobs" element={<Jobs />} />
+                <Route path="/produksi/*" element={<ProductionApp />} />
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/attendance" element={<Attendance />} />
 
@@ -178,7 +174,7 @@ function App() {
                 <Route path="/customers" element={<Customers />} />
                 <Route path="/users" element={<Employees />} />
                 <Route path="/employees" element={<Employees />} />
-                <Route path="/divisi" element={<PageNotReady name="Divisi & Jadwal" />} />
+                <Route path="/divisi" element={<Divisi />} />
 
                 {/* Laporan & Lainnya */}
                 <Route path="/buku-besar" element={<BukuBesar />} />
@@ -192,25 +188,29 @@ function App() {
           </Routes>
         </BrowserRouter>
       </DynamicIslandProvider>
-      
+
       {/* Premium Enterprise Custom Alert Modal */}
       {customAlert.open && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-sm w-full p-6 relative flex flex-col items-center text-center transform scale-100 transition-all duration-300 shadow-indigo-500/10">
             {/* Close Button */}
             <button
-              onClick={() => setCustomAlert(prev => ({ ...prev, open: false }))}
+              onClick={() => setCustomAlert((prev) => ({ ...prev, open: false }))}
               className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 rounded-full p-1 hover:bg-slate-50 transition-all cursor-pointer"
             >
               <X size={16} />
             </button>
 
             {/* Icon */}
-            <div className={`p-4 rounded-full mb-4 ${
-              customAlert.type === 'success' ? 'bg-emerald-50 text-emerald-500' :
-              customAlert.type === 'error' ? 'bg-rose-50 text-rose-500' :
-              'bg-indigo-50 text-indigo-500'
-            }`}>
+            <div
+              className={`p-4 rounded-full mb-4 ${
+                customAlert.type === 'success'
+                  ? 'bg-emerald-50 text-emerald-500'
+                  : customAlert.type === 'error'
+                    ? 'bg-rose-50 text-rose-500'
+                    : 'bg-indigo-50 text-indigo-500'
+              }`}
+            >
               {customAlert.type === 'success' && <CheckCircle size={32} />}
               {customAlert.type === 'error' && <AlertCircle size={32} />}
               {customAlert.type === 'info' && <Info size={32} />}
@@ -218,9 +218,11 @@ function App() {
 
             {/* Title */}
             <h3 className="text-base font-extrabold text-slate-900 mb-2">
-              {customAlert.type === 'success' ? 'Berhasil' :
-               customAlert.type === 'error' ? 'Pemberitahuan Sistem' :
-               'Informasi'}
+              {customAlert.type === 'success'
+                ? 'Berhasil'
+                : customAlert.type === 'error'
+                  ? 'Pemberitahuan Sistem'
+                  : 'Informasi'}
             </h3>
 
             {/* Message */}
@@ -230,11 +232,13 @@ function App() {
 
             {/* Action Button */}
             <button
-              onClick={() => setCustomAlert(prev => ({ ...prev, open: false }))}
+              onClick={() => setCustomAlert((prev) => ({ ...prev, open: false }))}
               className={`w-full py-2.5 rounded-xl font-bold text-xs text-white shadow-md transition-all transform active:scale-95 cursor-pointer ${
-                customAlert.type === 'success' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-emerald-500/20' :
-                customAlert.type === 'error' ? 'bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 shadow-rose-500/20' :
-                'bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-600 hover:to-blue-600 shadow-indigo-500/20'
+                customAlert.type === 'success'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-emerald-500/20'
+                  : customAlert.type === 'error'
+                    ? 'bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 shadow-rose-500/20'
+                    : 'bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-600 hover:to-blue-600 shadow-indigo-500/20'
               }`}
             >
               OK

@@ -1,5 +1,6 @@
 import apiClient from '../api/apiClient';
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Download,
@@ -10,7 +11,6 @@ import {
   CheckSquare,
   XCircle,
   Search,
-  Calendar,
   Edit2,
   X,
   UserCheck,
@@ -24,8 +24,19 @@ import OrderInputForm from '../components/orders/OrderInputForm';
 
 export default function Orders() {
   const { user, businessSettings } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [staffList, setStaffList] = useState([]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('action') === 'new') {
+      setIsManualModalOpen(true);
+      // Clean up URL query parameters
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location, navigate]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
@@ -33,12 +44,13 @@ export default function Orders() {
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [editModalData, setEditModalData] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState('');
-  
+  const [exporting, setExporting] = useState(false);
+
   const openEditModal = (order) => {
     setEditModalData(order);
     setSelectedStatus(order.status_global);
   };
-  
+
   const closeEditModal = () => {
     setEditModalData(null);
     setSelectedStatus('');
@@ -198,6 +210,8 @@ export default function Orders() {
     const form = e.target;
     const newStatus = form.status.value;
     const staffId = form.assign_staff?.value;
+    const biayaDesain = form.biaya_desain?.value ? parseInt(form.biaya_desain.value) : undefined;
+    const insentif = form.insentif?.value ? parseInt(form.insentif.value) : undefined;
     const jumlahBayar = parseInt(form.jumlah_bayar?.value || '0');
     const metodePembayaran = form.metode_pembayaran?.value || 'tunai';
 
@@ -215,13 +229,22 @@ export default function Orders() {
         });
       }
 
-      // 3. Assign Staff PIC jika diisi
+      // 3. Assign / Publish Job (Staff PIC atau Global Pool)
       let updatedOrderData = null;
-      if (staffId && staffId !== '') {
-        await apiClient.post(`/orders/${editModalData.id}/assign/`, {
-          staff_id: parseInt(staffId),
+      if (['desain', 'proses'].includes(newStatus)) {
+        const payload = {
           status_global: newStatus,
-        });
+        };
+        if (staffId && staffId !== '') {
+          payload.staff_id = parseInt(staffId);
+        }
+        if (biayaDesain !== undefined) {
+          payload.biaya_desain = biayaDesain;
+        }
+        if (insentif !== undefined) {
+          payload.insentif = insentif;
+        }
+        await apiClient.post(`/orders/${editModalData.id}/assign/`, payload);
       }
 
       // Tarik data pesanan terbaru setelah semua update selesai
@@ -231,8 +254,8 @@ export default function Orders() {
       closeEditModal();
       fetchOrders();
 
-      // Jika ada PIC yang di-assign, otomatis tampilkan SPK cetak
-      if (staffId && staffId !== '' && updatedOrderData) {
+      // Tampilkan SPK cetak jika masuk ke antrean/penugasan
+      if (['desain', 'proses'].includes(newStatus) && updatedOrderData) {
         setPrintSpkOrder(updatedOrderData);
       }
     } catch (error) {
@@ -256,6 +279,8 @@ export default function Orders() {
   };
 
   const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
     try {
       const response = await apiClient.get('/export/orders/', { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -268,6 +293,8 @@ export default function Orders() {
     } catch (error) {
       console.error('Export failed', error);
       alert('Gagal mengekspor data.');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -283,9 +310,10 @@ export default function Orders() {
           {isManager && (
             <button
               onClick={handleExport}
-              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-sm"
+              disabled={exporting}
+              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
             >
-              <Download className="w-3.5 h-3.5" /> Export Excel
+              <Download className="w-3.5 h-3.5" /> {exporting ? 'Exporting...' : 'Export Excel'}
             </button>
           )}
           <button
@@ -305,12 +333,7 @@ export default function Orders() {
           count={stats.pending}
           iconColor="text-slate-400"
         />
-        <StatCard
-          title="Desain"
-          icon={Palette}
-          count={stats.desain}
-          iconColor="text-purple-500"
-        />
+        <StatCard title="Desain" icon={Palette} count={stats.desain} iconColor="text-purple-500" />
         <StatCard
           title="In Progress"
           icon={FileClock}
@@ -342,31 +365,38 @@ export default function Orders() {
       {/* Filters & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-1">
         <div className="flex gap-1 bg-slate-100/50 p-1 rounded-md border border-slate-200 overflow-x-auto">
-          {['all', 'pending', 'desain', 'printing', 'ready', 'completed', 'cancelled', 'piutang'].map(
-            (tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-3 py-1 rounded text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer ${
-                  activeTab === tab
-                    ? 'bg-slate-900 text-white shadow-sm border border-slate-900'
-                    : tab === 'cancelled' || tab === 'piutang'
-                      ? 'text-red-600 hover:text-red-800'
-                      : 'text-slate-500 hover:text-slate-950'
-                }`}
-              >
-                {tab === 'all'
-                  ? 'All Jobs'
-                  : tab === 'piutang'
-                    ? 'Piutang'
-                    : tab === 'printing'
-                      ? 'Printing'
-                      : tab === 'desain'
-                        ? 'Desain'
-                        : tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            )
-          )}
+          {[
+            'all',
+            'pending',
+            'desain',
+            'printing',
+            'ready',
+            'completed',
+            'cancelled',
+            'piutang',
+          ].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-1 rounded text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === tab
+                  ? 'bg-slate-900 text-white shadow-sm border border-slate-900'
+                  : tab === 'cancelled' || tab === 'piutang'
+                    ? 'text-red-600 hover:text-red-800'
+                    : 'text-slate-500 hover:text-slate-950'
+              }`}
+            >
+              {tab === 'all'
+                ? 'All Jobs'
+                : tab === 'piutang'
+                  ? 'Piutang'
+                  : tab === 'printing'
+                    ? 'Printing'
+                    : tab === 'desain'
+                      ? 'Desain'
+                      : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
         </div>
         <div className="relative w-full sm:w-56 shrink-0">
           <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-slate-400" />
@@ -629,26 +659,54 @@ export default function Orders() {
                 </div>
 
                 {isManager && ['review', 'desain', 'proses'].includes(selectedStatus) && (
-                  <div className="space-y-1.5">
-                    <label className="text-[12px] font-bold text-slate-800 flex items-center gap-1.5">
-                      <UserCheck className="w-3.5 h-3.5 text-indigo-500" />
-                      Assign Staff (PIC)
-                    </label>
-                    <select
-                      name="assign_staff"
-                      className="w-full text-[12px] border border-slate-200 bg-white rounded-md px-3 py-2 focus:ring-1 focus:ring-slate-900 outline-none"
-                    >
-                      <option value="">-- Pilih Staff --</option>
-                      {staffList.map((staff) => (
-                        <option key={staff.id} value={staff.id}>
-                          {staff.username}
-                          {staff.divisi_nama ? ` (${staff.divisi_nama})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-[10px] text-slate-400 italic">
-                      Memilih staff akan otomatis membuat job di Papan Produksi
-                    </p>
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[12px] font-bold text-slate-800 flex items-center gap-1.5">
+                        <UserCheck className="w-3.5 h-3.5 text-indigo-500" />
+                        Assign Staff (PIC)
+                      </label>
+                      <select
+                        name="assign_staff"
+                        className="w-full text-[12px] border border-slate-200 bg-white rounded-md px-3 py-2 focus:ring-1 focus:ring-slate-900 outline-none"
+                      >
+                        <option value="">-- Kirim ke Antrean Global Divisi (Claim Pool) --</option>
+                        {staffList.map((staff) => (
+                          <option key={staff.id} value={staff.id}>
+                            {staff.username}
+                            {staff.divisi_nama ? ` (${staff.divisi_nama})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-slate-400 italic">
+                        Biarkan kosong untuk mempublikasikan tugas ke kolam klaim divisi (Claim
+                        Pool).
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-650">
+                          Biaya Desain (Custom)
+                        </label>
+                        <input
+                          type="number"
+                          name="biaya_desain"
+                          placeholder="Cth: 25000"
+                          className="w-full text-[12px] border border-slate-200 bg-white rounded-md px-3 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-650">
+                          Estimasi Insentif
+                        </label>
+                        <input
+                          type="number"
+                          name="insentif"
+                          placeholder="Cth: 15000"
+                          className="w-full text-[12px] border border-slate-200 bg-white rounded-md px-3 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -748,8 +806,12 @@ export default function Orders() {
                 <h2 className="font-extrabold text-[16px] uppercase tracking-widest text-slate-900">
                   {businessSettings?.nama_bisnis || 'Brandy'}
                 </h2>
-                <p className="text-[11px] text-slate-500 mt-1">{businessSettings?.alamat || 'Jl. Produksi No. 123, Kota'}</p>
-                <p className="text-[11px] text-slate-500">Telp: {businessSettings?.no_telepon || '0812-3456-7890'}</p>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  {businessSettings?.alamat || 'Jl. Produksi No. 123, Kota'}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  Telp: {businessSettings?.no_telepon || '0812-3456-7890'}
+                </p>
               </div>
 
               <div className="space-y-1 mb-4 text-[11px]">
@@ -857,9 +919,15 @@ export default function Orders() {
                   <p className="text-slate-500 font-mono mt-1">#{printInvoiceOrder.id}</p>
                 </div>
                 <div className="text-right">
-                  <h2 className="font-bold text-[14px]">{businessSettings?.nama_bisnis || 'Brandy'}</h2>
-                  <p className="text-slate-500 mt-0.5">{businessSettings?.alamat || 'Jl. Produksi No. 123, Kota'}</p>
-                  <p className="text-slate-500">WA: {businessSettings?.no_telepon || '0812-3456-7890'}</p>
+                  <h2 className="font-bold text-[14px]">
+                    {businessSettings?.nama_bisnis || 'Brandy'}
+                  </h2>
+                  <p className="text-slate-500 mt-0.5">
+                    {businessSettings?.alamat || 'Jl. Produksi No. 123, Kota'}
+                  </p>
+                  <p className="text-slate-500">
+                    WA: {businessSettings?.no_telepon || '0812-3456-7890'}
+                  </p>
                 </div>
               </div>
 
@@ -976,16 +1044,23 @@ export default function Orders() {
                 <div className="flex gap-12">
                   <div className="text-[10px] text-slate-500 space-y-1 self-start">
                     <p className="font-bold text-slate-700">Metode Pembayaran:</p>
-                    <p className="max-w-[220px]">{businessSettings?.deskripsi || `Transfer BCA: 1234567890 a/n ${businessSettings?.nama_bisnis || 'Brandy'}`}</p>
+                    <p className="max-w-[220px]">
+                      {businessSettings?.deskripsi ||
+                        `Transfer BCA: 1234567890 a/n ${businessSettings?.nama_bisnis || 'Brandy'}`}
+                    </p>
                   </div>
                   <div className="text-center w-36">
                     <p className="mb-12 text-slate-500">Tanda Terima,</p>
-                    <p className="font-bold border-t border-slate-400 pt-1 text-slate-800">Pelanggan</p>
+                    <p className="font-bold border-t border-slate-400 pt-1 text-slate-800">
+                      Pelanggan
+                    </p>
                   </div>
                 </div>
                 <div className="text-center w-36">
                   <p className="mb-12 text-slate-500">Hormat Kami,</p>
-                  <p className="font-bold border-t border-slate-400 pt-1 text-slate-800">Finance Dept.</p>
+                  <p className="font-bold border-t border-slate-400 pt-1 text-slate-800">
+                    Finance Dept.
+                  </p>
                 </div>
               </div>
             </div>
@@ -1099,7 +1174,9 @@ export default function Orders() {
                 </div>
                 <div className="text-center w-40">
                   <p className="mb-16">Mengetahui,</p>
-                  <p className="font-bold border-t border-slate-400 pt-1">{businessSettings?.nama_bisnis || 'Brandy'}</p>
+                  <p className="font-bold border-t border-slate-400 pt-1">
+                    {businessSettings?.nama_bisnis || 'Brandy'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1138,177 +1215,167 @@ export default function Orders() {
               </button>
             </div>
 
-            {/* Area SPK yang diprint */}
-            <div className="p-8 print-area bg-white text-slate-800 text-[12px]">
-              {/* Header SPK (seperti gambar) */}
-              <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-slate-900 rounded-lg flex items-center justify-center text-white font-black text-xl">
+            <div className="p-6 print-area bg-white text-slate-800 text-[11px] leading-tight">
+              {/* Header SPK */}
+              <div className="flex justify-between items-center border-b pb-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-slate-900 rounded flex items-center justify-center text-white font-black text-sm">
                     {businessSettings?.nama_bisnis?.slice(0, 2).toUpperCase() || 'SA'}
                   </div>
                   <div>
-                    <h2 className="font-black text-sm tracking-wide uppercase text-slate-900 leading-tight">
+                    <h2 className="font-extrabold text-xs tracking-wide uppercase text-slate-900 leading-none">
                       {businessSettings?.nama_bisnis || 'STAR ADVERTISING'}
                     </h2>
-                    <p className="text-[10px] text-slate-500 font-bold mt-0.5">
-                      (WA: {businessSettings?.no_telepon || '0878 37 333 992'})
+                    <p className="text-[9px] text-slate-500 font-medium">
+                      WA: {businessSettings?.no_telepon || '0878 37 333 992'}
                     </p>
                   </div>
                 </div>
 
-                <div className="text-center self-center bg-slate-100 px-3 py-1 rounded border border-slate-200">
-                  <span className="text-slate-500 font-extrabold text-[10px] uppercase tracking-wider block">No Order</span>
-                  <h2 className="text-sm font-black text-red-650 font-mono tracking-wider">
-                    {printSpkOrder.id}
-                  </h2>
-                </div>
-
-                <table className="border-collapse border border-slate-400 text-[9px] font-bold text-slate-700 w-64">
-                  <thead>
-                    <tr className="bg-slate-100 divide-x divide-slate-400 border-b border-slate-400 text-center">
-                      <th className="py-1 px-1">Tgl. Terima</th>
-                      <th className="py-1 px-1">Tgl. Lihat Edit</th>
-                      <th className="py-1 px-1">OK Cetak</th>
-                      <th className="py-1 px-1">Tgl. Selesai</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="divide-x divide-slate-400 text-center font-black text-slate-900">
-                      <td className="py-2 px-1">
-                        {new Date(printSpkOrder.waktu).toLocaleDateString('id-ID', {
-                          day: '2-digit',
-                          month: '2-digit',
-                        })}
-                      </td>
-                      <td className="py-2 px-1"></td>
-                      <td className="py-2 px-1"></td>
-                      <td className="py-2 px-1"></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Data Customer (seperti gambar) */}
-              <div className="grid grid-cols-2 gap-4 text-[11px] font-bold text-slate-700 mb-6">
-                <div className="space-y-1.5">
-                  <div className="flex border-b border-slate-200 pb-0.5">
-                    <span className="w-16 text-slate-400 uppercase tracking-wider">Nama :</span>
-                    <span className="text-slate-900 font-extrabold">{printSpkOrder.nama}</span>
+                <div className="flex items-center gap-4 text-[10px]">
+                  <div className="text-right">
+                    <span className="text-slate-400 font-bold block text-[8px] uppercase">
+                      No Order
+                    </span>
+                    <span className="font-mono font-black text-red-650 text-xs">
+                      #{printSpkOrder.id}
+                    </span>
                   </div>
-                  <div className="flex border-b border-slate-200 pb-0.5">
-                    <span className="w-16 text-slate-400 uppercase tracking-wider">Tlp/WA :</span>
-                    <span className="text-slate-900 font-extrabold">{printSpkOrder.nomor_wa}</span>
-                  </div>
-                  <div className="flex border-b border-slate-200 pb-0.5">
-                    <span className="w-16 text-slate-400 uppercase tracking-wider">Email :</span>
-                    <span className="text-slate-900 font-extrabold">-</span>
+                  <div className="text-right border-l pl-3">
+                    <span className="text-slate-400 font-bold block text-[8px] uppercase">
+                      Tgl Order
+                    </span>
+                    <span className="font-bold text-slate-800">
+                      {new Date(printSpkOrder.waktu).toLocaleDateString('id-ID', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Tabel SPK (seperti gambar) */}
-              <table className="w-full text-left border-collapse mb-6 border border-slate-400">
+              {/* Data Customer */}
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 grid grid-cols-3 gap-3 mb-3 text-[10px]">
+                <div>
+                  <span className="text-slate-400 block text-[8px] uppercase font-bold">
+                    Pelanggan
+                  </span>
+                  <span className="text-slate-900 font-extrabold capitalize">
+                    {printSpkOrder.nama}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[8px] uppercase font-bold">
+                    Kontak / WA
+                  </span>
+                  <span className="text-slate-900 font-bold">{printSpkOrder.nomor_wa}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[8px] uppercase font-bold">
+                    Metode Pembayaran
+                  </span>
+                  <span className="text-slate-900 font-extrabold uppercase">
+                    {printSpkOrder.metode_pembayaran || 'Cash/EDC/Transfer'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Tabel SPK */}
+              <table className="w-full text-left border-collapse mb-3 border border-slate-350">
                 <thead>
-                  <tr className="bg-slate-100 border-b border-slate-400 divide-x divide-slate-400 text-[10px] uppercase font-black text-slate-700">
-                    <th className="py-2 px-3">Order</th>
-                    <th className="py-2 px-3 text-center w-28">Ukuran</th>
-                    <th className="py-2 px-3 text-center w-28">Finishing</th>
-                    <th className="py-2 px-3 text-center w-20">Bentuk</th>
-                    <th className="py-2 px-3 text-center w-24">Jml/Pcs/Lembar</th>
-                    <th className="py-2 px-3 text-right w-32">Harga</th>
+                  <tr className="bg-slate-100 border-b border-slate-350 divide-x divide-slate-350 text-[9px] uppercase font-black text-slate-650">
+                    <th className="py-1.5 px-2">Item Order</th>
+                    <th className="py-1.5 px-2 text-center w-24">Ukuran</th>
+                    <th className="py-1.5 px-2 text-center w-36">Finishing & Keterangan</th>
+                    <th className="py-1.5 px-2 text-center w-14">Qty</th>
+                    <th className="py-1.5 px-2 text-right w-24">Harga</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-300">
+                <tbody className="divide-y divide-slate-250 text-[10px]">
                   {printSpkOrder.items?.map((item, idx) => {
-                    const formatUkuran = (parseFloat(item.panjang) > 0 && parseFloat(item.lebar) > 0)
-                      ? `${parseFloat(item.panjang)} x ${parseFloat(item.lebar)} m`
-                      : '-';
+                    const formatUkuran =
+                      parseFloat(item.panjang) > 0 && parseFloat(item.lebar) > 0
+                        ? `${parseFloat(item.panjang)} x ${parseFloat(item.lebar)} m`
+                        : '-';
 
                     return (
-                      <tr key={idx} className="divide-x divide-slate-300 font-semibold text-slate-800 text-[11px] hover:bg-slate-50/50">
-                        <td className="py-3 px-3">
-                          <p className="font-extrabold text-slate-900">{item.jenis_produk}</p>
-                          <p className="text-[9px] text-slate-500 font-medium">Bahan: {item.bahan || '-'}</p>
+                      <tr
+                        key={idx}
+                        className="divide-x divide-slate-250 font-medium text-slate-800 hover:bg-slate-50/50"
+                      >
+                        <td className="py-1.5 px-2">
+                          <p className="font-extrabold text-slate-900 leading-tight">
+                            {item.jenis_produk}
+                          </p>
+                          <p className="text-[8.5px] text-slate-500">Bahan: {item.bahan || '-'}</p>
+                          {item.jobs && item.jobs.length > 0 && (
+                            <div className="mt-1 space-y-0.5 border-t border-slate-100 pt-1 text-[8px] text-slate-400">
+                              {item.jobs.map((job) => (
+                                <p key={job.id}>
+                                  <strong>{job.tahap_nama}:</strong> {job.pic_nama || 'Belum Klaim'}{' '}
+                                  ({job.status_pekerjaan})
+                                </p>
+                              ))}
+                            </div>
+                          )}
                         </td>
-                        <td className="py-3 px-3 text-center">{formatUkuran}</td>
-                        <td className="py-3 px-3 text-center">{item.keterangan_detail || '-'}</td>
-                        <td className="py-3 px-3 text-center">
-                          {/* Bentuk Checkbox: 2 Kotak Kosong seperti di gambar */}
-                          <div className="flex justify-center gap-1.5">
-                            <span className="inline-block w-3.5 h-3.5 border border-slate-400 rounded-sm"></span>
-                            <span className="inline-block w-3.5 h-3.5 border border-slate-400 rounded-sm"></span>
-                          </div>
+                        <td className="py-1.5 px-2 text-center whitespace-nowrap">
+                          {formatUkuran}
                         </td>
-                        <td className="py-3 px-3 text-center font-extrabold text-[12px]">{item.qty}</td>
-                        <td className="py-3 px-3 text-right font-extrabold">
+                        <td className="py-1.5 px-2 text-slate-600 leading-tight text-[9.5px]">
+                          {item.keterangan_detail || '-'}
+                        </td>
+                        <td className="py-1.5 px-2 text-center font-extrabold">{item.qty}</td>
+                        <td className="py-1.5 px-2 text-right font-bold">
                           {formatRupiah(item.harga_jual || 0)}
                         </td>
                       </tr>
                     );
                   })}
-                  {/* Kosongkan sisa baris agar mirip nota kertas fisik (minimal 8 baris total) */}
-                  {Array.from({ length: Math.max(0, 8 - (printSpkOrder.items?.length || 0)) }).map((_, emptyIdx) => (
-                    <tr key={`empty-${emptyIdx}`} className="divide-x divide-slate-200 border-b border-slate-200 h-9 bg-slate-50/5">
-                      <td className="py-3 px-3"></td>
-                      <td className="py-3 px-3"></td>
-                      <td className="py-3 px-3"></td>
-                      <td className="py-3 px-3 text-center">
-                        <div className="flex justify-center gap-1.5 opacity-30">
-                          <span className="inline-block w-3.5 h-3.5 border border-slate-400 rounded-sm"></span>
-                          <span className="inline-block w-3.5 h-3.5 border border-slate-400 rounded-sm"></span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3"></td>
-                      <td className="py-3 px-3"></td>
-                    </tr>
-                  ))}
                 </tbody>
               </table>
 
-              {/* Rincian Notes, Total, DP, Sisa, & Pembayaran */}
-              <div className="grid grid-cols-5 border border-slate-400 rounded-md overflow-hidden text-[11px] mb-6">
-                <div className="col-span-3 p-3 border-r border-slate-400 flex flex-col justify-between bg-slate-50/30">
-                  <div>
-                    <p className="font-extrabold text-slate-500 uppercase tracking-wider mb-1.5">Note :</p>
-                    <p className="text-slate-700 font-bold whitespace-pre-wrap leading-relaxed">
-                      {printSpkOrder.catatan_pelanggan || '-'}
-                    </p>
-                  </div>
-                  <div className="text-[9px] text-slate-400 italic mt-4 border-t border-slate-200 pt-1.5">
-                    Dokumen cetak SPK & Nota Star Advertising.
-                  </div>
+              {/* Rincian Notes & Total */}
+              <div className="grid grid-cols-5 border border-slate-350 rounded overflow-hidden text-[10px] mb-3">
+                <div className="col-span-3 p-2 bg-slate-50/20 border-r border-slate-350">
+                  <span className="font-bold text-slate-400 block text-[8px] uppercase">
+                    Catatan Pelanggan / Produksi :
+                  </span>
+                  <p className="text-slate-700 whitespace-pre-wrap leading-tight mt-0.5">
+                    {printSpkOrder.catatan_pelanggan || '-'}
+                  </p>
                 </div>
 
-                <div className="col-span-2 divide-y divide-slate-400 font-bold text-slate-700">
-                  <div className="grid grid-cols-3 p-2 bg-slate-50/50">
-                    <span className="col-span-1 text-slate-500 uppercase tracking-wider">Total</span>
-                    <span className="col-span-2 text-right font-black text-slate-900">
+                <div className="col-span-2 divide-y divide-slate-350 font-bold text-slate-700">
+                  <div className="grid grid-cols-2 p-1.5 bg-slate-50/50">
+                    <span className="text-slate-400 text-[8px] uppercase">Total</span>
+                    <span className="text-right font-black text-slate-900">
                       {formatRupiah(printSpkOrder.total_harga || 0)}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 p-2">
-                    <span className="col-span-1 text-slate-500 uppercase tracking-wider">DP</span>
-                    <span className="col-span-2 text-right font-black text-indigo-700">
+                  <div className="grid grid-cols-2 p-1.5">
+                    <span className="text-slate-400 text-[8px] uppercase">DP</span>
+                    <span className="text-right font-black text-indigo-700">
                       {printSpkOrder.dp_dibayar > 0 ? formatRupiah(printSpkOrder.dp_dibayar) : '-'}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 p-2 bg-red-50/30">
-                    <span className="col-span-1 text-red-950 uppercase tracking-wider">Sisa</span>
-                    <span className={`col-span-2 text-right font-black ${printSpkOrder.sisa_tagihan <= 0 ? 'text-emerald-600' : 'text-red-650'}`}>
-                      {printSpkOrder.sisa_tagihan <= 0 ? 'LUNAS' : formatRupiah(printSpkOrder.sisa_tagihan)}
+                  <div className="grid grid-cols-2 p-1.5 bg-red-50/10">
+                    <span className="text-red-900 text-[8px] uppercase">Sisa</span>
+                    <span
+                      className={`text-right font-black ${printSpkOrder.sisa_tagihan <= 0 ? 'text-emerald-600' : 'text-red-650'}`}
+                    >
+                      {printSpkOrder.sisa_tagihan <= 0
+                        ? 'LUNAS'
+                        : formatRupiah(printSpkOrder.sisa_tagihan)}
                     </span>
-                  </div>
-                  <div className="p-2 text-[10px] space-y-1">
-                    <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Pembayaran :</p>
-                    <p className="font-extrabold capitalize text-slate-800">
-                      {printSpkOrder.metode_pembayaran || 'Cash / EDC / Transfer'}
-                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* Lembar Checklist Alur Produksi (8 Kotak TTD seperti di gambar) */}
-              <div className="grid grid-cols-8 gap-2 text-center mt-6">
+              {/* Lembar Checklist Alur Produksi */}
+              <div className="grid grid-cols-8 gap-1 text-center">
                 {[
                   { label: 'Ord. Service', checked: true },
                   { label: 'Editor 1' },
@@ -1319,15 +1386,18 @@ export default function Orders() {
                   { label: 'Approval' },
                   { label: 'QC' },
                 ].map((box, index) => (
-                  <div key={index} className="border border-slate-400 rounded p-1 flex flex-col justify-between h-14 bg-slate-50/10">
-                    <p className="text-[8px] font-black text-slate-500 truncate border-b border-slate-200 pb-0.5 uppercase tracking-wide">
+                  <div
+                    key={index}
+                    className="border border-slate-300 rounded p-1 flex flex-col justify-between h-10 bg-slate-50/10"
+                  >
+                    <p className="text-[7.5px] font-bold text-slate-450 truncate border-b border-slate-100 pb-0.5 uppercase tracking-wide">
                       {box.label}
                     </p>
-                    <div className="h-6 flex items-center justify-center">
+                    <div className="flex items-center justify-center">
                       {box.checked ? (
-                        <span className="text-[9px] font-black text-blue-600 font-mono">✓ CS</span>
+                        <span className="text-[8px] font-black text-blue-600 font-mono">✓ CS</span>
                       ) : (
-                        <span className="text-slate-300 font-mono text-[8px]">—</span>
+                        <span className="text-slate-300 font-mono text-[7px]">—</span>
                       )}
                     </div>
                   </div>
@@ -1344,7 +1414,7 @@ export default function Orders() {
               </button>
               <button
                 onClick={() => window.print()}
-                className="px-4 py-2 bg-orange-600 text-white font-bold text-xs rounded-md hover:bg-orange-700 flex items-center gap-2 cursor-pointer"
+                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-md flex items-center gap-2 cursor-pointer"
               >
                 <Printer size={14} /> Cetak SPK Produksi
               </button>

@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 
 const DynamicIslandContext = createContext(null);
 
-export const TRACKS = [
+const TRACKS = [
   {
     title: 'Chill Lofi Beats',
     artist: 'Lofi Work Study',
@@ -75,6 +75,7 @@ export function DynamicIslandProvider({ children }) {
         setMusicPlaying(false);
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTrackIndex, audio]);
 
   // Sync music playing state
@@ -166,6 +167,7 @@ export function DynamicIslandProvider({ children }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useDynamicIsland() {
   const context = useContext(DynamicIslandContext);
   if (!context) {

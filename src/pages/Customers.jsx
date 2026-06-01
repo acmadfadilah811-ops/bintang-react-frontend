@@ -20,6 +20,7 @@ export default function Customers() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const isManager = ['owner', 'manager'].includes(user?.role);
 
@@ -138,6 +139,8 @@ export default function Customers() {
   };
 
   const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
     try {
       const response = await apiClient.get('/export/contacts/', { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -150,6 +153,8 @@ export default function Customers() {
     } catch (err) {
       console.error('Export gagal:', err);
       alert('Gagal mengekspor data pelanggan.');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -182,14 +187,14 @@ export default function Customers() {
             {syncing ? 'Syncing...' : 'Sync Data'}
           </button>
 
-          {/* Export Excel — hanya manager/owner */}
           {isManager && (
             <button
               onClick={handleExport}
-              className="inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors bg-green-600 text-white hover:bg-green-700 shadow h-8 px-3"
+              disabled={exporting}
+              className="inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors bg-green-600 text-white hover:bg-green-700 shadow h-8 px-3 disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5 mr-1.5" />
-              Export Excel
+              {exporting ? 'Exporting...' : 'Export Excel'}
             </button>
           )}
 

@@ -12,7 +12,6 @@ export default function Layout() {
   const navigate = useNavigate();
   const [statusTerkunci, setStatusTerkunci] = useState(null);
   const [loading, setLoading] = useState(true);
-
   const [isMobileScreen, setIsMobileScreen] = useState(() => window.innerWidth < 768);
 
   useEffect(() => {
@@ -41,6 +40,10 @@ export default function Layout() {
       setLoading(false);
     }
   }, [user]);
+
+  if (location.pathname.startsWith('/produksi')) {
+    return <Outlet />;
+  }
 
   if (loading) {
     return (

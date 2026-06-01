@@ -21,6 +21,7 @@ import {
   DollarSign,
   ChevronDown,
   BarChart3,
+  Layers,
 } from 'lucide-react';
 
 const groupedMenuOwnerManager = [
@@ -32,7 +33,7 @@ const groupedMenuOwnerManager = [
     isGroup: true,
     submenus: [
       { path: '/orders', label: 'Pesanan', icon: ShoppingCart },
-      { path: '/jobs', label: 'Papan Produksi', icon: Kanban },
+      { path: '/produksi', label: 'Papan Produksi', icon: Kanban },
       { path: '/customers', label: 'Pelanggan', icon: User },
     ],
   },
@@ -44,6 +45,7 @@ const groupedMenuOwnerManager = [
     submenus: [
       { path: '/attendance', label: 'Absensi', icon: CalendarClock },
       { path: '/employees', label: 'Karyawan', icon: Briefcase },
+      { path: '/divisi', label: 'Divisi & Tahap', icon: Layers },
       { path: '/announcements', label: 'Pengumuman', icon: Bell },
       { path: '/reports', label: 'Laporan Kerja', icon: BarChart3 },
     ],
@@ -65,8 +67,15 @@ const groupedMenuOwnerManager = [
 
 const menuStaff = [
   { path: '/staff-dashboard', label: 'Dashboard', icon: LayoutDashboard, isGroup: false },
-  { path: '/jobs', label: 'Papan Produksi', icon: Kanban, isGroup: false },
+  { path: '/produksi', label: 'Papan Produksi', icon: Kanban, isGroup: false },
   { path: '/profile', label: 'Profil', icon: User, isGroup: false },
+];
+
+const menuAdmin = [
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, isGroup: false },
+  { path: '/produksi', label: 'Papan Produksi', icon: Kanban, isGroup: false },
+  { path: '/profile', label: 'Profil', icon: User, isGroup: false },
+  { path: '/settings', label: 'Pengaturan', icon: Settings, isGroup: false },
 ];
 
 const getLogoUrl = (url) => {
@@ -104,7 +113,7 @@ export default function Sidebar() {
     if (path === '/dashboard' || path === '/') return 'dashboard';
     if (path === '/staff-dashboard') return 'staff-dashboard';
     if (path === '/orders') return 'orders';
-    if (path === '/jobs') return 'jobs';
+    if (path === '/jobs' || path === '/produksi') return 'jobs';
     if (path === '/customers') return 'customers';
     if (path === '/attendance') return 'attendance';
     if (path === '/employees') return 'employees';
@@ -113,11 +122,13 @@ export default function Sidebar() {
     if (path === '/inventory') return 'inventory';
     if (path === '/buku-besar') return 'buku-besar';
     if (path === '/pricelist') return 'pricelist';
+    if (path === '/divisi') return 'divisi';
     if (path === '/settings') return 'settings';
     return null;
   };
 
-  const baseMenu = userRole === 'staff' ? menuStaff : groupedMenuOwnerManager;
+  const baseMenu =
+    userRole === 'staff' ? menuStaff : userRole === 'admin' ? menuAdmin : groupedMenuOwnerManager;
 
   // Filter menu berdasarkan perizinan hak akses dinamis
   const filteredMenu = baseMenu
@@ -149,26 +160,30 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`bg-slate-900 min-h-screen flex flex-col border-r border-slate-800 transition-all duration-300 relative z-20 shadow-sm ${
+      className={`bg-white min-h-screen flex flex-col border-r border-slate-200 transition-all duration-300 relative z-20 shadow-sm ${
         isCollapsed ? 'w-20' : 'w-56'
       }`}
     >
       {/* Tombol Toggle Expand/Collapse */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-6 bg-slate-800 hover:bg-slate-700 text-slate-300 p-1 rounded-full border border-slate-700 z-30 transition-colors shadow-sm cursor-pointer"
+        className="absolute -right-3 top-6 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-700 p-1 rounded-full border border-slate-200 z-30 transition-colors shadow-sm cursor-pointer"
       >
         {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
       </button>
 
       {/* Logo / Nama Aplikasi */}
-      <div className="h-16 flex items-center justify-center border-b border-slate-800 overflow-hidden bg-slate-900 shrink-0">
+      <div className="h-16 flex items-center justify-center border-b border-slate-200 overflow-hidden bg-white shrink-0">
         <div
           className={`flex items-center gap-2 whitespace-nowrap transition-all duration-300 ${isCollapsed ? 'scale-110' : 'scale-100'}`}
         >
-          <div className={`rounded-lg flex items-center justify-center overflow-hidden w-12 h-12 shrink-0 ${
-            businessSettings?.logo_url && !logoError ? 'p-0' : 'p-2.5 bg-blue-600 shadow-sm'
-          }`}>
+          <div
+            className={`rounded-lg flex items-center justify-center overflow-hidden w-12 h-12 shrink-0 ${
+              businessSettings?.logo_url && !logoError
+                ? 'p-0'
+                : 'p-2.5 bg-blue-650 bg-blue-600 shadow-sm'
+            }`}
+          >
             {businessSettings?.logo_url && !logoError ? (
               <img
                 src={getLogoUrl(businessSettings.logo_url)}
@@ -181,7 +196,10 @@ export default function Sidebar() {
             )}
           </div>
           {!isCollapsed && (
-            <h1 className="text-white font-extrabold text-[15px] tracking-tight animate-fade-in truncate max-w-[125px]" title={businessSettings?.nama_bisnis || 'Brandy'}>
+            <h1
+              className="text-slate-855 text-slate-800 font-extrabold text-[15px] tracking-tight animate-fade-in truncate max-w-[125px]"
+              title={businessSettings?.nama_bisnis || 'Brandy'}
+            >
               {businessSettings?.nama_bisnis || 'Brandy'}
             </h1>
           )}
@@ -189,7 +207,7 @@ export default function Sidebar() {
       </div>
 
       {/* Menu Navigasi */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto overflow-x-hidden sidebar-scrollbar">
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto overflow-x-hidden sidebar-scrollbar bg-white">
         {filteredMenu.map((item) => {
           if (!item.isGroup) {
             const isActive = location.pathname === item.path;
@@ -203,8 +221,8 @@ export default function Sidebar() {
                   isCollapsed ? 'justify-center p-2.5' : 'px-3 py-2 gap-3'
                 } ${
                   isActive
-                    ? 'bg-blue-600/20 text-blue-400 font-bold shadow-sm border border-blue-500/30'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white font-medium'
+                    ? 'bg-blue-50 text-blue-600 font-extrabold shadow-sm border border-blue-100'
+                    : 'text-slate-650 hover:bg-slate-50 hover:text-slate-900 font-semibold'
                 }`}
               >
                 <Icon size={isCollapsed ? 20 : 18} className="shrink-0" />
@@ -227,8 +245,8 @@ export default function Sidebar() {
                     isCollapsed ? 'justify-center p-2.5' : 'px-3 py-2 gap-3'
                   } ${
                     isAnySubActive
-                      ? 'bg-slate-800/60 text-blue-400 font-bold border-l-2 border-blue-500'
-                      : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200 font-semibold'
+                      ? 'bg-slate-50 text-blue-600 font-extrabold border-l-2 border-blue-500'
+                      : 'text-slate-650 hover:bg-slate-50/50 hover:text-slate-800 font-semibold'
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -268,8 +286,8 @@ export default function Sidebar() {
                               : 'pl-9 pr-3 py-1.5 gap-2 text-xs'
                           } ${
                             isSubActive
-                              ? 'text-blue-400 font-bold bg-blue-600/10'
-                              : 'text-slate-500 hover:text-slate-200'
+                              ? 'text-blue-600 font-extrabold bg-blue-50/60'
+                              : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50/30'
                           }`}
                         >
                           <SubIcon size={isCollapsed ? 16 : 14} className="shrink-0" />
@@ -288,11 +306,11 @@ export default function Sidebar() {
       </nav>
 
       {/* Tombol Logout */}
-      <div className="p-3 border-t border-slate-800 bg-slate-900 shrink-0">
+      <div className="p-3 border-t border-slate-200 bg-white shrink-0">
         <button
           onClick={logout}
           title={isCollapsed ? 'Keluar' : ''}
-          className={`flex items-center w-full rounded-lg text-sm text-red-400 hover:bg-red-950/50 hover:text-red-300 font-medium transition-all duration-200 cursor-pointer ${
+          className={`flex items-center w-full rounded-lg text-sm text-red-600 hover:bg-red-50 hover:text-red-700 font-semibold transition-all duration-200 cursor-pointer ${
             isCollapsed ? 'justify-center p-2.5' : 'px-3 py-2 gap-3'
           }`}
         >

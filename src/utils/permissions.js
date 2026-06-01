@@ -13,13 +13,12 @@ export const MENU_FEATURES = [
   { id: 'buku-besar', label: 'Buku Besar (Ledger)', path: '/buku-besar' },
   { id: 'pricelist', label: 'Daftar Harga (Pricelist)', path: '/pricelist' },
   { id: 'settings', label: 'Pengaturan (Settings)', path: '/settings' },
+  { id: 'divisi', label: 'Divisi & Tahap Proses', path: '/divisi' },
 ];
 
 export const DEFAULT_PERMISSIONS = {
   owner: [
     'dashboard',
-    'orders',
-    'jobs',
     'customers',
     'attendance',
     'employees',
@@ -28,12 +27,11 @@ export const DEFAULT_PERMISSIONS = {
     'inventory',
     'buku-besar',
     'pricelist',
+    'divisi',
     'settings',
   ],
   manager: [
     'dashboard',
-    'orders',
-    'jobs',
     'customers',
     'attendance',
     'employees',
@@ -42,6 +40,7 @@ export const DEFAULT_PERMISSIONS = {
     'inventory',
     'buku-besar',
     'pricelist',
+    'divisi',
     'settings',
   ],
   admin: [
@@ -59,7 +58,7 @@ export const DEFAULT_PERMISSIONS = {
 
 // Perizinan yang WAJIB dimiliki dan tidak bisa dihapus per-role
 const LOCKED_PERMISSIONS = {
-  admin: ['dashboard', 'settings'],
+  admin: ['dashboard', 'settings', 'jobs'],
   manager: ['dashboard'],
   staff: ['staff-dashboard'],
 };
@@ -123,7 +122,15 @@ export function hasMenuAccess(role, featureId) {
   if (!role) return false;
   const currentRole = role.toLowerCase();
 
-  // Owner memiliki akses penuh tanpa kecuali
+  // Owner & Manager do not have access to 'orders' or 'jobs' features
+  if (
+    (currentRole === 'owner' || currentRole === 'manager') &&
+    (featureId === 'orders' || featureId === 'jobs')
+  ) {
+    return false;
+  }
+
+  // Owner memiliki akses penuh tanpa kecuali (selain fitur di atas)
   if (currentRole === 'owner') return true;
 
   // Cek locked permissions terlebih dahulu
@@ -137,6 +144,7 @@ export function hasMenuAccess(role, featureId) {
 // Memetakan URL path ke ID fitur untuk proteksi rute
 export function getFeatureIdByPath(path) {
   if (path === '/') return 'dashboard';
+  if (path.startsWith('/produksi')) return 'jobs';
   const match = MENU_FEATURES.find((f) => f.path !== '/' && path.startsWith(f.path));
   return match ? match.id : null;
 }

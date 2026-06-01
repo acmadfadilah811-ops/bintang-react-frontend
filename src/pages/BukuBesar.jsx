@@ -81,6 +81,7 @@ export default function BukuBesar() {
     if (filter.akun_id) {
       fetchBukuBesar();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter.akun_id]);
 
   const handleFilterChange = (e) => {

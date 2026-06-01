@@ -142,7 +142,6 @@ export default function Settings() {
   const [bisnisMsg, setBisnisMsg] = useState(null); // { type, text }
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState('');
-  const [logoError, setLogoError] = useState(false);
 
   // ── Tab Akun Saya ──
   const [profil, setProfil] = useState({ no_hp: '', kota: '', bio: '', email: '' });
@@ -195,12 +194,11 @@ export default function Settings() {
     setBisnisLoading(true);
     try {
       const res = await apiClient.get('/business-settings/');
-      const { divisi_list, ...fields } = res.data;
+      const { divisi_list: _divBisnis, ...fields } = res.data;
       setBisnis(fields);
-      setBisnisDivisi(divisi_list || []);
+      setBisnisDivisi(_divBisnis || []);
       setLogoFile(null);
       setLogoPreview('');
-      setLogoError(false);
     } catch {
       /* silent */
     } finally {
@@ -265,26 +263,31 @@ export default function Settings() {
           'Content-Type': 'multipart/form-data',
         },
       });
-      
+
       // Update context global agar Topbar / Sidebar langsung terupdate
       updateBusinessSettings(res.data);
-      
+
       // Update local state bisnis dengan respon data terbaru
-      const { divisi_list, ...fields } = res.data;
+      const fields = { ...res.data };
+      delete fields.divisi_list;
       setBisnis(fields);
       setLogoFile(null);
       setLogoPreview('');
-      setLogoError(false);
-      
+
       setBisnisMsg({ type: 'success', text: 'Pengaturan bisnis berhasil disimpan.' });
     } catch (err) {
       // Deteksi error spesifik
       const status = err?.response?.status;
       const detail = err?.response?.data?.detail || err?.response?.data?.logo_file?.[0] || '';
-      
+
       let errMsg = 'Gagal menyimpan. Coba lagi.';
-      if (detail.toLowerCase().includes('storage') || detail.toLowerCase().includes('s3') || detail.toLowerCase().includes('connection')) {
-        errMsg = 'Gagal upload logo: storage cloud tidak terhubung. Hubungi administrator untuk konfigurasi R2/S3.';
+      if (
+        detail.toLowerCase().includes('storage') ||
+        detail.toLowerCase().includes('s3') ||
+        detail.toLowerCase().includes('connection')
+      ) {
+        errMsg =
+          'Gagal upload logo: storage cloud tidak terhubung. Hubungi administrator untuk konfigurasi R2/S3.';
       } else if (status === 413) {
         errMsg = 'Ukuran file terlalu besar. Maksimal 2MB.';
       } else if (status === 415 || detail.toLowerCase().includes('image')) {
@@ -296,14 +299,13 @@ export default function Settings() {
       } else if (detail) {
         errMsg = detail;
       }
-      
+
       setBisnisMsg({ type: 'error', text: errMsg });
     } finally {
       setBisnisSaving(false);
       setTimeout(() => setBisnisMsg(null), 5000);
     }
   };
-
 
   // ── Handler Akun Saya ──────────────────────────────────
   const handleSaveProfil = async (e) => {

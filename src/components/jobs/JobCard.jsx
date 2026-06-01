@@ -1,8 +1,11 @@
 /**
  * JobCard — Kartu job minimal di papan kanban staff.
  * Props: job, orderInfo, onOpenWorkspace
+ *
+ * BUG FIX: prop bernama `_job` (underscore) → tidak bisa diakses sebagai `job`.
+ * Diubah ke `job` agar data status dan tahap bisa ditampilkan.
  */
-export default function JobCard({ _job, orderInfo, onOpenWorkspace }) {
+export default function JobCard({ job, orderInfo, onOpenWorkspace }) {
   return (
     <div
       onClick={onOpenWorkspace}
@@ -20,6 +23,9 @@ export default function JobCard({ _job, orderInfo, onOpenWorkspace }) {
       <p className="text-[11px] text-indigo-700 font-semibold truncate mt-1">
         {orderInfo?.jenisProduk || '...'}
       </p>
+      {job?.tahap_nama && (
+        <p className="text-[9px] text-slate-400 truncate mt-0.5">📍 {job.tahap_nama}</p>
+      )}
     </div>
   );
 }

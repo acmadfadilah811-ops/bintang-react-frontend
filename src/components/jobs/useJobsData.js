@@ -6,11 +6,12 @@ import { STAFF_COLUMNS } from './jobConstants';
  * useJobsData — Custom hook untuk semua state & handler di halaman Jobs.
  * Memisahkan logika dari tampilan agar Jobs.jsx tetap bersih.
  */
-export function useJobsData(isManager = false) {
+export function useJobsData() {
   const [jobs, setJobs] = useState([]);
   const [orderMap, setOrderMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
 
   const [tahapList, setTahapList] = useState([]);
@@ -31,40 +32,49 @@ export function useJobsData(isManager = false) {
   const fetchData = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [jobsRes, ordersRes] = await Promise.all([
+      // Gunakan allSettled agar jika /orders/ gagal 403 (staff belum clock-in),
+      // papan produksi tetap bisa tampil dengan data jobs saja.
+      const [jobsRes, ordersRes] = await Promise.allSettled([
         apiClient.get('/jobs/'),
         apiClient.get('/orders/'),
       ]);
 
-      const map = {};
-      ordersRes.data.forEach((order) => {
-        order.items?.forEach((item) => {
-          map[item.id] = {
-            orderItemId: item.id,
-            orderId: order.id,
-            jenisProduk: item.jenis_produk,
-            customerName: order.nama,
-            nomorWa: order.nomor_wa,
-            keterangan: item.detail || '',
-            keteranganDetail: item.keterangan_detail || '',
-            catatanPelanggan: order.catatan_pelanggan || '',
-            fileLink: item.gdrive_customer_link || '',
-            qty: item.qty || 1,
-            hargaJual: item.harga_jual || 0,
-          };
-        });
-      });
+      if (jobsRes.status === 'fulfilled') {
+        setJobs(jobsRes.value.data);
+        setError(null);
+      } else {
+        console.error('Gagal memuat data jobs:', jobsRes.reason);
+        if (jobsRes.reason?.response?.status === 403) {
+          setError(
+            'Akses ditolak. Anda harus absen (Clock-In) terlebih dahulu untuk membuka Pekerjaan.'
+          );
+        }
+      }
 
-      setJobs(jobsRes.data);
-      setOrderMap(map);
-      setError(null);
+      if (ordersRes.status === 'fulfilled') {
+        const map = {};
+        ordersRes.value.data.forEach((order) => {
+          order.items?.forEach((item) => {
+            map[item.id] = {
+              orderItemId: item.id,
+              orderId: order.id,
+              jenisProduk: item.jenis_produk,
+              customerName: order.nama,
+              nomorWa: order.nomor_wa,
+              keterangan: item.detail || '',
+              keteranganDetail: item.keterangan_detail || '',
+              catatanPelanggan: order.catatan_pelanggan || '',
+              fileLink: item.gdrive_customer_link || '',
+              qty: item.qty || 1,
+              hargaJual: item.harga_jual || 0,
+            };
+          });
+        });
+        setOrderMap(map);
+      }
+      // Jika ordersRes gagal (403), orderMap tetap kosong tapi jobs tetap tampil
     } catch (err) {
       console.error('Gagal memuat data jobs:', err);
-      if (err.response?.status === 403 && !isManager) {
-        setError(
-          'Akses ditolak. Anda harus absen (Clock-In) terlebih dahulu untuk membuka Pekerjaan.'
-        );
-      }
     } finally {
       if (!silent) setLoading(false);
     }
@@ -80,7 +90,6 @@ export function useJobsData(isManager = false) {
       .get('/users/')
       .then((res) => setStaffList(res.data.filter((u) => u.role === 'staff')))
       .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ─── Grouping untuk kanban staff ──────────────────────
@@ -200,6 +209,8 @@ export function useJobsData(isManager = false) {
 
   // ─── Export Excel ─────────────────────────────────────
   const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
     try {
       const response = await apiClient.get('/export/jobs/', { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -211,6 +222,8 @@ export function useJobsData(isManager = false) {
       link.remove();
     } catch {
       alert('Gagal mengekspor data.');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -219,6 +232,7 @@ export function useJobsData(isManager = false) {
     orderMap,
     loading,
     saving,
+    exporting,
     error,
     tahapList,
     staffList,

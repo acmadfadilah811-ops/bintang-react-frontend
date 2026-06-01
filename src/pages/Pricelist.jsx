@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import apiClient from '../api/apiClient';
-import { DollarSign, Search, Filter, Edit2, X, AlertCircle } from 'lucide-react';
+import { DollarSign, Search, Filter, X, AlertCircle } from 'lucide-react';
 
 export default function Pricelist() {
   const [dbPrices, setDbPrices] = useState([]);
@@ -11,7 +11,6 @@ export default function Pricelist() {
   const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
   const [priceFormLoading, setPriceFormLoading] = useState(false);
   const [priceFormError, setPriceFormError] = useState('');
-  const [priceFormSuccess, setPriceFormSuccess] = useState('');
 
   const priceCategories = {
     print_outdoor_per_m2: 'Print Outdoor / m²',
@@ -60,18 +59,48 @@ export default function Pricelist() {
     }
   };
 
+  const handleCreatePrice = () => {
+    setEditingPrice({
+      id: null,
+      kategori: 'print_outdoor_per_m2',
+      nama_produk: '',
+      material: '',
+      price_type: 'flat',
+      harga: 0,
+      tiers: null,
+    });
+    setPriceFormError('');
+    setIsPriceModalOpen(true);
+  };
+
   const handleEditPrice = (item) => {
     setEditingPrice(item);
     setPriceFormError('');
-    setPriceFormSuccess('');
     setIsPriceModalOpen(true);
+  };
+
+  const handleDeletePrice = async (item) => {
+    const confirmDelete = window.confirm(
+      `Apakah Anda yakin ingin menghapus produk "${item.nama_produk}"?`
+    );
+    if (!confirmDelete) return;
+    setPriceLoading(true);
+    try {
+      await apiClient.delete(`/product-prices/${item.id}/`);
+      fetchPrices();
+      alert('Produk berhasil dihapus!');
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menghapus produk.');
+    } finally {
+      setPriceLoading(false);
+    }
   };
 
   const handleUpdatePrice = async (e) => {
     e.preventDefault();
     setPriceFormLoading(true);
     setPriceFormError('');
-    setPriceFormSuccess('');
 
     const form = e.target;
     const name = form.nama_produk.value;
@@ -101,20 +130,27 @@ export default function Pricelist() {
     }
 
     try {
-      await apiClient.put(`/product-prices/${editingPrice.id}/`, {
+      const payload = {
         nama_produk: name,
         material: material,
         kategori: category,
         price_type: priceType,
         harga: priceType === 'flat' ? price : 0,
         tiers: priceType === 'tiered' ? tiersVal : null,
-      });
-      setPriceFormSuccess('Harga produk berhasil diperbarui!');
+      };
+
+      if (editingPrice.id) {
+        await apiClient.put(`/product-prices/${editingPrice.id}/`, payload);
+      } else {
+        await apiClient.post('/product-prices/', payload);
+      }
       setIsPriceModalOpen(false);
       fetchPrices();
     } catch (err) {
       console.error(err);
-      setPriceFormError('Gagal memperbarui harga produk.');
+      setPriceFormError(
+        editingPrice.id ? 'Gagal memperbarui harga produk.' : 'Gagal menambahkan produk baru.'
+      );
     } finally {
       setPriceFormLoading(false);
     }
@@ -151,15 +187,24 @@ export default function Pricelist() {
           </p>
         </div>
 
-        {dbPrices.length === 0 && !priceLoading && (
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+          {dbPrices.length === 0 && !priceLoading && (
+            <button
+              type="button"
+              onClick={handleSeedPrices}
+              className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
+            >
+              Impor Harga Default
+            </button>
+          )}
           <button
             type="button"
-            onClick={handleSeedPrices}
-            className="w-full md:w-auto bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+            onClick={handleCreatePrice}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
           >
-            Impor Harga Default
+            + Tambah Produk Baru
           </button>
-        )}
+        </div>
       </div>
 
       {/* Filter & Search */}
@@ -257,12 +302,20 @@ export default function Pricelist() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <button
-                        onClick={() => handleEditPrice(item)}
-                        className="text-blue-600 hover:text-blue-900 font-bold flex items-center gap-1 justify-center mx-auto hover:underline"
-                      >
-                        Edit
-                      </button>
+                      <div className="flex items-center justify-center gap-3">
+                        <button
+                          onClick={() => handleEditPrice(item)}
+                          className="text-blue-600 hover:text-blue-900 font-bold hover:underline cursor-pointer"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeletePrice(item)}
+                          className="text-red-600 hover:text-red-900 font-bold hover:underline cursor-pointer"
+                        >
+                          Hapus
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -284,11 +337,12 @@ export default function Pricelist() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200 animate-slide-up">
             <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50">
               <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                <DollarSign className="text-blue-600" size={16} /> Edit Harga Produk
+                <DollarSign className="text-blue-600" size={16} />
+                {editingPrice.id ? 'Edit Harga Produk' : 'Tambah Produk Baru'}
               </h3>
               <button
                 onClick={() => setIsPriceModalOpen(false)}
-                className="text-slate-400 hover:text-red-500 transition-colors"
+                className="text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -407,16 +461,20 @@ export default function Pricelist() {
                 <button
                   type="button"
                   onClick={() => setIsPriceModalOpen(false)}
-                  className="px-4 py-2 text-slate-600 text-xs font-bold bg-slate-100 hover:bg-slate-200 rounded"
+                  className="px-4 py-2 text-slate-600 text-xs font-bold bg-slate-100 hover:bg-slate-200 rounded cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={priceFormLoading}
-                  className="px-4 py-2 text-white text-xs font-bold bg-blue-600 hover:bg-blue-700 rounded flex items-center gap-2"
+                  className="px-4 py-2 text-white text-xs font-bold bg-blue-600 hover:bg-blue-700 rounded flex items-center gap-2 cursor-pointer"
                 >
-                  {priceFormLoading ? 'Menyimpan...' : 'Simpan Perubahan'}
+                  {priceFormLoading
+                    ? 'Menyimpan...'
+                    : editingPrice.id
+                      ? 'Simpan Perubahan'
+                      : 'Tambah Produk'}
                 </button>
               </div>
             </form>

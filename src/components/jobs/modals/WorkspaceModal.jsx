@@ -463,8 +463,7 @@ export default function WorkspaceModal({
           {workspaceJob.job?.status_pekerjaan === 'dikerjakan' && (
             <div className="bg-white border border-slate-300 rounded-lg shadow-sm p-3">
               <h3 className="text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
-                Verifikasi OTP & Teruskan/Selesaikan
-                Pekerjaan
+                Verifikasi OTP & Teruskan/Selesaikan Pekerjaan
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">

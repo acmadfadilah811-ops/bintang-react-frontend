@@ -50,6 +50,7 @@ export default function Inventory() {
   const [adjustDelta, setAdjustDelta] = useState('');
   const [adjustNote, setAdjustNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // ── Fetch Data ────────────────────────────────────────────
   const fetchItems = async () => {
@@ -164,6 +165,8 @@ export default function Inventory() {
   };
 
   const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
     try {
       const response = await apiClient.get('/export/inventory/', { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -176,6 +179,8 @@ export default function Inventory() {
     } catch (error) {
       console.error('Export failed', error);
       alert('Gagal mengekspor data.');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -207,9 +212,10 @@ export default function Inventory() {
           {isManager && (
             <button
               onClick={handleExport}
-              className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-bold px-4 py-2 rounded-lg shadow transition-all"
+              disabled={exporting}
+              className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-bold px-4 py-2 rounded-lg shadow transition-all disabled:opacity-50"
             >
-              <Download size={16} /> Export
+              <Download size={16} /> {exporting ? 'Exporting...' : 'Export'}
             </button>
           )}
           {isManager && (

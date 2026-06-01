@@ -423,7 +423,7 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
-    {/* MODAL KONFIRMASI CLOCK OUT CUSTOM (PREMIUM STYLE) */}
+      {/* MODAL KONFIRMASI CLOCK OUT CUSTOM (PREMIUM STYLE) */}
       {showClockOutModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 flex flex-col animate-scale-up text-left">
@@ -440,8 +440,12 @@ export default function AdminDashboard() {
               <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center border border-white/20 mb-3 shadow-inner">
                 <CalendarClock size={32} className="text-white" />
               </div>
-              <h3 className="font-extrabold text-lg tracking-wide uppercase">Konfirmasi Keluar Jam Kerja</h3>
-              <p className="text-xs text-rose-100 mt-1">Sistem Absensi &amp; Kepegawaian Bintang Advertising</p>
+              <h3 className="font-extrabold text-lg tracking-wide uppercase">
+                Konfirmasi Keluar Jam Kerja
+              </h3>
+              <p className="text-xs text-rose-100 mt-1">
+                Sistem Absensi &amp; Kepegawaian Bintang Advertising
+              </p>
             </div>
 
             {/* Konten Detail Peringatan */}
@@ -449,13 +453,18 @@ export default function AdminDashboard() {
               <div className="flex gap-3 items-start bg-amber-50 border border-amber-200 rounded-xl p-3.5">
                 <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={20} />
                 <div className="text-xs text-amber-800 leading-relaxed font-medium">
-                  <span className="font-extrabold block text-amber-900 mb-1">⚠️ PERINGATAN PENTING:</span>
-                  Setelah menekan tombol Clock-Out, akses Anda ke <strong>Papan Produksi (Kanban Kerja) akan otomatis TERKUNCI</strong> untuk hari ini.
+                  <span className="font-extrabold block text-amber-900 mb-1">
+                    ⚠️ PERINGATAN PENTING:
+                  </span>
+                  Setelah menekan tombol Clock-Out, akses Anda ke{' '}
+                  <strong>Papan Produksi (Kanban Kerja) akan otomatis TERKUNCI</strong> untuk hari
+                  ini.
                 </div>
               </div>
 
               <div className="text-xs text-slate-500 leading-relaxed text-center">
-                Apakah Anda yakin telah menyelesaikan semua tugas admin hari ini dan ingin melakukan Clock-Out?
+                Apakah Anda yakin telah menyelesaikan semua tugas admin hari ini dan ingin melakukan
+                Clock-Out?
               </div>
             </div>
 

@@ -19,6 +19,7 @@ export default function Attendance() {
   // State untuk Keterangan/Catatan
   const [notes, setNotes] = useState({});
   const [savingNoteId, setSavingNoteId] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -165,6 +166,8 @@ export default function Attendance() {
   };
 
   const handleExportExcel = async () => {
+    if (exporting) return;
+    setExporting(true);
     try {
       const response = await apiClient.get('/export/absensi/', {
         params: { tanggal: selectedDate },
@@ -179,6 +182,8 @@ export default function Attendance() {
       link.remove();
     } catch {
       alert('Gagal mengekspor data absensi.');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -225,9 +230,10 @@ export default function Attendance() {
 
             <button
               onClick={handleExportExcel}
-              className="flex items-center gap-1.5 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-md px-3 py-1.5 text-[11px] font-bold hover:bg-emerald-100 transition-colors shadow-sm"
+              disabled={exporting}
+              className="flex items-center gap-1.5 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-md px-3 py-1.5 text-[11px] font-bold hover:bg-emerald-100 transition-colors shadow-sm disabled:opacity-50"
             >
-              <FileSpreadsheet size={13} /> Export Excel
+              <FileSpreadsheet size={13} /> {exporting ? 'Exporting...' : 'Export Excel'}
             </button>
           </div>
 

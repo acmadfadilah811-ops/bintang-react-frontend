@@ -1,0 +1,145 @@
+import { Play, CheckCircle2, Clock, FileText } from 'lucide-react';
+
+export default function KanbanPersonal({ jobs, onSelectJob, onStart, onComplete }) {
+  // Group jobs by status
+  const columns = {
+    todo: {
+      title: 'Antrean Kerja (Todo)',
+      color: 'border-amber-400 bg-amber-50/50',
+      iconColor: 'text-amber-500',
+      badgeColor: 'bg-amber-100 text-amber-800',
+      items: jobs.filter((j) => j.status_pekerjaan === 'antrean'),
+    },
+    progress: {
+      title: 'Sedang Dikerjakan (Progress)',
+      color: 'border-indigo-400 bg-indigo-50/50',
+      iconColor: 'text-indigo-500',
+      badgeColor: 'bg-indigo-100 text-indigo-800',
+      items: jobs.filter((j) => j.status_pekerjaan === 'dikerjakan'),
+    },
+    done: {
+      title: 'Selesai Hari Ini (Done)',
+      color: 'border-emerald-400 bg-emerald-50/50',
+      iconColor: 'text-emerald-500',
+      badgeColor: 'bg-emerald-100 text-emerald-800',
+      items: jobs.filter((j) => j.status_pekerjaan === 'selesai'),
+    },
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-sm font-bold text-slate-800">Kanban Personal</h2>
+        <p className="text-[11px] text-slate-400">
+          Kelola dan update status pekerjaan aktif Anda di bawah ini.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {Object.entries(columns).map(([colKey, col]) => (
+          <div
+            key={colKey}
+            className="flex flex-col bg-slate-50 rounded-xl p-4 border border-slate-200/60 min-h-[400px]"
+          >
+            {/* Column Header */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-2 h-2 rounded-full ${colKey === 'todo' ? 'bg-amber-500' : colKey === 'progress' ? 'bg-indigo-500' : 'bg-emerald-500'}`}
+                />
+                <h3 className="text-xs font-bold text-slate-700">{col.title}</h3>
+              </div>
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${col.badgeColor}`}>
+                {col.items.length}
+              </span>
+            </div>
+
+            {/* Column Items */}
+            <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px]">
+              {col.items.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400 text-[10px] font-medium border border-dashed border-slate-200 rounded-lg">
+                  <Clock size={16} className="text-slate-300 mb-1" />
+                  Kosong
+                </div>
+              ) : (
+                col.items.map((job) => {
+                  const item = job.order_item_detail || {};
+                  return (
+                    <div
+                      key={job.id}
+                      onClick={() => onSelectJob(job)}
+                      className="bg-white border border-slate-200 hover:border-indigo-400 rounded-lg p-3.5 shadow-sm hover:shadow transition-all cursor-pointer group"
+                    >
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                          {job.tahap_nama}
+                        </span>
+                        <span className="text-[9px] font-bold text-slate-500">#{job.id}</span>
+                      </div>
+
+                      <h4 className="text-xs font-extrabold text-slate-800 mt-1 group-hover:text-indigo-600 transition-colors">
+                        {item.jenis_produk || 'Produk'}
+                      </h4>
+
+                      {/* Info baris */}
+                      <div className="flex items-center justify-between mt-3 text-[10px] text-slate-500">
+                        <span>
+                          Qty: <strong className="text-slate-700">{item.qty || 1}</strong>
+                        </span>
+                        {job.biaya_desain > 0 && (
+                          <span className="text-slate-400 font-semibold">
+                            Rp{job.biaya_desain.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Quick Action Shortcuts inside Kanban Card */}
+                      <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectJob(job);
+                          }}
+                          className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-500"
+                        >
+                          <FileText size={12} />
+                          Buka Workspace
+                        </button>
+
+                        {colKey === 'todo' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onStart(job.id);
+                            }}
+                            className="flex items-center gap-0.5 px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-white text-[9px] font-extrabold shadow-sm"
+                          >
+                            <Play size={10} fill="white" />
+                            Mulai
+                          </button>
+                        )}
+
+                        {colKey === 'progress' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onComplete(job); // Pass whole job to open Forward modal directly
+                            }}
+                            className="flex items-center gap-0.5 px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-[9px] font-extrabold shadow-sm"
+                          >
+                            <CheckCircle2 size={10} />
+                            Selesai
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

@@ -157,10 +157,7 @@ export default function Login() {
       <div className="relative z-10 w-full max-w-[440px] p-8 flex flex-col gap-6 bg-transparent rounded-2xl mt-4">
         {/* Tampilan OTP Verification jika IP Berubah */}
         {verificationRequired ? (
-          <form
-            onSubmit={handleVerifyOtp}
-            className="w-full flex flex-col gap-5"
-          >
+          <form onSubmit={handleVerifyOtp} className="w-full flex flex-col gap-5">
             <div className="flex flex-col items-center text-center gap-2 mb-2">
               <div className="w-14 h-14 bg-rose-500/20 text-rose-400 flex items-center justify-center rounded-full border border-rose-500/30">
                 <ShieldAlert size={36} />
@@ -380,8 +377,6 @@ export default function Login() {
           </form>
         ) : (
           <form onSubmit={handleSubmit} className="w-full flex flex-col gap-5">
-
-
             {/* Pesan Error */}
             {error && (
               <div className="bg-red-600/90 text-white text-sm p-3 rounded-lg flex items-center justify-center gap-2 shadow-lg">

@@ -20,7 +20,12 @@ import WorkspaceReviewModal from '../components/jobs/modals/WorkspaceReviewModal
 
 export default function Jobs() {
   const { user } = useAuth();
-  const isManager = ['owner', 'manager'].includes(user?.role);
+  const isManager = ['owner', 'manager', 'admin'].includes(user?.role);
+
+  const getDashboardUrl = () => {
+    if (['owner', 'manager', 'admin'].includes(user?.role?.toLowerCase())) return '/dashboard';
+    return '/staff-dashboard';
+  };
 
   // ─── Data & Handlers dari custom hook ────────────────
   const {
@@ -28,6 +33,7 @@ export default function Jobs() {
     orderMap,
     loading,
     saving,
+    exporting,
     error,
     tahapList,
     staffList,
@@ -76,6 +82,7 @@ export default function Jobs() {
         setWorkspaceReviewJob((prev) => ({ ...prev, job: updatedJob }));
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobs]);
 
   // ─── OTP Generator ───────────────────────────────────
@@ -162,7 +169,7 @@ export default function Jobs() {
       // Buka workspace modal dikerjakan secara langsung
       const orderItemId = typeof job.order_item === 'object' ? job.order_item?.id : job.order_item;
       setWorkspaceJob({ job, orderItemData: orderMap[orderItemId], fromStart: false });
-    } catch (err) {
+    } catch {
       alert('Gagal memulai pekerjaan.');
     }
   };
@@ -197,7 +204,7 @@ export default function Jobs() {
       // Buka workspace modal dikerjakan secara langsung untuk editing
       const orderItemId = typeof job.order_item === 'object' ? job.order_item?.id : job.order_item;
       setWorkspaceJob({ job, orderItemData: orderMap[orderItemId], fromStart: false });
-    } catch (err) {
+    } catch {
       alert('Gagal memproses revisi pekerjaan.');
     }
   };
@@ -212,18 +219,99 @@ export default function Jobs() {
 
   if (error) {
     return (
-      <div className="h-full flex flex-col items-center justify-center space-y-4 max-w-lg mx-auto text-center px-4">
-        <div className="bg-red-100 p-6 rounded-full">
-          <Kanban size={48} className="text-red-500" />
+      <div className="h-full flex flex-col items-center justify-center max-w-md mx-auto text-center px-4 gap-5">
+        {/* Icon terkunci */}
+        <div className="relative">
+          <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center border-4 border-slate-200">
+            <Kanban size={40} className="text-slate-400" />
+          </div>
+          <div className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full bg-rose-500 flex items-center justify-center border-2 border-white shadow">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="white"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              viewBox="0 0 24 24"
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
         </div>
-        <h2 className="text-2xl font-black text-slate-800">Akses Terkunci</h2>
-        <p className="text-slate-600 font-medium">{error}</p>
-        <button
-          onClick={() => (window.location.href = isManager ? '/dashboard' : '/staff-dashboard')}
-          className="mt-4 px-6 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition-colors"
-        >
-          Ke Dashboard
-        </button>
+
+        <div>
+          <h2 className="text-xl font-extrabold text-slate-800 mb-1">Papan Produksi Terkunci</h2>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            Akses ke papan kerja membutuhkan status absensi aktif — sudah <strong>Clock-In</strong>{' '}
+            dan belum <strong>Clock-Out</strong>, atau izin khusus dari Owner/Manager.
+          </p>
+        </div>
+
+        <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-left space-y-3 shadow-sm">
+          <p className="text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200 pb-1.5 flex items-center gap-1.5">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              viewBox="0 0 24 24"
+            >
+              <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+              <path d="M12 16v-4" />
+              <path d="M12 8h.01" />
+            </svg>
+            Prosedur Otoritas Papan Produksi
+          </p>
+          <div className="flex items-start gap-2.5 text-xs text-slate-600">
+            <span className="mt-0.5 w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[9px] font-black shrink-0">
+              ✓
+            </span>
+            <span>
+              Mulai Jam Kerja: <strong>Clock-In</strong> aktif → Akses papan terbuka otomatis.
+            </span>
+          </div>
+          <div className="flex items-start gap-2.5 text-xs text-slate-600">
+            <span className="mt-0.5 w-4 h-4 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center text-[9px] font-black shrink-0">
+              ✕
+            </span>
+            <span>
+              Selesai Jam Kerja: <strong>Clock-Out</strong> dilakukan → Akses papan terkunci
+              otomatis.
+            </span>
+          </div>
+          <div className="flex items-start gap-2.5 text-xs text-slate-600">
+            <span className="mt-0.5 w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[9px] font-black shrink-0">
+              ℹ
+            </span>
+            <span>
+              Kebutuhan Mendesak: Akses di luar jam kerja dapat diajukan kepada Owner/Manager untuk
+              pembukaan manual.
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 w-full">
+          <button
+            onClick={() => (window.location.href = getDashboardUrl())}
+            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all shadow-sm cursor-pointer"
+          >
+            Ke Dashboard (Absensi)
+          </button>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full py-2.5 bg-white hover:bg-slate-50 text-slate-600 font-semibold rounded-xl text-sm border border-slate-200 transition-all cursor-pointer"
+          >
+            Coba Lagi
+          </button>
+        </div>
       </div>
     );
   }
@@ -246,9 +334,10 @@ export default function Jobs() {
         {isManager && (
           <button
             onClick={handleExport}
-            className="flex items-center gap-1.5 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-md px-2.5 py-1.5 text-[11px] font-bold hover:bg-emerald-100 shadow-sm"
+            disabled={exporting}
+            className="flex items-center gap-1.5 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-md px-2.5 py-1.5 text-[11px] font-bold hover:bg-emerald-100 shadow-sm disabled:opacity-50"
           >
-            <Download size={12} /> Export Excel
+            <Download size={12} /> {exporting ? 'Exporting...' : 'Export Excel'}
           </button>
         )}
       </div>
