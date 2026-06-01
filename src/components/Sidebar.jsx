@@ -198,9 +198,9 @@ export default function Sidebar() {
           {!isCollapsed && (
             <h1
               className="text-slate-855 text-slate-800 font-extrabold text-[15px] tracking-tight animate-fade-in truncate max-w-[125px]"
-              title={businessSettings?.nama_bisnis || 'Brandy'}
+              title={businessSettings?.nama_bisnis || 'Bintang Advertising'}
             >
-              {businessSettings?.nama_bisnis || 'Brandy'}
+              {businessSettings?.nama_bisnis || 'Bintang Advertising'}
             </h1>
           )}
         </div>

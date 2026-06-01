@@ -804,7 +804,7 @@ export default function Orders() {
             <div className="p-6 receipt-print-area text-slate-900 text-sm font-mono max-h-[70vh] overflow-y-auto bg-white">
               <div className="text-center border-b border-dashed border-slate-300 pb-4 mb-4">
                 <h2 className="font-extrabold text-[16px] uppercase tracking-widest text-slate-900">
-                  {businessSettings?.nama_bisnis || 'Brandy'}
+                  {businessSettings?.nama_bisnis || 'Bintang Advertising'}
                 </h2>
                 <p className="text-[11px] text-slate-500 mt-1">
                   {businessSettings?.alamat || 'Jl. Produksi No. 123, Kota'}
@@ -920,7 +920,7 @@ export default function Orders() {
                 </div>
                 <div className="text-right">
                   <h2 className="font-bold text-[14px]">
-                    {businessSettings?.nama_bisnis || 'Brandy'}
+                    {businessSettings?.nama_bisnis || 'Bintang Advertising'}
                   </h2>
                   <p className="text-slate-500 mt-0.5">
                     {businessSettings?.alamat || 'Jl. Produksi No. 123, Kota'}
@@ -1046,7 +1046,7 @@ export default function Orders() {
                     <p className="font-bold text-slate-700">Metode Pembayaran:</p>
                     <p className="max-w-[220px]">
                       {businessSettings?.deskripsi ||
-                        `Transfer BCA: 1234567890 a/n ${businessSettings?.nama_bisnis || 'Brandy'}`}
+                        `Transfer BCA: 1234567890 a/n ${businessSettings?.nama_bisnis || 'Bintang Advertising'}`}
                     </p>
                   </div>
                   <div className="text-center w-36">
@@ -1100,13 +1100,26 @@ export default function Orders() {
             </div>
 
             <div className="p-8 print-area bg-white text-slate-800 text-[12px]">
-              <div className="text-center border-b-2 border-slate-800 pb-4 mb-6">
-                <h1 className="text-xl font-black tracking-widest uppercase text-slate-900">
-                  SURAT JALAN
-                </h1>
-                <p className="text-slate-500 font-mono mt-1">
-                  Ref Order: #{printSuratJalanOrder.id}
-                </p>
+              <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-6">
+                <div>
+                  <h1 className="text-xl font-black tracking-widest uppercase text-slate-900">
+                    SURAT JALAN
+                  </h1>
+                  <p className="text-slate-500 font-mono mt-1">
+                    Ref Order: #{printSuratJalanOrder.id}
+                  </p>
+                </div>
+                <div className="text-right text-[11px]">
+                  <h2 className="font-bold text-[13px]">
+                    {businessSettings?.nama_bisnis || 'Bintang Advertising'}
+                  </h2>
+                  <p className="text-slate-500 mt-0.5">
+                    {businessSettings?.alamat || 'Jl. Produksi No. 123, Kota'}
+                  </p>
+                  <p className="text-slate-500">
+                    WA: {businessSettings?.no_telepon || '0812-3456-7890'}
+                  </p>
+                </div>
               </div>
 
               <div className="flex justify-between mb-8">
@@ -1175,7 +1188,7 @@ export default function Orders() {
                 <div className="text-center w-40">
                   <p className="mb-16">Mengetahui,</p>
                   <p className="font-bold border-t border-slate-400 pt-1">
-                    {businessSettings?.nama_bisnis || 'Brandy'}
+                    {businessSettings?.nama_bisnis || 'Bintang Advertising'}
                   </p>
                 </div>
               </div>
@@ -1220,14 +1233,14 @@ export default function Orders() {
               <div className="flex justify-between items-center border-b pb-2 mb-3">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 bg-slate-900 rounded flex items-center justify-center text-white font-black text-sm">
-                    {businessSettings?.nama_bisnis?.slice(0, 2).toUpperCase() || 'SA'}
+                    {businessSettings?.nama_bisnis?.slice(0, 2).toUpperCase() || 'BA'}
                   </div>
                   <div>
                     <h2 className="font-extrabold text-xs tracking-wide uppercase text-slate-900 leading-none">
-                      {businessSettings?.nama_bisnis || 'STAR ADVERTISING'}
+                      {businessSettings?.nama_bisnis || 'Bintang Advertising'}
                     </h2>
                     <p className="text-[9px] text-slate-500 font-medium">
-                      WA: {businessSettings?.no_telepon || '0878 37 333 992'}
+                      WA: {businessSettings?.no_telepon || '0812-3456-7890'}
                     </p>
                   </div>
                 </div>

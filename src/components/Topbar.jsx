@@ -115,7 +115,7 @@ export default function Topbar() {
   }, [isSearchExpanded]);
 
   const getPageTitle = () =>
-    PAGE_TITLES[location.pathname] || businessSettings?.nama_bisnis || 'Brandy';
+    PAGE_TITLES[location.pathname] || businessSettings?.nama_bisnis || 'Bintang Advertising';
 
   const getAvatarUrl = (path) => {
     if (!path) return null;
