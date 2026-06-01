@@ -10,6 +10,7 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
   const [inventoryItems, setInventoryItems] = useState([]);
   const [historyNotes, setHistoryNotes] = useState([]);
   const [updating, setUpdating] = useState(false);
+  const [staffNote, setStaffNote] = useState('');
 
   // Excel sheet state and custom calculator parameters
   const [activeSheet, setActiveSheet] = useState('detail'); // 'detail' | 'materials' | 'incentive'
@@ -56,9 +57,14 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
         }))
       );
       setHistoryNotes(historyRows);
+
+      // Find staff note if exists
+      const noteObj = currentMaterials.find((row) => row.type === 'catatan_tambahan');
+      setStaffNote(noteObj ? noteObj.text : '');
     } else {
       setMaterialUsage([]);
       setHistoryNotes([]);
+      setStaffNote('');
     }
   }, [job]);
 
@@ -118,6 +124,16 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
         catatan: row.catatan,
         item_id: row.item_id,
       }));
+
+      // Append staff note if present
+      if (staffNote.trim()) {
+        tableRows.push({
+          type: 'catatan_tambahan',
+          text: staffNote.trim(),
+          keterangan: 'Catatan Tambahan Staff',
+          catatan: staffNote.trim(),
+        });
+      }
 
       // Combine history notes and current rows
       const combinedNotes = [...historyNotes, ...tableRows];
@@ -247,7 +263,7 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
               className="flex items-center gap-1 px-3 py-1 bg-[#107c41] text-white hover:bg-[#0d6233] disabled:opacity-50 rounded font-extrabold transition-all cursor-pointer shadow-sm"
             >
               <CheckCircle size={12} />
-              <span>Selesaikan SPK (Kirim ke Finishing)</span>
+              <span>Finalisasi Pekerjaan & Teruskan</span>
             </button>
           )}
         </div>
@@ -383,10 +399,27 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
                   />
                 </td>
               </tr>
+              <tr className="h-10 hover:bg-slate-50/30">
+                <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
+                  7
+                </td>
+                <td className="bg-[#e8f5e9] px-2 font-extrabold text-[#2e7d32] border border-[#ccc] uppercase">
+                  CATATAN TAMBAHAN STAFF
+                </td>
+                <td colSpan={3} className="p-0 border border-[#ccc] bg-[#e8f5e9]/10">
+                  <input
+                    type="text"
+                    placeholder="Tulis catatan tambahan pengerjaan di sini (misal: mesin aman, bahan sisa dikembalikan, dll)..."
+                    value={staffNote}
+                    onChange={(e) => setStaffNote(e.target.value)}
+                    className="w-full h-full bg-transparent px-3 outline-none text-[#2e7d32] font-semibold text-[10px] border border-transparent focus:border-[#107c41] focus:bg-white"
+                  />
+                </td>
+              </tr>
               {historyNotes.length > 0 ? (
                 <tr className="hover:bg-slate-50/30">
                   <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
-                    7
+                    8
                   </td>
                   <td className="bg-amber-50 px-2 font-extrabold text-amber-800 border border-[#ccc] uppercase align-top py-2">
                     RIWAYAT & CATATAN DIVISI SEBELUMNYA
@@ -421,6 +454,13 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
                               </div>
                             </div>
                           );
+                        } else if (row.type === 'catatan_tambahan') {
+                          return (
+                            <div key={rIdx} className="pl-2 py-1 text-amber-900 font-medium flex items-center gap-1.5 bg-amber-50 rounded border border-amber-200/50 px-2 my-1">
+                              <span className="font-extrabold text-[9.5px]">💬 Catatan Tambahan Staff:</span>
+                              <span className="italic text-slate-700 font-bold">"{row.text}"</span>
+                            </div>
+                          );
                         } else {
                           return (
                             <div
@@ -447,7 +487,7 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
               ) : (
                 <tr className="h-6">
                   <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
-                    7
+                    8
                   </td>
                   <td className="border border-[#ccc]"></td>
                   <td className="border border-[#ccc]"></td>
@@ -457,7 +497,7 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
               )}
               <tr className="h-6">
                 <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
-                  8
+                  9
                 </td>
                 <td className="border border-[#ccc]"></td>
                 <td className="border border-[#ccc]"></td>
@@ -784,6 +824,57 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
                   className="px-3 font-black text-lg text-[#107c41] border border-[#ccc] font-mono"
                 >
                   Rp{computedIncentive.toLocaleString()}
+                </td>
+              </tr>
+              <tr className="h-8">
+                <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
+                  12
+                </td>
+                <td
+                  colSpan={3}
+                  className="bg-[#107c41] text-white font-extrabold px-3 uppercase text-[9px] tracking-wide border border-[#ccc] py-1"
+                >
+                  ℹ️ INFORMASI & PANDUAN KUSTOMISASI FORMULA
+                </td>
+              </tr>
+              <tr className="hover:bg-slate-50/30">
+                <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
+                  13
+                </td>
+                <td className="bg-[#fafafa] px-2 font-bold text-slate-500 border border-[#ccc] uppercase align-top py-2">
+                  RUMUS UTAMA (ADA UKURAN)
+                </td>
+                <td colSpan={2} className="px-3 py-2 text-slate-700 border border-[#ccc] font-medium leading-relaxed bg-white">
+                  <strong>Rumus:</strong> (Luas m² x Tarif per m² x Qty) x (Persentase Komisi / 100) + Biaya Tambahan Desain <br />
+                  <span className="text-slate-500 italic">Digunakan apabila barang memiliki ukuran panjang dan lebar yang valid di nota penjualan.</span>
+                </td>
+              </tr>
+              <tr className="hover:bg-slate-50/30">
+                <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
+                  14
+                </td>
+                <td className="bg-[#fafafa] px-2 font-bold text-slate-500 border border-[#ccc] uppercase align-top py-2">
+                  RUMUS ALTERNATIF (TANPA UKURAN)
+                </td>
+                <td colSpan={2} className="px-3 py-2 text-slate-700 border border-[#ccc] font-medium leading-relaxed bg-white">
+                  <strong>Rumus:</strong> Subtotal Harga Nota x (Persentase Komisi / 100) + Biaya Tambahan Desain <br />
+                  <span className="text-slate-500 italic">Secara otomatis aktif sebagai fallback apabila ukuran panjang/lebar produk bernilai 0 atau tidak didefinisikan.</span>
+                </td>
+              </tr>
+              <tr className="hover:bg-slate-50/30">
+                <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
+                  15
+                </td>
+                <td className="bg-[#e8f5e9] px-2 font-bold text-[#1b5e20] border border-[#ccc] uppercase align-top py-2">
+                  CARA KUSTOMISASI MANDIRI
+                </td>
+                <td colSpan={2} className="px-3 py-2 text-slate-700 border border-[#ccc] font-medium leading-relaxed bg-[#e8f5e9]/10">
+                  <ol className="list-decimal pl-4 space-y-1">
+                    <li>Pindah ke sel input berwarna <strong>hijau muda</strong> di atas pada Baris 6 (Tarif Jasa Cetak) atau Baris 8 (Persentase Komisi).</li>
+                    <li>Ubah angka secara langsung sesuai kebutuhan kesepakatan baru dengan staff.</li>
+                    <li>Hasil akhir <strong>ESTIMASI INSENTIF (Baris 11)</strong> akan terkalkulasi ulang secara otomatis dan presisi!</li>
+                    <li>Klik <strong>"Simpan Draft"</strong> untuk mengunci nilai insentif baru ini ke dalam SPK.</li>
+                  </ol>
                 </td>
               </tr>
             </tbody>
