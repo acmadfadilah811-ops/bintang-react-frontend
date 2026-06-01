@@ -28,16 +28,6 @@ import ProductionApp from './pages/produksi/ProductionApp';
 
 let globalAlertTrigger = null;
 
-// Override native window.alert globally
-const nativeAlert = window.alert;
-window.alert = (message) => {
-  if (globalAlertTrigger) {
-    globalAlertTrigger(message);
-  } else {
-    nativeAlert(message);
-  }
-};
-
 function HomeRedirect() {
   const { user } = useAuth();
   const role = user?.role?.toLowerCase();
@@ -60,7 +50,10 @@ function App() {
     type: 'info',
   });
 
+  // Safe window.alert override with unmount cleanup
   useEffect(() => {
+    const originalAlert = window.alert;
+
     globalAlertTrigger = (message) => {
       let type = 'info';
       const msgLower = String(message || '').toLowerCase();
@@ -87,19 +80,32 @@ function App() {
         type,
       });
     };
+
+    window.alert = (message) => {
+      if (globalAlertTrigger) {
+        globalAlertTrigger(message);
+      } else {
+        originalAlert(message);
+      }
+    };
+
     return () => {
+      window.alert = originalAlert; // Restore original alert on unmount
       globalAlertTrigger = null;
     };
   }, []);
 
   // Global Click Sound Effect
   useEffect(() => {
-    const clickSoundUrl = import.meta.env.VITE_CLICK_SOUND_URL;
+    const clickSoundUrl = import.meta.env.VITE_CLICK_SOUND_URL || '';
 
     // Helper untuk memutar suara klik sintetis (Web Audio API)
     const playSyntheticClick = () => {
       try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
         const oscillator = audioCtx.createOscillator();
         const gainNode = audioCtx.createGain();
 
@@ -122,18 +128,28 @@ function App() {
 
     let audioFile = null;
     if (clickSoundUrl) {
-      audioFile = new Audio(clickSoundUrl);
-      audioFile.volume = 0.15;
+      try {
+        audioFile = new Audio(clickSoundUrl);
+        audioFile.volume = 0.15;
+      } catch (e) {
+        console.warn('Gagal menginisialisasi audio clickSoundUrl:', e);
+      }
     }
 
     const handleGlobalClick = (e) => {
       const target = e.target.closest('button, a, [role="button"]');
       if (target) {
         if (audioFile) {
-          audioFile.currentTime = 0;
-          audioFile.play().catch(() => {
+          try {
+            audioFile.currentTime = 0;
+            audioFile.play().catch((err) => {
+              console.debug('Audio play failed, falling back to synthetic:', err);
+              playSyntheticClick();
+            });
+          } catch (err) {
+            console.debug('Audio play exception, falling back to synthetic:', err);
             playSyntheticClick();
-          });
+          }
         } else {
           playSyntheticClick();
         }
