@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowLeft,
+  Kanban,
 } from 'lucide-react';
 
 // Staff Modals & Views
@@ -28,6 +29,8 @@ import CustomerPanel from './panels/CustomerPanel';
 import PricelistPanel from './panels/PricelistPanel';
 import DivisionPanel from './panels/DivisionPanel';
 import ActivityLogsPanel from './panels/ActivityLogsPanel';
+import KanbanGlobalPanel from './panels/KanbanGlobalPanel';
+import PapanKerjaSpkPanel from './panels/PapanKerjaSpkPanel';
 
 // --- DYNAMIC MINI CALENDAR COMPONENT ---
 function MiniCalendar() {
@@ -188,9 +191,18 @@ export default function ProductionApp() {
   // Set isAdminMode ONCE when user data is available (after AuthContext resolves)
   useEffect(() => {
     if (user && !modeInitialized) {
-      const privileged = ['owner', 'manager', 'admin'].includes(user.role);
+      const roleLower = user.role?.toLowerCase();
+      const privileged = ['owner', 'manager', 'admin'].includes(roleLower);
       setIsAdminMode(privileged);
-      setActiveTab(privileged ? 'global_list' : 'claim_pool');
+      
+      let defaultTab = 'claim_pool';
+      if (['owner', 'manager'].includes(roleLower)) {
+        defaultTab = 'papan_kerja_spk';
+      } else if (roleLower === 'admin') {
+        defaultTab = 'global_list';
+      }
+      
+      setActiveTab(defaultTab);
       setModeInitialized(true);
     }
   }, [user, modeInitialized]);
@@ -274,6 +286,10 @@ export default function ProductionApp() {
   const renderPanel = () => {
     if (isAdminMode) {
       switch (activeTab) {
+        case 'papan_kerja_spk':
+          return <PapanKerjaSpkPanel />;
+        case 'kanban_global':
+          return <KanbanGlobalPanel />;
         case 'global_list':
           return <GlobalListPanel />;
         case 'inventory':
@@ -295,6 +311,9 @@ export default function ProductionApp() {
         case 'logs':
           return <ActivityLogsPanel logs={logs} />;
         default:
+          if (['owner', 'manager'].includes(user?.role?.toLowerCase())) {
+            return <PapanKerjaSpkPanel />;
+          }
           return <GlobalListPanel />;
       }
     } else {
@@ -319,20 +338,34 @@ export default function ProductionApp() {
     }
   };
 
-  const menuItems = isAdminMode
-    ? [
-        { id: 'global_list', label: 'Monitor Pesanan', icon: Globe },
-        { id: 'inventory', label: 'Master Inventory', icon: Package },
-        { id: 'customers', label: 'Database Konsumen', icon: Users },
-        { id: 'pricelist', label: 'Daftar Harga', icon: Tag },
-        { id: 'divisions', label: 'Monitoring Divisi', icon: FolderTree },
-        { id: 'logs', label: 'Log Aktivitas', icon: Bell },
-      ]
-    : [
-        { id: 'claim_pool', label: 'Antrean Global', icon: Inbox },
-        { id: 'kanban_personal', label: 'Pekerjaan Saya', icon: ClipboardList },
-        { id: 'logs', label: 'Log Aktivitas', icon: Bell },
-      ];
+  const roleLower = user?.role?.toLowerCase();
+  let menuItems = [];
+  if (['owner', 'manager'].includes(roleLower)) {
+    menuItems = [
+      { id: 'papan_kerja_spk', label: 'Papan Kerja SPK', icon: ClipboardList },
+      { id: 'global_list', label: 'Monitor Pesanan', icon: Globe },
+      { id: 'inventory', label: 'Master Inventory', icon: Package },
+      { id: 'customers', label: 'Database Konsumen', icon: Users },
+      { id: 'pricelist', label: 'Daftar Harga', icon: Tag },
+      { id: 'divisions', label: 'Monitoring Divisi', icon: FolderTree },
+      { id: 'logs', label: 'Log Aktivitas', icon: Bell },
+    ];
+  } else if (roleLower === 'admin') {
+    menuItems = [
+      { id: 'global_list', label: 'Monitor Pesanan', icon: Globe },
+      { id: 'inventory', label: 'Master Inventory', icon: Package },
+      { id: 'customers', label: 'Database Konsumen', icon: Users },
+      { id: 'pricelist', label: 'Daftar Harga', icon: Tag },
+      { id: 'divisions', label: 'Monitoring Divisi', icon: FolderTree },
+      { id: 'logs', label: 'Log Aktivitas', icon: Bell },
+    ];
+  } else {
+    menuItems = [
+      { id: 'claim_pool', label: 'Antrean Global', icon: Inbox },
+      { id: 'kanban_personal', label: 'Pekerjaan Saya', icon: ClipboardList },
+      { id: 'logs', label: 'Log Aktivitas', icon: Bell },
+    ];
+  }
 
   if (error) {
     return (
@@ -721,8 +754,8 @@ export default function ProductionApp() {
                               : 'rgba(245, 158, 11, 0.05)',
                         }}
                       >
-                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-800 leading-tight">
-                          <span className="uppercase truncate max-w-[110px]">{item.nama}</span>
+                        <div className="flex justify-between items-start text-[10px] font-bold text-slate-800 leading-tight gap-2">
+                          <span className="uppercase break-words flex-1">{item.nama}</span>
                           <span
                             className={`font-extrabold shrink-0 ${item.stok === 0 ? 'text-red-600' : 'text-amber-600'}`}
                           >

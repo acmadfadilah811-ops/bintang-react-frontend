@@ -1,6 +1,11 @@
-import { useState, useEffect } from 'react';
-import { Play, CheckCircle, Save, Trash, ChevronLeft } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Play, CheckCircle, Save, Trash, ChevronLeft, Download, Printer, RefreshCw, Plus, Search, AlertTriangle } from 'lucide-react';
 import apiClient from '../../../api/apiClient';
+import KomplainModal from '../../../components/orders/KomplainModal';
+
+const COLS = ['A','B','C','D','E','F','G','H'];
+const FREE_ROWS = 20;
+const mkEmpty = () => Array.from({ length: FREE_ROWS }, () => Array(COLS.length).fill(''));
 
 export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving }) {
   const [driveLink, setDriveLink] = useState(job?.gdrive_output_link || '');
@@ -13,9 +18,30 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
   const [staffNote, setStaffNote] = useState('');
 
   // Excel sheet state and custom calculator parameters
-  const [activeSheet, setActiveSheet] = useState('detail'); // 'detail' | 'materials' | 'incentive'
+  const [activeSheet, setActiveSheet] = useState('detail');
   const [tarifPerm2, setTarifPerm2] = useState(15000);
   const [komisiPersen, setKomisiPersen] = useState(5);
+
+  // Free-form Catatan Bebas grid
+  const [freeGrid, setFreeGrid] = useState(mkEmpty);
+  const [activeCell, setActiveCell] = useState(null); // { r, c }
+  const [formulaVal, setFormulaVal] = useState('');
+  const [savedAt, setSavedAt] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isKomplainOpen, setIsKomplainOpen] = useState(false);
+  const [complaints, setComplaints] = useState([]);
+
+  const setFreeCell = useCallback((r, c, val) => {
+    setFreeGrid(g => g.map((row, ri) => ri === r ? row.map((cell, ci) => ci === c ? val : cell) : row));
+  }, []);
+
+  const exportFreeGridCSV = () => {
+    const header = COLS.join(',');
+    const rows = freeGrid.map(row => row.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([header + '\n' + rows], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `catatan_spk_${job?.id || 'draft'}.csv`; a.click();
+  };
 
   useEffect(() => {
     setDriveLink(job?.gdrive_output_link || '');
@@ -86,6 +112,15 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
   const selectInventoryItem = (idx, itemId) => {
     const found = inventoryItems.find((it) => String(it.id) === String(itemId));
     if (found) {
+      let suggestedQty = '';
+      let autoNote = '';
+      const isRoll = found.satuan?.toLowerCase() === 'm²' || found.satuan?.toLowerCase() === 'm2' || found.kategori?.toLowerCase() === 'bahan cetak';
+      if (isRoll) {
+        if (panjang > 0 && lebar > 0) {
+          suggestedQty = String(panjang * lebar * orderQty);
+          autoNote = `Konversi UoM: ${panjang}x${lebar}m x ${orderQty} pcs`;
+        }
+      }
       setMaterialUsage((prev) =>
         prev.map((row, i) =>
           i === idx
@@ -94,6 +129,8 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
                 item_id: found.id,
                 item_nama: found.nama,
                 satuan: found.satuan,
+                qty: suggestedQty || row.qty || '1',
+                catatan: autoNote || row.catatan || '',
               }
             : row
         )
@@ -107,6 +144,8 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
                 item_id: '',
                 item_nama: '',
                 satuan: '',
+                qty: '',
+                catatan: '',
               }
             : row
         )
@@ -167,6 +206,21 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
   const baseValue = luas > 0 ? luas * tarifPerm2 * orderQty : orderTotal;
   const computedIncentive = Math.round(baseValue * (komisiPersen / 100) + designFee);
 
+  const fetchComplaints = useCallback(async () => {
+    const orderId = job?.order_id || job?.order_item_detail?.order || job?.order_item;
+    if (!orderId) return;
+    try {
+      const res = await apiClient.get(`/komplain/?order=${orderId}`);
+      setComplaints(res.data);
+    } catch (err) {
+      console.error('Failed to fetch complaints:', err);
+    }
+  }, [job]);
+
+  useEffect(() => {
+    fetchComplaints();
+  }, [fetchComplaints]);
+
   // Must be ABOVE early return to comply with Rules of Hooks
   useEffect(() => {
     if (activeSheet === 'incentive') {
@@ -183,87 +237,70 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
       {/* EXCEL RIBBON & TABS */}
       <div className="bg-[#107c41] text-white shrink-0">
         {/* File / Home Menu Tabs */}
-        <div className="flex items-center px-3 pt-1 gap-1 text-[10px] select-none font-semibold">
-          <button
-            onClick={() => setActiveSheet('detail')}
-            className={`px-3 py-1 rounded-t-sm border-none outline-none cursor-pointer transition-all ${
-              activeSheet === 'detail'
-                ? 'bg-[#f3f3f3] text-[#107c41]'
-                : 'opacity-75 text-white hover:bg-[#185e37]'
-            }`}
-          >
-            File Kerja SPK (Detail)
-          </button>
-          <button
-            onClick={() => setActiveSheet('materials')}
-            className={`px-3 py-1 rounded-t-sm border-none outline-none cursor-pointer transition-all ${
-              activeSheet === 'materials'
-                ? 'bg-[#f3f3f3] text-[#107c41]'
-                : 'opacity-75 text-white hover:bg-[#185e37]'
-            }`}
-          >
-            Bahan Baku Terpakai
-          </button>
-          <button
-            onClick={() => setActiveSheet('incentive')}
-            className={`px-3 py-1 rounded-t-sm border-none outline-none cursor-pointer transition-all ${
-              activeSheet === 'incentive'
-                ? 'bg-[#f3f3f3] text-[#107c41]'
-                : 'opacity-75 text-white hover:bg-[#185e37]'
-            }`}
-          >
-            Rumus Insentif Cetak
-          </button>
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-[9px] bg-[#185e37] px-2 py-0.5 rounded uppercase font-black tracking-wide">
-              {job.tahap_nama}
-            </span>
+        <div className="flex items-center px-3 pt-1 gap-1 text-[10px] select-none font-semibold overflow-x-auto">
+          {[['detail','SPK Detail'],['materials','Bahan Baku'],['incentive','Insentif'],['notes','Catatan Bebas']].map(([id, label]) => (
+            <button key={id} onClick={() => setActiveSheet(id)}
+              className={`px-3 py-1 rounded-t-sm whitespace-nowrap border-none outline-none cursor-pointer transition-all ${
+                activeSheet === id ? 'bg-[#f3f3f3] text-[#107c41] font-black' : 'opacity-80 text-white hover:bg-[#185e37]'
+              }`}>
+              {label}
+            </button>
+          ))}
+          <div className="ml-auto flex items-center gap-2 shrink-0">
+            {savedAt && <span className="text-[8.5px] bg-[#0d5c30] px-2 py-0.5 rounded text-green-200">✓ Tersimpan {savedAt}</span>}
+            <span className="text-[9px] bg-[#185e37] px-2 py-0.5 rounded uppercase font-black tracking-wide">{job.tahap_nama}</span>
           </div>
         </div>
 
         {/* Toolbar / Actions (Green Ribbon Style) */}
-        <div className="bg-[#f3f3f3] border-b border-[#ccc] p-1.5 flex items-center gap-2 text-slate-700 shadow-sm">
-          <button
-            onClick={onClose}
-            className="flex items-center gap-1 px-2.5 py-1 bg-white border border-[#ccc] hover:bg-slate-100 rounded text-slate-650 font-bold transition-all cursor-pointer shadow-sm"
-          >
-            <ChevronLeft size={12} className="text-[#107c41]" />
-            <span>Kembali</span>
+        <div className="bg-[#f3f3f3] border-b border-[#ccc] p-1.5 flex items-center gap-1.5 text-slate-700 shadow-sm flex-wrap">
+          <button onClick={onClose} className="flex items-center gap-1 px-2 py-1 bg-white border border-[#ccc] hover:bg-slate-100 rounded font-bold text-[10px] cursor-pointer shadow-sm">
+            <ChevronLeft size={11} className="text-[#107c41]" /><span>Kembali</span>
           </button>
-
-          <div className="h-4 w-[1px] bg-slate-300 mx-1"></div>
-
-          <button
-            onClick={handleSaveDraft}
-            disabled={updating}
-            className="flex items-center gap-1 px-3 py-1 bg-white border border-[#ccc] hover:bg-slate-100 disabled:opacity-50 rounded text-slate-700 font-extrabold transition-all cursor-pointer shadow-sm"
-          >
-            <Save size={12} className="text-[#107c41]" />
-            <span>Simpan Draft (Ctrl+S)</span>
+          <div className="h-4 w-px bg-slate-300 mx-0.5" />
+          <button onClick={async () => { await handleSaveDraft(); setSavedAt(new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})); }} disabled={updating}
+            className="flex items-center gap-1 px-2.5 py-1 bg-white border border-[#ccc] hover:bg-slate-100 disabled:opacity-50 rounded font-extrabold text-[10px] cursor-pointer shadow-sm">
+            <Save size={11} className="text-[#107c41]" /><span>Simpan</span>
           </button>
-
-          {job.status_pekerjaan === 'antrean' && (
-            <button
-              onClick={() => onStart(job.id)}
-              disabled={saving}
-              className="flex items-center gap-1 px-3 py-1 bg-[#107c41] text-white hover:bg-[#0d6233] disabled:opacity-50 rounded font-extrabold transition-all cursor-pointer shadow-sm"
-            >
-              <Play size={12} fill="white" />
-              <span>Mulai Kerjakan SPK</span>
+          {job?.order_id && (
+            <button onClick={() => setIsKomplainOpen(true)}
+              className="flex items-center gap-1 px-2.5 py-1 bg-white border border-rose-200 hover:bg-rose-50 text-rose-700 font-extrabold text-[10px] cursor-pointer shadow-sm">
+              <AlertTriangle size={11} className="text-rose-600 animate-pulse" /><span>Catat Komplain</span>
             </button>
           )}
-
+          {activeSheet === 'notes' && (
+            <button onClick={exportFreeGridCSV} className="flex items-center gap-1 px-2.5 py-1 bg-white border border-[#ccc] hover:bg-slate-100 rounded font-bold text-[10px] cursor-pointer shadow-sm">
+              <Download size={11} className="text-indigo-600" /><span>Export CSV</span>
+            </button>
+          )}
+          {activeSheet === 'notes' && (
+            <button onClick={() => setFreeGrid(mkEmpty())} className="flex items-center gap-1 px-2.5 py-1 bg-white border border-[#ccc] hover:bg-slate-100 rounded font-bold text-[10px] cursor-pointer shadow-sm">
+              <RefreshCw size={11} className="text-red-500" /><span>Reset Grid</span>
+            </button>
+          )}
+          <div className="h-4 w-px bg-slate-300 mx-0.5" />
+          {/* Formula bar */}
+          <div className="flex items-center gap-1.5 flex-1 min-w-0 bg-white border border-[#ccc] rounded px-2 py-0.5">
+            <span className="text-[9px] font-black font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+              {activeCell ? `${COLS[activeCell.c]}${activeCell.r + 1}` : '—'}
+            </span>
+            <span className="text-slate-300 text-[10px] shrink-0">fx</span>
+            <input value={formulaVal} onChange={e => { setFormulaVal(e.target.value); if (activeCell) setFreeCell(activeCell.r, activeCell.c, e.target.value); }}
+              disabled={activeSheet !== 'notes'}
+              placeholder={activeSheet === 'notes' ? 'Klik sel untuk edit...' : 'Pilih Sheet "Catatan Bebas" untuk mengedit'}
+              className="flex-1 bg-transparent outline-none text-[10px] font-mono text-slate-800 min-w-0 disabled:text-slate-400" />
+          </div>
+          <div className="h-4 w-px bg-slate-300 mx-0.5" />
+          {job.status_pekerjaan === 'antrean' && (
+            <button onClick={() => onStart(job.id)} disabled={saving}
+              className="flex items-center gap-1 px-2.5 py-1 bg-[#107c41] text-white hover:bg-[#0d6233] disabled:opacity-50 rounded font-extrabold text-[10px] cursor-pointer shadow-sm">
+              <Play size={11} fill="white" /><span>Mulai SPK</span>
+            </button>
+          )}
           {job.status_pekerjaan === 'dikerjakan' && (
-            <button
-              onClick={async () => {
-                await handleSaveDraft();
-                onComplete(job);
-              }}
-              disabled={saving}
-              className="flex items-center gap-1 px-3 py-1 bg-[#107c41] text-white hover:bg-[#0d6233] disabled:opacity-50 rounded font-extrabold transition-all cursor-pointer shadow-sm"
-            >
-              <CheckCircle size={12} />
-              <span>Finalisasi Pekerjaan & Teruskan</span>
+            <button onClick={async () => { await handleSaveDraft(); onComplete(job); }} disabled={saving}
+              className="flex items-center gap-1 px-2.5 py-1 bg-[#107c41] text-white hover:bg-[#0d6233] disabled:opacity-50 rounded font-extrabold text-[10px] cursor-pointer shadow-sm">
+              <CheckCircle size={11} /><span>Finalisasi & Teruskan</span>
             </button>
           )}
         </div>
@@ -416,10 +453,42 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
                   />
                 </td>
               </tr>
+              <tr className="hover:bg-slate-50/30">
+                <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
+                  8
+                </td>
+                <td className="bg-rose-50 px-2 font-extrabold text-rose-800 border border-[#ccc] uppercase align-top py-2">
+                  RIWAYAT KOMPLAIN
+                </td>
+                <td colSpan={3} className="px-3 py-2 text-slate-700 border border-[#ccc] align-top bg-rose-50/10">
+                  {complaints.length === 0 ? (
+                    <span className="text-slate-400 italic">Tidak ada komplain tercatat untuk pesanan ini.</span>
+                  ) : (
+                    <div className="space-y-2">
+                      {complaints.map((c, idx) => (
+                        <div key={c.id} className="bg-white border border-rose-200 rounded p-2 shadow-sm">
+                          <div className="flex items-center justify-between font-bold text-rose-700 mb-1">
+                            <span>Komplain #{idx + 1} ({c.jenis_display})</span>
+                            <span className="text-[9px] uppercase bg-rose-100 px-1.5 py-0.5 rounded font-black text-rose-700">
+                              {c.status_display}
+                            </span>
+                          </div>
+                          <p className="text-slate-700 font-semibold whitespace-pre-line leading-relaxed text-[10px]">{c.deskripsi}</p>
+                          {c.catatan_resolusi && (
+                            <div className="mt-1.5 pt-1.5 border-t border-rose-100 text-[9.5px] text-slate-500 font-medium">
+                              <strong>Resolusi ({c.resolusi_display}):</strong> {c.catatan_resolusi}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </td>
+              </tr>
               {historyNotes.length > 0 ? (
                 <tr className="hover:bg-slate-50/30">
                   <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
-                    8
+                    9
                   </td>
                   <td className="bg-amber-50 px-2 font-extrabold text-amber-800 border border-[#ccc] uppercase align-top py-2">
                     RIWAYAT & CATATAN DIVISI SEBELUMNYA
@@ -487,7 +556,7 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
               ) : (
                 <tr className="h-6">
                   <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
-                    8
+                    9
                   </td>
                   <td className="border border-[#ccc]"></td>
                   <td className="border border-[#ccc]"></td>
@@ -538,7 +607,7 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
                   className="bg-[#107c41] text-white font-extrabold px-3 uppercase text-[9px] tracking-wide border border-[#ccc]"
                 >
                   <div className="flex justify-between items-center w-full">
-                    <span>📦 LAPORAN PEMAKAIAN BAHAN BAKU / INVENTORI TERPAKAI</span>
+                    <span>LAPORAN PEMAKAIAN BAHAN BAKU / INVENTORI TERPAKAI</span>
                     <button
                       type="button"
                       onClick={addMaterialRow}
@@ -673,7 +742,7 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
                   colSpan={3}
                   className="bg-[#107c41] text-white font-extrabold px-3 uppercase text-[9px] tracking-wide border border-[#ccc]"
                 >
-                  🧮 RUMUS KALKULASI & ESTIMASI INSENTIF KERJA
+                  RUMUS KALKULASI & ESTIMASI INSENTIF KERJA
                 </td>
               </tr>
               <tr className="bg-[#f3f3f3] select-none text-slate-600 font-bold h-6 text-[9.5px]">
@@ -880,47 +949,102 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
             </tbody>
           </table>
         )}
+        {/* SHEET 4: CATATAN BEBAS */}
+        {activeSheet === 'notes' && (
+          <div className="flex flex-col h-full">
+            {/* Search bar */}
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-[#f9f9f9] border-b border-[#ccc] shrink-0">
+              <Search size={11} className="text-slate-400 shrink-0" />
+              <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Cari teks dalam grid..."
+                className="flex-1 bg-transparent outline-none text-[10px] text-slate-700" />
+              <button onClick={() => { setFreeGrid(g => [...g, Array(COLS.length).fill('')]); }}
+                className="flex items-center gap-1 text-[9px] font-bold text-[#107c41] border border-[#107c41] px-2 py-0.5 rounded hover:bg-[#107c41]/10 cursor-pointer">
+                <Plus size={9} /> Tambah Baris
+              </button>
+            </div>
+            {/* Free grid */}
+            <div className="overflow-auto flex-1">
+              <table className="border-collapse text-[10.5px]">
+                <thead>
+                  <tr className="bg-[#f3f3f3] sticky top-0 z-10">
+                    <th className="w-8 border border-[#ccc] text-[8px] text-slate-400 py-1 font-bold" />
+                    {COLS.map(c => (
+                      <th key={c} className="w-28 border border-[#ccc] text-center text-slate-500 font-semibold py-1">{c}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {freeGrid.map((row, ri) => (
+                    <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'}>
+                      <td className="border border-[#ccc] text-center text-[8.5px] text-slate-400 font-bold bg-[#f3f3f3] select-none w-8">{ri + 1}</td>
+                      {row.map((cell, ci) => {
+                        const isActive = activeCell?.r === ri && activeCell?.c === ci;
+                        const highlight = searchQuery && cell && cell.toLowerCase().includes(searchQuery.toLowerCase());
+                        return (
+                          <td key={ci}
+                            onClick={() => { setActiveCell({ r: ri, c: ci }); setFormulaVal(cell); }}
+                            className={`border border-[#ccc] p-0 relative ${
+                              isActive ? 'outline outline-2 outline-[#107c41] z-10' : ''
+                            } ${highlight ? 'bg-yellow-100' : ''}`}>
+                            <input
+                              value={cell}
+                              onFocus={() => { setActiveCell({ r: ri, c: ci }); setFormulaVal(cell); }}
+                              onChange={e => { setFreeCell(ri, ci, e.target.value); setFormulaVal(e.target.value); }}
+                              className="w-full h-6 px-1.5 bg-transparent outline-none font-mono text-slate-800 text-[10px]"
+                            />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* EXCEL STATUS BAR / SHEET TABS */}
-      <div className="bg-[#f3f3f3] border-t border-[#ccc] px-3 py-1 flex items-center justify-between text-[9px] text-slate-500 shrink-0 font-semibold select-none">
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setActiveSheet('detail')}
-            className={`px-2.5 py-0.5 rounded-t-sm border-t border-x border-[#ccc] transition-all cursor-pointer border-none outline-none ${
-              activeSheet === 'detail'
-                ? 'bg-white text-[#107c41] font-bold border-t-2 border-t-[#107c41]'
-                : 'bg-[#e1dfdd] text-slate-650 hover:bg-slate-200'
-            }`}
-          >
-            Sheet1 (Detail SPK)
-          </button>
-          <button
-            onClick={() => setActiveSheet('materials')}
-            className={`px-2.5 py-0.5 rounded-t-sm border-t border-x border-[#ccc] transition-all cursor-pointer border-none outline-none ${
-              activeSheet === 'materials'
-                ? 'bg-white text-[#107c41] font-bold border-t-2 border-t-[#107c41]'
-                : 'bg-[#e1dfdd] text-slate-655 hover:bg-slate-200'
-            }`}
-          >
-            Sheet2 (Bahan Terpakai)
-          </button>
-          <button
-            onClick={() => setActiveSheet('incentive')}
-            className={`px-2.5 py-0.5 rounded-t-sm border-t border-x border-[#ccc] transition-all cursor-pointer border-none outline-none ${
-              activeSheet === 'incentive'
-                ? 'bg-white text-[#107c41] font-bold border-t-2 border-t-[#107c41]'
-                : 'bg-[#e1dfdd] text-slate-655 hover:bg-slate-200'
-            }`}
-          >
-            Sheet3 (Kalkulator Insentif)
-          </button>
+      <div className="bg-[#f3f3f3] border-t border-[#ccc] px-2 py-0.5 flex items-center justify-between text-[9px] text-slate-500 shrink-0 font-semibold select-none">
+        <div className="flex items-center gap-0.5">
+          {[['detail','Sheet1 · SPK Detail'],['materials','Sheet2 · Bahan'],['incentive','Sheet3 · Insentif'],['notes','Sheet4 · Catatan Bebas']].map(([id, label]) => (
+            <button key={id} onClick={() => setActiveSheet(id)}
+              className={`px-2.5 py-0.5 border-none outline-none cursor-pointer transition-all ${
+                activeSheet === id
+                  ? 'bg-white text-[#107c41] font-black border-t-2 border-t-[#107c41] rounded-t-sm'
+                  : 'bg-[#e1dfdd] text-slate-600 hover:bg-slate-200 rounded-t-sm'
+              }`}>
+              {label}
+            </button>
+          ))}
         </div>
-        <div className="flex items-center gap-2 font-mono">
-          <span>STATUS: READY</span>
-          <div className="w-2 h-2 rounded-full bg-[#107c41]"></div>
+        <div className="flex items-center gap-3 font-mono">
+          {activeCell && activeSheet === 'notes' && (
+            <span className="text-[#107c41] font-black">Sel: {COLS[activeCell.c]}{activeCell.r + 1}</span>
+          )}
+          <span className="text-slate-400">SPK #{job.id}</span>
+          <span className={`font-bold ${
+            job.status_pekerjaan === 'selesai' ? 'text-emerald-600' :
+            job.status_pekerjaan === 'dikerjakan' ? 'text-blue-600' : 'text-slate-500'
+          }`}>● {job.status_pekerjaan?.toUpperCase()}</span>
         </div>
       </div>
+      
+      <KomplainModal
+        isOpen={isKomplainOpen}
+        onClose={() => setIsKomplainOpen(false)}
+        order={{
+          id: job?.order_id || job?.order_item_detail?.order || job?.order_item,
+          nama: job?.pelanggan_nama || 'Pelanggan',
+          nomor_wa: job?.pelanggan_wa || '',
+        }}
+        defaultFotoBukti={driveLink}
+        onSuccess={() => {
+          setIsKomplainOpen(false);
+          fetchComplaints();
+        }}
+      />
     </div>
   );
 }

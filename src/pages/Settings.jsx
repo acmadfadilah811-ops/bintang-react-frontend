@@ -29,7 +29,6 @@ import {
   KeyRound,
   Eye,
   EyeOff,
-  Globe,
   Upload,
   Image,
 } from 'lucide-react';
@@ -135,8 +134,22 @@ export default function Settings() {
     mata_uang: 'IDR',
     logo_url: '',
     deskripsi: '',
+    ppn_default: 11,
+    invoice_terms: '',
+    order_prefix: 'ORD',
+    payroll_jam_masuk: '08:00',
+    payroll_jam_keluar: '17:00',
+    payroll_toleransi_menit: 15,
+    biaya_potongan_terlambat: 1000,
+    r2_bucket_name: '',
+    r2_custom_domain: '',
+    smtp_host: '',
+    smtp_port: 587,
+    smtp_user: '',
+    smtp_password: '',
   });
   const [bisnisDivisi, setBisnisDivisi] = useState([]);
+  const [subTab, setSubTab] = useState('umum');
   const [bisnisLoading, setBisnisLoading] = useState(false);
   const [bisnisSaving, setBisnisSaving] = useState(false);
   const [bisnisMsg, setBisnisMsg] = useState(null); // { type, text }
@@ -251,6 +264,25 @@ export default function Settings() {
       formData.append('no_telepon', bisnis.no_telepon || '');
       formData.append('mata_uang', bisnis.mata_uang || 'IDR');
       formData.append('deskripsi', bisnis.deskripsi || '');
+      
+      // Keuangan & Invoice
+      formData.append('ppn_default', bisnis.ppn_default !== undefined ? bisnis.ppn_default : 11);
+      formData.append('invoice_terms', bisnis.invoice_terms || '');
+      formData.append('order_prefix', bisnis.order_prefix || 'ORD');
+      
+      // Kebijakan Karyawan & Payroll
+      formData.append('payroll_jam_masuk', bisnis.payroll_jam_masuk || '08:00');
+      formData.append('payroll_jam_keluar', bisnis.payroll_jam_keluar || '17:00');
+      formData.append('payroll_toleransi_menit', bisnis.payroll_toleransi_menit !== undefined ? bisnis.payroll_toleransi_menit : 15);
+      formData.append('biaya_potongan_terlambat', bisnis.biaya_potongan_terlambat !== undefined ? bisnis.biaya_potongan_terlambat : 1000);
+      
+      // API & Integrasi Cloud
+      formData.append('r2_bucket_name', bisnis.r2_bucket_name || '');
+      formData.append('r2_custom_domain', bisnis.r2_custom_domain || '');
+      formData.append('smtp_host', bisnis.smtp_host || '');
+      formData.append('smtp_port', bisnis.smtp_port !== undefined ? bisnis.smtp_port : 587);
+      formData.append('smtp_user', bisnis.smtp_user || '');
+      formData.append('smtp_password', bisnis.smtp_password || '');
 
       if (logoFile) {
         formData.append('logo_file', logoFile);
@@ -655,160 +687,310 @@ export default function Settings() {
       {activeTab === 'bisnis' && (
         <div style={{ animation: 'revealUp 0.4s ease both' }}>
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
               <Building2 size={16} className="text-indigo-600" />
-              <h3 className="font-semibold text-slate-800">Informasi Bisnis</h3>
+              <h3 className="font-semibold text-slate-800">Pengaturan Bisnis & Sistem</h3>
             </div>
+            
             {bisnisLoading ? (
               <div className="flex justify-center py-12">
                 <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
               </div>
             ) : (
-              <form onSubmit={handleSaveBisnis} className="p-6 space-y-5">
-                <MsgBox msg={bisnisMsg} />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-                      <Building2 size={13} className="text-slate-400" /> Nama Bisnis
-                    </label>
-                    <input
-                      type="text"
-                      value={bisnis.nama_bisnis}
-                      onChange={(e) => setBisnis({ ...bisnis, nama_bisnis: e.target.value })}
-                      placeholder="PT. Maju Utama..."
-                      className={inputCls}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-                      <Phone size={13} className="text-slate-400" /> No Telepon
-                    </label>
-                    <input
-                      type="text"
-                      value={bisnis.no_telepon}
-                      onChange={(e) => setBisnis({ ...bisnis, no_telepon: e.target.value })}
-                      placeholder="0812..."
-                      className={inputCls}
-                    />
-                  </div>
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-                      <MapPin size={13} className="text-slate-400" /> Alamat
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={bisnis.alamat}
-                      onChange={(e) => setBisnis({ ...bisnis, alamat: e.target.value })}
-                      placeholder="Jl. ..."
-                      className={`${inputCls} resize-none`}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-                      <Globe size={13} className="text-slate-400" /> Mata Uang
-                    </label>
-                    <select
-                      value={bisnis.mata_uang}
-                      onChange={(e) => setBisnis({ ...bisnis, mata_uang: e.target.value })}
-                      className={`${inputCls} appearance-none cursor-pointer`}
-                    >
-                      <option value="IDR">IDR — Rupiah</option>
-                      <option value="USD">USD — Dollar</option>
-                      <option value="SGD">SGD — Singapore Dollar</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-                      <Image size={13} className="text-slate-400" /> Logo Bisnis
-                    </label>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-slate-200 rounded-xl bg-slate-50/50">
-                      <div className="relative w-20 h-20 rounded-xl border border-slate-200 bg-white flex items-center justify-center overflow-hidden group shrink-0">
-                        {logoPreview || bisnis.logo_url ? (
-                          <img
-                            src={logoPreview || getLogoUrl(bisnis.logo_url)}
-                            alt="Logo Bisnis"
-                            className="w-full h-full object-contain"
-                          />
-                        ) : (
-                          <Building2 size={28} className="text-slate-300" />
-                        )}
-                        <label
-                          htmlFor="logo-file-input"
-                          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-                        >
-                          <Upload size={16} className="text-white" />
-                        </label>
-                      </div>
-                      <div className="space-y-1.5">
-                        <input
-                          type="file"
-                          id="logo-file-input"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleLogoChange}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => document.getElementById('logo-file-input').click()}
-                          className="px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 rounded-lg text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
-                        >
-                          <Upload size={13} className="text-slate-500" /> Pilih File Gambar
-                        </button>
-                        <p className="text-[10px] text-slate-400">
-                          Format PNG, JPG, atau WEBP. Maksimal 2MB.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-                      <FileText size={13} className="text-slate-400" /> Deskripsi Bisnis
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={bisnis.deskripsi}
-                      onChange={(e) => setBisnis({ ...bisnis, deskripsi: e.target.value })}
-                      placeholder="Ceritakan tentang bisnis Anda..."
-                      className={`${inputCls} resize-none`}
-                    />
-                  </div>
+              <form onSubmit={handleSaveBisnis} className="flex flex-col md:flex-row min-h-[500px]">
+                {/* Sidebar Sub-Tabs */}
+                <div className="w-full md:w-64 border-r border-slate-100 bg-slate-50/50 p-4 space-y-1 shrink-0">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-2">Sub Setelan</p>
+                  {[
+                    { id: 'umum', label: 'Umum & Lokalisasi', icon: Building2 },
+                    { id: 'keuangan', label: 'Keuangan & Invoice', icon: FileText },
+                    { id: 'karyawan', label: 'Kebijakan Karyawan', icon: Users },
+                  ].map((sub) => {
+                    const SubIcon = sub.icon;
+                    const isSubActive = subTab === sub.id;
+                    return (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        onClick={() => setSubTab(sub.id)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all text-left cursor-pointer
+                          ${isSubActive ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'}`}
+                      >
+                        <SubIcon size={16} className={isSubActive ? 'text-indigo-600' : 'text-slate-400'} />
+                        {sub.label}
+                      </button>
+                    );
+                  })}
                 </div>
 
-                {/* Divisi */}
-                {bisnisDivisi.length > 0 && (
-                  <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                      Daftar Divisi
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {bisnisDivisi.map((d) => (
-                        <span
-                          key={d.id}
-                          className="px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-full border border-indigo-100"
-                        >
-                          {d.nama}
-                        </span>
-                      ))}
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-1.5">
-                      Kelola divisi melalui halaman Karyawan.
-                    </p>
-                  </div>
-                )}
+                {/* Right Form Panel */}
+                <div className="flex-1 p-6 space-y-6">
+                  <MsgBox msg={bisnisMsg} />
 
-                <div className="flex justify-end pt-2 border-t border-slate-100">
-                  <button
-                    type="submit"
-                    disabled={bisnisSaving}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-all disabled:opacity-60 cursor-pointer"
-                  >
-                    {bisnisSaving ? (
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Save size={15} />
-                    )}
-                    Simpan Pengaturan
-                  </button>
+                  {/* SUB-TAB: UMUM */}
+                  {subTab === 'umum' && (
+                    <div className="space-y-5 animate-fade-in">
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-base">Umum & Profil Bisnis</h4>
+                        <p className="text-xs text-slate-400">Atur profil dasar perusahaan dan logo utama.</p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+                            Nama Perusahaan
+                          </label>
+                          <input
+                            type="text"
+                            value={bisnis.nama_bisnis || ''}
+                            onChange={(e) => setBisnis({ ...bisnis, nama_bisnis: e.target.value })}
+                            placeholder="PT. Maju Utama..."
+                            className={inputCls}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+                            No Telepon Kantor
+                          </label>
+                          <input
+                            type="text"
+                            value={bisnis.no_telepon || ''}
+                            onChange={(e) => setBisnis({ ...bisnis, no_telepon: e.target.value })}
+                            placeholder="0812..."
+                            className={inputCls}
+                          />
+                        </div>
+                        <div className="space-y-1.5 sm:col-span-2">
+                          <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+                            Alamat Kantor
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={bisnis.alamat || ''}
+                            onChange={(e) => setBisnis({ ...bisnis, alamat: e.target.value })}
+                            placeholder="Jl. ..."
+                            className={`${inputCls} resize-none`}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+                            Mata Uang Default
+                          </label>
+                          <select
+                            value={bisnis.mata_uang || 'IDR'}
+                            onChange={(e) => setBisnis({ ...bisnis, mata_uang: e.target.value })}
+                            className={`${inputCls} appearance-none cursor-pointer`}
+                          >
+                            <option value="IDR">IDR — Rupiah</option>
+                            <option value="USD">USD — Dollar</option>
+                            <option value="SGD">SGD — Singapore Dollar</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5 sm:col-span-2">
+                          <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+                            Logo Bisnis
+                          </label>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-slate-200 rounded-xl bg-slate-50/50">
+                            <div className="relative w-20 h-20 rounded-xl border border-slate-200 bg-white flex items-center justify-center overflow-hidden group shrink-0">
+                              {logoPreview || bisnis.logo_url ? (
+                                <img
+                                  src={logoPreview || getLogoUrl(bisnis.logo_url)}
+                                  alt="Logo Bisnis"
+                                  className="w-full h-full object-contain"
+                                />
+                              ) : (
+                                <Building2 size={28} className="text-slate-300" />
+                              )}
+                              <label
+                                htmlFor="logo-file-input"
+                                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                              >
+                                <Upload size={16} className="text-white" />
+                              </label>
+                            </div>
+                            <div className="space-y-1.5">
+                              <input
+                                type="file"
+                                id="logo-file-input"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleLogoChange}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => document.getElementById('logo-file-input').click()}
+                                className="px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 rounded-lg text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                              >
+                                <Upload size={13} className="text-slate-500" /> Pilih File Gambar
+                              </button>
+                              <p className="text-[10px] text-slate-400">
+                                Format PNG, JPG, atau WEBP. Maksimal 2MB.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="space-y-1.5 sm:col-span-2">
+                          <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+                            Deskripsi Bisnis
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={bisnis.deskripsi || ''}
+                            onChange={(e) => setBisnis({ ...bisnis, deskripsi: e.target.value })}
+                            placeholder="Ceritakan tentang bisnis Anda..."
+                            className={`${inputCls} resize-none`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUB-TAB: KEUANGAN & INVOICE */}
+                  {subTab === 'keuangan' && (
+                    <div className="space-y-5 animate-fade-in">
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-base">Keuangan & Cetak Invoice</h4>
+                        <p className="text-xs text-slate-400">Konfigurasi persentase pajak default dan terms struk pembayaran.</p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700">
+                            PPN Default (%)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={bisnis.ppn_default || 0}
+                            onChange={(e) => setBisnis({ ...bisnis, ppn_default: parseInt(e.target.value) || 0 })}
+                            className={inputCls}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700">
+                            Prefix Nomor Order / Invoice
+                          </label>
+                          <input
+                            type="text"
+                            value={bisnis.order_prefix || ''}
+                            onChange={(e) => setBisnis({ ...bisnis, order_prefix: e.target.value })}
+                            placeholder="ORD"
+                            className={inputCls}
+                          />
+                        </div>
+                        <div className="space-y-1.5 sm:col-span-2">
+                          <label className="text-sm font-medium text-slate-700">
+                            Syarat & Ketentuan Struk (Terms & Conditions)
+                          </label>
+                          <textarea
+                            rows={4}
+                            value={bisnis.invoice_terms || ''}
+                            onChange={(e) => setBisnis({ ...bisnis, invoice_terms: e.target.value })}
+                            placeholder="Barang yang sudah dibeli tidak dapat ditukar..."
+                            className={inputCls}
+                          />
+                          <p className="text-[10px] text-slate-400">
+                            Teks ini akan dicetak di bagian paling bawah pada invoice/struk pesanan.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUB-TAB: KEBIJAKAN KARYAWAN */}
+                  {subTab === 'karyawan' && (
+                    <div className="space-y-5 animate-fade-in">
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-base">Kebijakan Staff & Absensi</h4>
+                        <p className="text-xs text-slate-400">Atur regulasi jam masuk kerja, batas toleransi, dan denda terlambat.</p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700">
+                            Jam Masuk Kerja (Default)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="08:00"
+                            value={bisnis.payroll_jam_masuk || ''}
+                            onChange={(e) => setBisnis({ ...bisnis, payroll_jam_masuk: e.target.value })}
+                            className={inputCls}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700">
+                            Jam Pulang Kerja (Default)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="17:00"
+                            value={bisnis.payroll_jam_keluar || ''}
+                            onChange={(e) => setBisnis({ ...bisnis, payroll_jam_keluar: e.target.value })}
+                            className={inputCls}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700">
+                            Batas Toleransi Keterlambatan (Menit)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={bisnis.payroll_toleransi_menit || 0}
+                            onChange={(e) => setBisnis({ ...bisnis, payroll_toleransi_menit: parseInt(e.target.value) || 0 })}
+                            className={inputCls}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700">
+                            Nominal Denda Terlambat (Rupiah per Menit)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={bisnis.biaya_potongan_terlambat || 0}
+                            onChange={(e) => setBisnis({ ...bisnis, biaya_potongan_terlambat: parseInt(e.target.value) || 0 })}
+                            className={inputCls}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Divisi */}
+                      {bisnisDivisi.length > 0 && (
+                        <div className="pt-4 border-t border-slate-100">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                            Daftar Divisi Aktif
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {bisnisDivisi.map((d) => (
+                              <span
+                                key={d.id}
+                                className="px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-full border border-indigo-100"
+                              >
+                                {d.nama}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Sticky Save Button Bar */}
+                  <div className="flex justify-end pt-4 border-t border-slate-100">
+                    <button
+                      type="submit"
+                      disabled={bisnisSaving}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-all disabled:opacity-60 cursor-pointer shadow-sm animate-fade-in"
+                    >
+                      {bisnisSaving ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Save size={15} />
+                      )}
+                      Simpan Pengaturan Bisnis
+                    </button>
+                  </div>
                 </div>
               </form>
             )}

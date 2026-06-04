@@ -31,12 +31,38 @@ export default function Customers() {
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [paymentModalData, setPaymentModalData] = useState(null);
 
+  // CRM Scheduled Activities States
+  const [activities, setActivities] = useState([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
+  const [showAddActivityForm, setShowAddActivityForm] = useState(false);
+  const [newActivity, setNewActivity] = useState({
+    order_id: '',
+    tipe: 'whatsapp',
+    keterangan: '',
+    waktu_jatuh_tempo: new Date().toISOString().slice(0, 10),
+  });
+
+  const fetchCustomerActivities = async (ordersList) => {
+    try {
+      setLoadingActivities(true);
+      const res = await apiClient.get('/customer-activities/');
+      const orderIds = ordersList.map((o) => o.id);
+      const filtered = res.data.filter((act) => orderIds.includes(act.order));
+      setActivities(filtered);
+    } catch (err) {
+      console.error('Gagal memuat aktivitas:', err);
+    } finally {
+      setLoadingActivities(false);
+    }
+  };
+
   const fetchCustomerOrders = async (phone) => {
     try {
       setLoadingOrders(true);
       const res = await apiClient.get('/orders/');
       const filtered = res.data.filter((o) => o.nomor_wa === phone);
       setCustomerOrders(filtered);
+      await fetchCustomerActivities(filtered);
     } catch (err) {
       console.error('Gagal memuat history order:', err);
     } finally {
@@ -50,21 +76,28 @@ export default function Customers() {
   const [isSavingCustomer, setIsSavingCustomer] = useState(false);
   const [isSavingPayment, setIsSavingPayment] = useState(false);
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       const res = await apiClient.get('/contacts/');
       const sorted = res.data.sort((a, b) => (b.total_spent || 0) - (a.total_spent || 0));
       setCustomers(sorted);
     } catch (err) {
       console.error('Gagal memuat data pelanggan:', err);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchCustomers();
+
+    // Polling background setiap 10 detik agar data selalu real-time dan up-to-date
+    const intervalId = setInterval(() => {
+      fetchCustomers(true); // Silent refresh
+    }, 10000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   const filteredCustomers = customers.filter((customer) => {
@@ -617,6 +650,197 @@ export default function Customers() {
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* Scheduled Activities Section */}
+              <div className="space-y-4 border-t border-slate-150 pt-4">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-bold text-slate-900 text-[12px] uppercase tracking-wider">
+                    Aktivitas Follow-Up (CRM)
+                  </h4>
+                  <button
+                    onClick={() => {
+                      setShowAddActivityForm(!showAddActivityForm);
+                      if (customerOrders.length > 0) {
+                        setNewActivity((prev) => ({
+                          ...prev,
+                          order_id: customerOrders[0].id,
+                        }));
+                      }
+                    }}
+                    className="text-[10px] font-bold text-indigo-650 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 px-2 py-1 rounded transition-colors"
+                  >
+                    {showAddActivityForm ? 'Batal' : '+ Jadwal Baru'}
+                  </button>
+                </div>
+
+                {showAddActivityForm && (
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      try {
+                        const payload = {
+                          order: newActivity.order_id,
+                          tipe: newActivity.tipe,
+                          keterangan: newActivity.keterangan,
+                          waktu_jatuh_tempo: newActivity.waktu_jatuh_tempo,
+                        };
+                        await apiClient.post('/customer-activities/', payload);
+                        setShowAddActivityForm(false);
+                        setNewActivity({
+                          order_id: customerOrders[0]?.id || '',
+                          tipe: 'whatsapp',
+                          keterangan: '',
+                          waktu_jatuh_tempo: new Date().toISOString().slice(0, 10),
+                        });
+                        await fetchCustomerActivities(customerOrders);
+                        alert('Aktivitas follow-up berhasil dijadwalkan!');
+                      } catch (err) {
+                        console.error('Gagal menjadwalkan aktivitas:', err);
+                        alert('Gagal menjadwalkan aktivitas.');
+                      }
+                    }}
+                    className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-3 text-slate-800"
+                  >
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-655 text-slate-600 block">Pilih Pesanan</label>
+                        <select
+                          value={newActivity.order_id}
+                          onChange={(e) => setNewActivity({ ...newActivity, order_id: e.target.value })}
+                          className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          required
+                        >
+                          {customerOrders.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              Order #{o.id} ({o.items?.map((i) => i.jenis_produk).join(', ') || 'No Prod'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-655 text-slate-600 block">Tipe Aktivitas</label>
+                        <select
+                          value={newActivity.tipe}
+                          onChange={(e) => setNewActivity({ ...newActivity, tipe: e.target.value })}
+                          className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        >
+                          <option value="whatsapp">Kirim WhatsApp</option>
+                          <option value="call">Telepon</option>
+                          <option value="design_check">Konfirmasi Desain</option>
+                          <option value="payment_followup">Follow-up Pembayaran</option>
+                          <option value="other">Lainnya</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-655 text-slate-600 block">Tanggal Jatuh Tempo</label>
+                      <input
+                        type="date"
+                        value={newActivity.waktu_jatuh_tempo}
+                        onChange={(e) => setNewActivity({ ...newActivity, waktu_jatuh_tempo: e.target.value })}
+                        className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-655 text-slate-600 block">Keterangan Detail</label>
+                      <textarea
+                        value={newActivity.keterangan}
+                        onChange={(e) => setNewActivity({ ...newActivity, keterangan: e.target.value })}
+                        placeholder="Contoh: Kirim reminder sisa tagihan DP..."
+                        className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none"
+                        rows="2"
+                        required
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full py-1.5 bg-indigo-650 bg-indigo-600 text-white rounded text-xs font-bold hover:bg-indigo-700 shadow-sm"
+                    >
+                      Jadwalkan Aktivitas
+                    </button>
+                  </form>
+                )}
+
+                {loadingActivities ? (
+                  <div className="text-center py-4 text-slate-400 text-xs">Memuat aktivitas...</div>
+                ) : activities.length === 0 ? (
+                  <p className="text-center py-4 text-slate-400 text-[11px] italic">
+                    Belum ada jadwal follow-up untuk pelanggan ini.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {activities.map((act) => {
+                      const isOverdue = !act.selesai && new Date(act.waktu_jatuh_tempo) < new Date().setHours(0,0,0,0);
+                      const tipeLabelMap = {
+                        whatsapp: 'WhatsApp',
+                        call: 'Telepon',
+                        design_check: 'Desain',
+                        payment_followup: 'Tagihan',
+                        other: 'Lainnya',
+                      };
+                      return (
+                        <div
+                          key={act.id}
+                          className={`p-3 rounded-lg border flex justify-between items-start ${
+                            act.selesai
+                              ? 'bg-slate-50/75 border-slate-250 border-slate-200 opacity-75'
+                              : isOverdue
+                                ? 'bg-red-50/40 border-red-200'
+                                : 'bg-white border-slate-200 shadow-sm'
+                          }`}
+                        >
+                          <div className="space-y-1 max-w-[80%]">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
+                                  act.tipe === 'whatsapp'
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : act.tipe === 'payment_followup'
+                                      ? 'bg-red-100 text-red-700'
+                                      : 'bg-indigo-100 text-indigo-700'
+                                }`}
+                              >
+                                {tipeLabelMap[act.tipe] || act.tipe}
+                              </span>
+                              <span className={`text-[10px] font-semibold ${isOverdue ? 'text-red-650 text-red-600' : 'text-slate-500'}`}>
+                                {new Date(act.waktu_jatuh_tempo).toLocaleDateString('id-ID', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })}
+                                {isOverdue && ' (Terlambat)'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-800 font-medium">{act.keterangan}</p>
+                            <p className="text-[9px] text-slate-400">
+                              PIC: <span className="font-semibold text-slate-500">{act.pic_username}</span> • Order: #{act.order}
+                            </p>
+                          </div>
+
+                          {!act.selesai && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await apiClient.post(`/customer-activities/${act.id}/complete/`);
+                                  await fetchCustomerActivities(customerOrders);
+                                  alert('Aktivitas ditandai selesai!');
+                                } catch (err) {
+                                  console.error('Gagal menyelesaikan aktivitas:', err);
+                                }
+                              }}
+                              className="px-2 py-1 bg-emerald-650 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[9px] font-bold shadow-sm transition-colors cursor-pointer"
+                              title="Tandai Selesai"
+                            >
+                              Selesai
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Order History Section */}

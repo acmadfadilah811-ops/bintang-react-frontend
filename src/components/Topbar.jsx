@@ -17,8 +17,22 @@ import {
   UserCheck,
   AlertCircle,
   Volume2,
+  LayoutDashboard,
+  ShoppingCart,
+  Kanban,
+  Layers,
+  Package,
+  Briefcase,
+  CalendarClock,
+  DollarSign,
+  BookOpen,
+  Bell,
+  Settings,
+  LogOut,
+  Grid,
+  ChevronRight,
 } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useDynamicIsland } from '../context/DynamicIslandContext';
 import { useState, useEffect, useRef } from 'react';
@@ -33,6 +47,7 @@ const PAGE_TITLES = {
   '/jobs': 'Papan Produksi',
   '/attendance': 'Absensi',
   '/employees': 'Karyawan',
+  '/payroll': 'Penggajian & BoM',
   '/buku-besar': 'Buku Besar',
   '/announcements': 'Pengumuman',
   '/profile': 'Profil Saya',
@@ -41,7 +56,41 @@ const PAGE_TITLES = {
 
 export default function Topbar() {
   const location = useLocation();
-  const { user, businessSettings } = useAuth();
+  const navigate = useNavigate();
+  const { user, businessSettings, logout } = useAuth();
+
+  // UI State Variables
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [commandQuery, setCommandQuery] = useState('');
+
+  const profileDropdownRef = useRef(null);
+  const commandPaletteRef = useRef(null);
+
+  const userRole = user?.role?.toLowerCase() || 'staff';
+
+  const allCommands = [
+    { label: 'Buka Dashboard', action: () => navigate(userRole === 'staff' ? '/staff-dashboard' : '/dashboard'), category: 'Navigasi' },
+    { label: 'Buka Pesanan (CRM)', action: () => navigate('/orders'), category: 'Navigasi' },
+    { label: 'Buka Papan Kerja (SPK)', action: () => navigate('/jobs'), category: 'Navigasi' },
+    { label: 'Buka Kanban Produksi', action: () => navigate('/produksi'), category: 'Navigasi' },
+    { label: 'Buka Pelanggan', action: () => navigate('/customers'), category: 'Navigasi' },
+    { label: 'Buka Inventori', action: () => navigate('/inventory'), category: 'Navigasi' },
+    { label: 'Buka Absensi', action: () => navigate('/attendance'), category: 'Navigasi' },
+    { label: 'Buka Karyawan', action: () => navigate('/employees'), category: 'Navigasi' },
+    { label: 'Buka Gaji & BoM', action: () => navigate('/payroll'), category: 'Navigasi' },
+    { label: 'Buka Buku Besar', action: () => navigate('/buku-besar'), category: 'Navigasi' },
+    { label: 'Buka Pengaturan', action: () => navigate('/settings'), category: 'Navigasi' },
+    { label: 'Buka Pemutar Musik', action: () => { setShowMusicPlayer(true); setShowCommandPalette(false); }, category: 'Alat' },
+    { label: 'Toggle Layar Penuh', action: () => { toggleFullscreen(); setShowCommandPalette(false); }, category: 'Alat' },
+    { label: 'Keluar / Logout', action: () => { logout(); navigate('/login'); }, category: 'Akun' },
+  ];
+
+  const filteredCommands = allCommands.filter(cmd => {
+    if (userRole === 'staff' && ['Buka Karyawan', 'Buka Gaji & BoM', 'Buka Buku Besar', 'Buka Pengaturan'].includes(cmd.label)) return false;
+    if (userRole === 'admin' && ['Buka Karyawan', 'Buka Gaji & BoM', 'Buka Buku Besar'].includes(cmd.label)) return false;
+    return cmd.label.toLowerCase().includes(commandQuery.toLowerCase());
+  });
   const [currentDate, setCurrentDate] = useState('');
   const [liveTime, setLiveTime] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -176,11 +225,30 @@ export default function Topbar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showOnlineStaff]);
 
+  // Hotkeys listener untuk Command Palette (Ctrl+K atau Cmd+K) & Esc key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setShowCommandPalette((prev) => !prev);
+      }
+      if (e.key === 'Escape') {
+        setShowCommandPalette(false);
+        setShowProfileDropdown(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Tutup dropdown saat klik di luar
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setShowOnlineStaff(false);
+      }
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target)) {
+        setShowProfileDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -230,6 +298,14 @@ export default function Topbar() {
           }
           .animate-ecg-scroll {
             animation: ecgScroll 4s linear infinite;
+          }
+
+          @keyframes scaleUp {
+            from { transform: scale(0.95); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+          }
+          .animate-scale-up {
+            animation: scaleUp 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
           }
         `}</style>
 
@@ -487,24 +563,62 @@ export default function Topbar() {
         <div className="hidden sm:block h-8 w-px bg-slate-200"></div>
 
         {/* Profil User */}
-        <div className="flex items-center gap-3 cursor-pointer group">
-          <div className="hidden sm:flex flex-col items-end">
-            <span className="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors leading-tight">
-              {user?.username || 'User'}
-            </span>
-            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-              {user?.role || 'staff'}
-            </span>
-          </div>
-          <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden shrink-0 border-2 border-slate-200 shadow-sm group-hover:border-blue-400 transition-colors">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-blue-700 font-black text-base">
-                {(user?.username || 'U').charAt(0).toUpperCase()}
+        <div className="relative" ref={profileDropdownRef}>
+          <button
+            onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+            className="flex items-center gap-3 cursor-pointer group outline-none focus:outline-none"
+          >
+            <div className="hidden sm:flex flex-col items-end">
+              <span className="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors leading-tight">
+                {user?.username || 'User'}
               </span>
-            )}
-          </div>
+              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                {user?.role || 'staff'}
+              </span>
+            </div>
+            <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden shrink-0 border-2 border-slate-200 shadow-sm group-hover:border-blue-400 transition-colors">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-blue-700 font-black text-base">
+                  {(user?.username || 'U').charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
+          </button>
+
+          {/* Profile Dropdown Panel */}
+          {showProfileDropdown && (
+            <div className="absolute right-0 top-12 w-48 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden py-1 animate-scale-up">
+              <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/50 text-left">
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Halo,</p>
+                <p className="text-sm font-black text-slate-700 truncate capitalize">{user?.username}</p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowProfileDropdown(false);
+                  navigate('/profile');
+                }}
+                className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors text-left cursor-pointer"
+              >
+                <UserCheck size={14} className="text-slate-405 text-slate-400" />
+                <span>Pengaturan Profil</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowProfileDropdown(false);
+                  logout();
+                  navigate('/login');
+                }}
+                className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-colors text-left border-t border-slate-100 cursor-pointer"
+              >
+                <LogOut size={14} className="text-rose-500" />
+                <span>Keluar</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -805,6 +919,69 @@ export default function Topbar() {
             >
               Simpan ke Dynamic Island
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Command Palette Overlay */}
+      {showCommandPalette && (
+        <div 
+          className="fixed inset-0 z-[110] flex justify-center bg-slate-950/60 backdrop-blur-sm p-4 pt-[10vh]"
+          onClick={() => setShowCommandPalette(false)}
+        >
+          <div 
+            className="bg-white/95 border border-slate-200/50 rounded-3xl max-w-lg w-full shadow-2xl flex flex-col overflow-hidden max-h-[400px] animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+            ref={commandPaletteRef}
+          >
+            {/* Input Search */}
+            <div className="p-4 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
+              <Search size={18} className="text-slate-400" />
+              <input
+                type="text"
+                value={commandQuery}
+                onChange={(e) => setCommandQuery(e.target.value)}
+                placeholder="Ketik menu atau aksi cepat... (Esc untuk batal)"
+                className="w-full bg-transparent text-sm font-semibold text-slate-700 outline-none placeholder-slate-400"
+                autoFocus
+              />
+              <span className="text-[10px] font-bold text-slate-400 border border-slate-200 bg-white px-2 py-0.5 rounded shadow-sm">ESC</span>
+            </div>
+
+            {/* List Commands */}
+            <div className="flex-1 overflow-y-auto py-2 divide-y divide-slate-100">
+              {filteredCommands.length > 0 ? (
+                Object.entries(
+                  filteredCommands.reduce((acc, cmd) => {
+                    if (!acc[cmd.category]) acc[cmd.category] = [];
+                    acc[cmd.category].push(cmd);
+                    return acc;
+                  }, {})
+                ).map(([category, cmds]) => (
+                  <div key={category} className="py-2">
+                    <p className="px-4 py-1 text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest bg-slate-50/20">{category}</p>
+                    {cmds.map((cmd, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          cmd.action();
+                          setShowCommandPalette(false);
+                          setCommandQuery('');
+                        }}
+                        className="w-full flex items-center justify-between px-6 py-2 hover:bg-indigo-50/40 text-xs font-bold text-slate-600 hover:text-indigo-600 transition-colors text-left cursor-pointer"
+                      >
+                        <span>{cmd.label}</span>
+                        <ChevronRight size={12} className="text-indigo-600" />
+                      </button>
+                    ))}
+                  </div>
+                ))
+              ) : (
+                <div className="p-6 text-center text-slate-400 text-xs font-semibold">
+                  Tidak ada perintah atau menu yang cocok
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

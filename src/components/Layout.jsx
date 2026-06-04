@@ -4,6 +4,7 @@ import Topbar from './Topbar';
 import { useAuth } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
 import LockedScreen from './LockedScreen';
+import apiClient from '../api/apiClient';
 import { LayoutDashboard, CalendarClock, ShoppingCart, Kanban, User } from 'lucide-react';
 
 export default function Layout() {
@@ -22,23 +23,23 @@ export default function Layout() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => {
-    const checkStatus = async () => {
-      try {
-        const response = await fetch('/api/hr/status-karyawan/');
-        const data = await response.json();
-        setStatusTerkunci(data.status_terkunci);
-      } catch (error) {
-        console.error('Error checking lock status:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (user && user.role?.toLowerCase() === 'staff') {
-      checkStatus();
-    } else {
+  const checkStatus = async () => {
+    if (!user || user.role?.toLowerCase() !== 'staff') {
+      setLoading(false);
+      return;
+    }
+    try {
+      const response = await apiClient.get('/hr/dashboard/staff/');
+      setStatusTerkunci(response.data.status_terkunci);
+    } catch (error) {
+      console.error('Error checking lock status:', error);
+    } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    checkStatus();
   }, [user]);
 
   if (location.pathname.startsWith('/produksi')) {
@@ -53,9 +54,10 @@ export default function Layout() {
     );
   }
 
-  if (statusTerkunci) {
-    return <LockedScreen />;
-  }
+  // TEMPORARY BYPASS: Dibuka sementara untuk pengetesan/review log Papan Kerja
+  // if (statusTerkunci && statusTerkunci.is_locked) {
+  //   return <LockedScreen statusTerkunci={statusTerkunci} onRefresh={checkStatus} />;
+  // }
 
   const mobileMenuStaff = [
     { path: '/staff-dashboard', label: 'Dashboard', icon: LayoutDashboard },

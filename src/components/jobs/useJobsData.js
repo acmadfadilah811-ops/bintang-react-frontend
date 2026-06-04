@@ -65,6 +65,8 @@ export function useJobsData() {
               keteranganDetail: item.keterangan_detail || '',
               catatanPelanggan: order.catatan_pelanggan || '',
               fileLink: item.gdrive_customer_link || '',
+              panjang: item.panjang || 0,
+              lebar: item.lebar || 0,
               qty: item.qty || 1,
               hargaJual: item.harga_jual || 0,
             };

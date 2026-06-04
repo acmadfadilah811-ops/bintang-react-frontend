@@ -5,7 +5,7 @@ import { STATUS_BADGE } from './jobConstants';
  * ManagerTable — Tabel master admin untuk owner/manager.
  * Menampilkan semua job + tombol OTP dan Edit.
  */
-export default function ManagerTable({ jobs, orderMap, staffList, onGenerateOtp, onEdit }) {
+export default function ManagerTable({ jobs, orderMap, staffList, onEdit }) {
   return (
     <div className="space-y-3 flex-1 flex flex-col overflow-hidden animate-fade-in">
       {/* Summary Box */}
@@ -38,7 +38,7 @@ export default function ManagerTable({ jobs, orderMap, staffList, onGenerateOtp,
             <span>MASTER ADMIN PANEL: KONTROL DAN VERIFIKASI ORDER</span>
           </div>
           <span className="text-[9px] font-bold text-slate-300 border border-slate-600 px-2 py-0.5 rounded">
-            High Security Mode
+            Core Production Engine
           </span>
         </div>
 
@@ -52,13 +52,14 @@ export default function ManagerTable({ jobs, orderMap, staffList, onGenerateOtp,
                 <th className="py-2 px-3 border-r border-slate-200">Tahap Divisi Saat Ini</th>
                 <th className="py-2 px-3 border-r border-slate-200">Operator PIC</th>
                 <th className="py-2 px-3 border-r border-slate-200 text-center">Status Internal</th>
-                <th className="py-2 px-3 text-center bg-indigo-50">Otorisasi Keamanan Admin</th>
+                <th className="py-2 px-3 border-r border-slate-200 text-center">Notifikasi WA</th>
+                <th className="py-2 px-3 text-center bg-indigo-50 font-bold">Kontrol Pekerjaan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 text-slate-700">
               {jobs.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="py-6 text-center text-slate-400 italic bg-slate-50/50">
+                  <td colSpan="8" className="py-6 text-center text-slate-400 italic bg-slate-50/50">
                     Tidak ada orderan aktif di sistem.
                   </td>
                 </tr>
@@ -70,7 +71,9 @@ export default function ManagerTable({ jobs, orderMap, staffList, onGenerateOtp,
                     cls: 'bg-slate-100 text-slate-600',
                   };
                   return (
-                    <tr key={job.id} className="hover:bg-blue-50/40 transition-colors">
+                    <tr key={job.id} className={`hover:bg-blue-50/40 transition-colors ${
+                      ['selesai', 'batal', 'gagal'].includes(job.status_pekerjaan) ? 'opacity-60' : ''
+                    }`}>
                       <td className="py-2 px-3 border-r border-slate-200 font-mono font-bold text-slate-800">
                         #{order?.orderId || '...'}
                       </td>
@@ -95,34 +98,28 @@ export default function ManagerTable({ jobs, orderMap, staffList, onGenerateOtp,
                           >
                             {badge.label}
                           </span>
-                          {job.otp_requested && !job.otp_sent && (
-                            <span className="bg-red-100 text-red-700 text-[8px] font-extrabold px-1.5 py-0.5 rounded border border-red-200 uppercase tracking-tight animate-pulse">
-                              Minta OTP
-                            </span>
-                          )}
                         </div>
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-200 text-center">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-50 border border-slate-200 text-slate-550 text-slate-500">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse" />
+                          Ready for WA Logic
+                        </span>
                       </td>
                       <td className="py-1 px-3 text-center bg-indigo-50/30">
                         <div className="flex gap-2 justify-center items-center">
-                          {job.status_pekerjaan !== 'gagal' && (
+                          {['selesai', 'batal', 'gagal'].includes(job.status_pekerjaan) ? (
+                            <span className="text-[9px] text-slate-400 font-semibold px-2.5 py-1 bg-slate-100 border border-slate-200 rounded select-none">
+                              Terkunci
+                            </span>
+                          ) : (
                             <button
-                              onClick={() => onGenerateOtp(job)}
-                              className={`font-bold text-[9px] px-2.5 py-1.5 rounded flex items-center gap-1.5 shadow-sm transition-all duration-300 ${
-                                job.otp_requested && !job.otp_sent
-                                  ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse ring-2 ring-red-500/50'
-                                  : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                              }`}
+                              onClick={() => onEdit(job)}
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[9px] px-3 py-1.5 rounded shadow-sm transition-all"
                             >
-                              <Key size={10} />
-                              {job.otp_requested && !job.otp_sent ? 'Minta OTP!' : 'Buat Kode OTP'}
+                              Edit / Teruskan Job
                             </button>
                           )}
-                          <button
-                            onClick={() => onEdit(job)}
-                            className="text-slate-500 hover:text-indigo-600 underline text-[9px] font-medium"
-                          >
-                            Edit Info
-                          </button>
                         </div>
                       </td>
                     </tr>

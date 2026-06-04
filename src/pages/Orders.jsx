@@ -19,8 +19,10 @@ import {
   Truck,
   DollarSign,
   Palette,
+  AlertTriangle,
 } from 'lucide-react';
 import OrderInputForm from '../components/orders/OrderInputForm';
+import KomplainModal from '../components/orders/KomplainModal';
 
 export default function Orders() {
   const { user, businessSettings } = useAuth();
@@ -42,13 +44,38 @@ export default function Orders() {
   const [activeTab, setActiveTab] = useState('all');
 
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [isKomplainModalOpen, setIsKomplainModalOpen] = useState(false);
   const [editModalData, setEditModalData] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState('');
   const [exporting, setExporting] = useState(false);
 
+  // CRM Scheduled Activities states
+  const [chatterTab, setChatterTab] = useState('logs'); // 'logs' | 'crm'
+  const [orderActivities, setOrderActivities] = useState([]);
+  const [loadingOrderActivities, setLoadingOrderActivities] = useState(false);
+  const [newOrderActivity, setNewOrderActivity] = useState({
+    tipe: 'whatsapp',
+    keterangan: '',
+    waktu_jatuh_tempo: new Date().toISOString().slice(0, 10),
+  });
+
+  const fetchOrderActivities = async (orderId) => {
+    try {
+      setLoadingOrderActivities(true);
+      const res = await apiClient.get(`/customer-activities/?order=${orderId}`);
+      setOrderActivities(res.data);
+    } catch (err) {
+      console.error('Gagal memuat aktivitas order:', err);
+    } finally {
+      setLoadingOrderActivities(false);
+    }
+  };
+
   const openEditModal = (order) => {
     setEditModalData(order);
     setSelectedStatus(order.status_global);
+    setChatterTab('logs');
+    fetchOrderActivities(order.id);
   };
 
   const closeEditModal = () => {
@@ -98,6 +125,8 @@ export default function Orders() {
   }, []);
 
   const getStatusType = (statusText = '') => {
+    if (statusText === 'draft') return 'draft';
+    if (statusText === 'quotation') return 'quotation';
     if (statusText === 'batal') return 'cancelled';
     if (statusText === 'review') return 'pending';
     if (statusText === 'desain') return 'desain';
@@ -109,6 +138,8 @@ export default function Orders() {
 
   const stats = useMemo(() => {
     const counts = {
+      draft: 0,
+      quotation: 0,
       pending: 0,
       desain: 0,
       progress: 0,
@@ -120,6 +151,8 @@ export default function Orders() {
     };
     orders.forEach((order) => {
       const type = getStatusType(order.status_global);
+      if (type === 'draft') counts.draft++;
+      if (type === 'quotation') counts.quotation++;
       if (type === 'pending') counts.pending++;
       if (type === 'desain') counts.desain++;
       if (type === 'printing') counts.progress++;
@@ -153,6 +186,20 @@ export default function Orders() {
 
   const renderBadge = (statusText = '') => {
     const type = getStatusType(statusText);
+    if (type === 'draft') {
+      return (
+        <span className="px-1.5 py-0.5 rounded-[4px] text-[8.5px] font-bold bg-slate-100 text-slate-500 uppercase tracking-wider">
+          Draft
+        </span>
+      );
+    }
+    if (type === 'quotation') {
+      return (
+        <span className="px-1.5 py-0.5 rounded-[4px] text-[8.5px] font-bold bg-blue-100 text-blue-700 uppercase tracking-wider">
+          Quotation
+        </span>
+      );
+    }
     if (type === 'cancelled') {
       return (
         <span className="px-1.5 py-0.5 rounded-[4px] text-[8.5px] font-bold bg-red-100 text-red-700 uppercase tracking-wider flex items-center gap-1 w-max mx-auto">
@@ -316,12 +363,14 @@ export default function Orders() {
               <Download className="w-3.5 h-3.5" /> {exporting ? 'Exporting...' : 'Export Excel'}
             </button>
           )}
-          <button
-            onClick={() => setIsManualModalOpen(true)}
-            className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" /> New Order
-          </button>
+          {!isManager && (
+            <button
+              onClick={() => setIsManualModalOpen(true)}
+              className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> New Order
+            </button>
+          )}
         </div>
       </div>
 
@@ -367,6 +416,8 @@ export default function Orders() {
         <div className="flex gap-1 bg-slate-100/50 p-1 rounded-md border border-slate-200 overflow-x-auto">
           {[
             'all',
+            'draft',
+            'quotation',
             'pending',
             'desain',
             'printing',
@@ -394,7 +445,11 @@ export default function Orders() {
                     ? 'Printing'
                     : tab === 'desain'
                       ? 'Desain'
-                      : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                      : tab === 'draft'
+                        ? 'Draft'
+                        : tab === 'quotation'
+                          ? 'Quotation'
+                          : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
         </div>
@@ -618,169 +673,591 @@ export default function Orders() {
         }}
       />
 
-      {/* EDIT STATUS MODAL */}
+      <KomplainModal
+        isOpen={isKomplainModalOpen}
+        onClose={() => setIsKomplainModalOpen(false)}
+        order={editModalData}
+        onSuccess={() => {
+          setIsKomplainModalOpen(false);
+        }}
+      />
+
+      {/* EDIT STATUS DRAWER */}
       {editModalData && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[2px] overflow-y-auto w-full h-full flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
-            <form onSubmit={handleUpdateStatus}>
-              <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <div className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-[2px] flex justify-end overflow-hidden transition-all duration-300">
+          {/* Backdrop Click to Close */}
+          <div className="absolute inset-0 -z-10" onClick={closeEditModal} />
+          
+          <div className="bg-white w-full max-w-5xl h-full flex flex-col md:flex-row shadow-2xl overflow-hidden border-l border-slate-200 animate-in slide-in-from-right duration-350 ease-out">
+            
+            {/* PANEL KIRI: DETAIL FORM & WORKFLOW (60% LEBAR) */}
+            <div className="w-full md:w-3/5 flex flex-col h-full bg-white">
+              
+              {/* Form Action Header */}
+              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div>
-                  <h3 className="text-[14px] font-bold text-slate-900">Update Job Status</h3>
-                  <p className="text-[11px] text-slate-500 font-mono">
-                    {editModalData.id} - {editModalData.nama}
-                  </p>
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    <span>Orders</span>
+                    <span>/</span>
+                    <span className="font-mono text-slate-600">{editModalData.id}</span>
+                  </div>
+                  <h3 className="text-[14px] font-extrabold text-slate-900 mt-0.5">
+                    {editModalData.nama}
+                  </h3>
                 </div>
-                <button
-                  type="button"
-                  onClick={closeEditModal}
-                  className="text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="p-5 space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[12px] font-bold text-slate-800">Job Status</label>
-                  <select
-                    name="status"
-                    value={selectedStatus}
-                    onChange={(e) => setSelectedStatus(e.target.value)}
-                    className="w-full text-[12px] border border-slate-200 bg-white rounded-md px-3 py-2 focus:ring-1 focus:ring-slate-900 outline-none"
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsKomplainModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg text-[10px] font-bold border border-rose-200 transition-colors shadow-sm"
                   >
-                    <option value="review">Pending / Review</option>
-                    <option value="desain">Proses Desain</option>
-                    <option value="proses">In Progress / Proses Cetak</option>
-                    <option value="ready">Ready / Siap Diambil</option>
-                    <option value="selesai">Completed / Selesai</option>
-                    <option value="batal" className="text-red-500 font-bold">
-                      Cancelled / Batal
-                    </option>
-                  </select>
+                    <AlertTriangle size={12} />
+                    Buat Komplain
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeEditModal}
+                    className="p-1.5 hover:bg-slate-200/60 rounded-full text-slate-450 hover:text-slate-800 transition-colors cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Form Scrollable Area */}
+              <form onSubmit={handleUpdateStatus} className="flex-1 overflow-y-auto p-6 space-y-6">
+                
+                {/* Workflow Status Tracker */}
+                <div className="space-y-2">
+                  <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Alur Tahapan Kerja</div>
+                  <div className="flex items-center gap-1 bg-slate-100 p-1.5 rounded-lg border border-slate-200 overflow-x-auto scrollbar-none">
+                    {[
+                      { id: 'draft', label: 'Draft' },
+                      { id: 'quotation', label: 'Quotation' },
+                      { id: 'review', label: 'Review' },
+                      { id: 'desain', label: 'Desain' },
+                      { id: 'proses', label: 'Proses Cetak' },
+                      { id: 'ready', label: 'Ready' },
+                      { id: 'selesai', label: 'Selesai' }
+                    ].map((stg, idx, arr) => {
+                      const isActive = editModalData.status_global === stg.id;
+                      return (
+                        <div key={stg.id} className="flex items-center shrink-0">
+                          <span className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
+                            isActive 
+                              ? 'bg-[#714B67] text-white shadow-sm border border-[#714B67]' 
+                              : 'text-slate-500 bg-white border border-slate-200'
+                          }`}>
+                            {stg.label}
+                          </span>
+                          {idx < arr.length - 1 && (
+                            <span className="text-slate-350 text-[10px] mx-1.5 font-bold">➔</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {isManager && ['review', 'desain', 'proses'].includes(selectedStatus) && (
-                  <div className="space-y-3">
-                    <div className="space-y-1.5">
-                      <label className="text-[12px] font-bold text-slate-800 flex items-center gap-1.5">
-                        <UserCheck className="w-3.5 h-3.5 text-indigo-500" />
-                        Assign Staff (PIC)
-                      </label>
-                      <select
-                        name="assign_staff"
-                        className="w-full text-[12px] border border-slate-200 bg-white rounded-md px-3 py-2 focus:ring-1 focus:ring-slate-900 outline-none"
-                      >
-                        <option value="">-- Kirim ke Antrean Global Divisi (Claim Pool) --</option>
-                        {staffList.map((staff) => (
-                          <option key={staff.id} value={staff.id}>
-                            {staff.username}
-                            {staff.divisi_nama ? ` (${staff.divisi_nama})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-[10px] text-slate-400 italic">
-                        Biarkan kosong untuk mempublikasikan tugas ke kolam klaim divisi (Claim
-                        Pool).
-                      </p>
+                {/* Smart Buttons Grid */}
+                <div>
+                  <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">Tombol Pintar (Shortcut)</div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <button 
+                      type="button" 
+                      onClick={() => { closeEditModal(); navigate('/jobs'); }} 
+                      className="flex flex-col items-center justify-center p-3 border border-slate-200 rounded-xl bg-white hover:bg-slate-50/80 transition-all cursor-pointer shadow-2xs hover:shadow-xs group"
+                    >
+                      <span className="text-[14px] font-extrabold text-slate-900 group-hover:scale-105 transition-transform">
+                        {editModalData.items?.reduce((acc, i) => acc + (i.jobs?.length || 0), 0) || 0}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-450 mt-1">Tugas Produksi</span>
+                    </button>
+                    
+                    <div className={`flex flex-col items-center justify-center p-3 border rounded-xl shadow-2xs ${
+                      editModalData.sisa_tagihan <= 0 ? 'bg-emerald-50/50 border-emerald-250 text-emerald-800' : 'bg-red-50/50 border-red-250 text-red-800'
+                    }`}>
+                      <span className="text-[11px] font-extrabold">
+                        {editModalData.sisa_tagihan <= 0 ? 'LUNAS' : formatRupiah(editModalData.sisa_tagihan)}
+                      </span>
+                      <span className="text-[9px] font-bold mt-1 opacity-75">Status Tagihan</span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-650">
-                          Biaya Desain (Custom)
-                        </label>
-                        <input
-                          type="number"
-                          name="biaya_desain"
-                          placeholder="Cth: 25000"
-                          className="w-full text-[12px] border border-slate-200 bg-white rounded-md px-3 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
-                        />
+                    <button 
+                      type="button" 
+                      onClick={() => { closeEditModal(); navigate('/customers'); }} 
+                      className="flex flex-col items-center justify-center p-3 border border-slate-200 rounded-xl bg-white hover:bg-slate-50/80 transition-all cursor-pointer shadow-2xs hover:shadow-xs group"
+                    >
+                      <span className="text-[11px] font-extrabold text-[#714B67] group-hover:scale-105 transition-transform">
+                        {formatRupiah(editModalData.customer_total_spent || 0)}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-450 mt-1">Loyalty Pelanggan</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* HPP & Margin Profitabilitas (Owner/Manager Only) */}
+                {isManager && editModalData.hpp_bahan !== undefined && (
+                  <div className={`rounded-xl border p-4 shadow-2xs ${
+                    editModalData.margin_persen === null
+                      ? 'bg-slate-50 border-slate-200'
+                      : editModalData.margin_persen >= 40
+                        ? 'bg-emerald-50/60 border-emerald-200'
+                        : editModalData.margin_persen >= 15
+                          ? 'bg-amber-50/60 border-amber-200'
+                          : 'bg-red-50/60 border-red-200'
+                  }`}>
+                    <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
+                      Analitik Profitabilitas Order
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="text-center">
+                        <div className="text-[12px] font-extrabold text-slate-800">
+                          {formatRupiah(editModalData.total_harga || 0)}
+                        </div>
+                        <div className="text-[9px] text-slate-450 font-bold mt-0.5">Omset / Revenue</div>
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-650">
-                          Estimasi Insentif
-                        </label>
-                        <input
-                          type="number"
-                          name="insentif"
-                          placeholder="Cth: 15000"
-                          className="w-full text-[12px] border border-slate-200 bg-white rounded-md px-3 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
-                        />
+                      <div className="text-center">
+                        <div className="text-[12px] font-extrabold text-rose-700">
+                          {formatRupiah(editModalData.hpp_bahan || 0)}
+                        </div>
+                        <div className="text-[9px] text-slate-450 font-bold mt-0.5">HPP Bahan</div>
+                      </div>
+                      <div className="text-center">
+                        <div className={`text-[12px] font-extrabold ${
+                          editModalData.margin_persen === null
+                            ? 'text-slate-400'
+                            : editModalData.margin_persen >= 40
+                              ? 'text-emerald-700'
+                              : editModalData.margin_persen >= 15
+                                ? 'text-amber-700'
+                                : 'text-red-700'
+                        }`}>
+                          {editModalData.margin_persen !== null ? `${editModalData.margin_persen}%` : '-'}
+                        </div>
+                        <div className="text-[9px] text-slate-450 font-bold mt-0.5">Margin Laba</div>
                       </div>
                     </div>
+                    {editModalData.hpp_bahan === 0 && (
+                      <p className="text-[9px] text-slate-400 italic mt-2.5 border-t border-slate-200/60 pt-2">
+                        HPP belum terhitung — operator belum mencatat pemakaian bahan baku di Lembar Kerja SPK.
+                      </p>
+                    )}
                   </div>
                 )}
 
-                {editModalData.sisa_tagihan > 0 && (
-                  <div className="border-t border-slate-100 pt-4 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <label className="text-[12px] font-bold text-slate-800">
-                        Pembayaran & Pelunasan
-                      </label>
-                      <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded border border-red-200">
-                        Piutang: {formatRupiah(editModalData.sisa_tagihan)}
-                      </span>
-                    </div>
+                {/* Form Fields Card */}
+                <div className="bg-slate-50/50 border border-slate-200 rounded-xl p-5 space-y-4 shadow-3xs">
+                  <div className="text-[11px] font-extrabold text-slate-800 border-b border-slate-200/60 pb-2 mb-2 uppercase tracking-wide">Pengaturan Pesanan & PIC</div>
+                  
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-700">Status Alur Kerja Baru</label>
+                    <select
+                      name="status"
+                      value={selectedStatus}
+                      onChange={(e) => setSelectedStatus(e.target.value)}
+                      className="w-full text-[12px] border border-slate-200 bg-white rounded-lg px-3 py-2.5 focus:ring-1 focus:ring-slate-900 outline-none shadow-3xs"
+                    >
+                      <option value="draft">Draft Penawaran</option>
+                      <option value="quotation">Kirim Penawaran (Quotation)</option>
+                      <option value="review">Pending / Review</option>
+                      <option value="desain">Proses Desain</option>
+                      <option value="proses">In Progress / Proses Cetak</option>
+                      <option value="ready">Ready / Siap Diambil</option>
+                      <option value="selesai">Completed / Selesai</option>
+                      <option value="batal" className="text-red-500 font-bold">
+                        Cancelled / Batal
+                      </option>
+                    </select>
+                  </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                  {isManager && ['review', 'desain', 'proses'].includes(selectedStatus) && (
+                    <div className="space-y-4 pt-2">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-500">
-                          Bayar Cicilan / Pelunasan (Rp)
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            name="jumlah_bayar"
-                            placeholder="Cth: 50000"
-                            className="w-full text-[12px] border border-slate-200 bg-white rounded-md pl-3 pr-12 py-2 focus:ring-1 focus:ring-slate-900 outline-none"
-                            id="jumlah_bayar_input"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const input = document.getElementById('jumlah_bayar_input');
-                              if (input) input.value = editModalData.sisa_tagihan;
-                            }}
-                            className="absolute right-1 top-1 px-2 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[9px] rounded cursor-pointer"
-                          >
-                            Lunas
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-500">
-                          Metode Pembayaran
+                        <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                          <UserCheck className="w-3.5 h-3.5 text-indigo-500" />
+                          Tugaskan Staf (PIC)
                         </label>
                         <select
-                          name="metode_pembayaran"
-                          defaultValue={editModalData.metode_pembayaran || 'tunai'}
-                          className="w-full text-[12px] border border-slate-200 bg-white rounded-md px-2 py-2 focus:ring-1 focus:ring-slate-900 outline-none"
+                          name="assign_staff"
+                          className="w-full text-[12px] border border-slate-200 bg-white rounded-lg px-3 py-2.5 focus:ring-1 focus:ring-slate-900 outline-none shadow-3xs"
                         >
-                          <option value="tunai">Tunai / Kas</option>
-                          <option value="transfer">Transfer Bank</option>
-                          <option value="qris">QRIS / E-Wallet</option>
+                          <option value="">-- Kirim ke Antrean Global Divisi (Claim Pool) --</option>
+                          {staffList.map((staff) => (
+                            <option key={staff.id} value={staff.id}>
+                              {staff.username}
+                              {staff.divisi_nama ? ` (${staff.divisi_nama})` : ''}
+                            </option>
+                          ))}
                         </select>
+                        <p className="text-[9px] text-slate-400 italic">
+                          Biarkan kosong untuk mempublikasikan tugas ke kolam klaim divisi (Claim Pool).
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-600">
+                            Biaya Desain (Custom)
+                          </label>
+                          <input
+                            type="number"
+                            name="biaya_desain"
+                            placeholder="Cth: 25000"
+                            className="w-full text-[12px] border border-slate-200 bg-white rounded-lg px-3 py-2 focus:ring-1 focus:ring-slate-900 outline-none shadow-3xs"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-600">
+                            Estimasi Insentif
+                          </label>
+                          <input
+                            type="number"
+                            name="insentif"
+                            placeholder="Cth: 15000"
+                            className="w-full text-[12px] border border-slate-200 bg-white rounded-lg px-3 py-2 focus:ring-1 focus:ring-slate-900 outline-none shadow-3xs"
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-              <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+                  )}
+
+                  {editModalData.sisa_tagihan > 0 && (
+                    <div className="border-t border-slate-200/60 pt-4 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[11px] font-bold text-slate-700">
+                          Pembayaran & Pelunasan
+                        </label>
+                        <span className="text-[9.5px] font-extrabold text-red-650 bg-red-50/55 px-2 py-0.5 rounded border border-red-200">
+                          Sisa: {formatRupiah(editModalData.sisa_tagihan)}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-500">
+                            Bayar Pelunasan (Rp)
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              name="jumlah_bayar"
+                              placeholder="Cth: 50000"
+                              className="w-full text-[12px] border border-slate-200 bg-white rounded-lg pl-3 pr-12 py-2 focus:ring-1 focus:ring-slate-900 outline-none shadow-3xs"
+                              id="jumlah_bayar_input"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const input = document.getElementById('jumlah_bayar_input');
+                                if (input) input.value = editModalData.sisa_tagihan;
+                              }}
+                              className="absolute right-1 top-1 px-2 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[9px] rounded-md cursor-pointer transition-colors"
+                            >
+                              Lunas
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-500">
+                            Metode Pembayaran
+                          </label>
+                          <select
+                            name="metode_pembayaran"
+                            defaultValue={editModalData.metode_pembayaran || 'tunai'}
+                            className="w-full text-[12px] border border-slate-200 bg-white rounded-lg px-2.5 py-2 focus:ring-1 focus:ring-slate-900 outline-none shadow-3xs"
+                          >
+                            <option value="tunai">Tunai / Kas</option>
+                            <option value="transfer">Transfer Bank</option>
+                            <option value="qris">QRIS / E-Wallet</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </form>
+
+              {/* Form Footer Buttons */}
+              <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={closeEditModal}
-                  className="px-4 py-1.5 border border-slate-200 rounded-md text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                  className="px-4 py-2 border border-slate-200 bg-white rounded-lg text-[11px] font-bold text-slate-650 hover:bg-slate-55 transition-colors shadow-3xs cursor-pointer"
                 >
-                  Cancel
+                  Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-black text-white rounded-md text-[11px] font-bold hover:bg-slate-800 shadow-sm transition-colors"
+                  onClick={(e) => {
+                    // Submit the nearest form programmatically
+                    const form = e.target.closest('div').previousSibling;
+                    if (form) form.requestSubmit();
+                  }}
+                  className="px-4 py-2 bg-[#714B67] hover:bg-[#5b3c53] text-white rounded-lg text-[11px] font-bold shadow-sm transition-colors cursor-pointer"
                 >
-                  Save Changes
+                  Simpan Perubahan
                 </button>
               </div>
-            </form>
+            </div>
+
+            {/* PANEL KANAN: TIME LINE AKTIVITAS */}
+            <div className="w-full md:w-2/5 bg-slate-50 border-l border-slate-200 flex flex-col h-full">
+              
+              {/* Chatter Header */}
+              <div className="px-5 py-4 border-b border-slate-250 bg-slate-100/60 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">Aktivitas & Log Dokumen</span>
+                </div>
+                {/* Chatter Tab Switcher */}
+                <div className="flex gap-1 bg-slate-200/50 p-0.5 rounded border border-slate-300">
+                  <button
+                    type="button"
+                    onClick={() => setChatterTab('logs')}
+                    className={`px-2.5 py-0.5 rounded text-[9px] font-extrabold transition-all cursor-pointer ${
+                      chatterTab === 'logs'
+                        ? 'bg-white shadow-3xs text-slate-800'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Log
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChatterTab('crm')}
+                    className={`px-2.5 py-0.5 rounded text-[9px] font-extrabold transition-all cursor-pointer ${
+                      chatterTab === 'crm'
+                        ? 'bg-white shadow-3xs text-slate-800'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    CRM
+                  </button>
+                </div>
+              </div>
+
+              {/* Chatter Content Container */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                {chatterTab === 'logs' ? (
+                  (!editModalData.activity_logs || editModalData.activity_logs.length === 0) ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center text-slate-400 py-12">
+                      <FileText size={24} className="text-slate-300 mb-1" />
+                      <p className="text-[10px] italic">Belum ada riwayat aktivitas tercatat pada pesanan ini.</p>
+                    </div>
+                  ) : (
+                    editModalData.activity_logs.map((log) => {
+                      // Custom styles based on action type (Tindakan)
+                      let badgeColor = "bg-slate-100 text-slate-600 border-slate-200";
+                      if (log.tindakan === "CREATE_ORDER" || log.tindakan === "READY_ORDER") {
+                        badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-100";
+                      } else if (log.tindakan === "ADD_ITEM") {
+                        badgeColor = "bg-indigo-50 text-indigo-700 border-indigo-100";
+                      } else if (log.tindakan === "UPDATE_ORDER" || log.tindakan === "UPDATE_ITEM") {
+                        badgeColor = "bg-amber-50 text-amber-700 border-amber-100";
+                      } else if (log.tindakan === "DELETE_ITEM") {
+                        badgeColor = "bg-rose-50 text-rose-700 border-rose-100";
+                      } else if (["CLAIM_JOB", "START_JOB", "COMPLETE_JOB"].includes(log.tindakan)) {
+                        badgeColor = "bg-[#714B67]/10 text-[#714B67] border-[#714B67]/20";
+                      }
+
+                      return (
+                        <div key={log.id} className="flex gap-2.5 text-[10.5px] items-start animate-fade-in">
+                          {/* Initial Circle Avatar */}
+                          <div className="w-7 h-7 rounded-full bg-[#714B67]/10 text-[#714B67] border border-[#714B67]/20 font-extrabold flex items-center justify-center shrink-0 uppercase text-[10px] shadow-3xs">
+                            {log.user_nama?.substring(0, 2) || 'SY'}
+                          </div>
+                          
+                          {/* Bubble Chat content */}
+                          <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-3xs flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-100/50 mb-1.5">
+                              <span className="font-extrabold text-slate-800 truncate">{log.user_nama || 'System'}</span>
+                              <span className="text-[8.5px] text-slate-450 shrink-0">{log.waktu_formatted || log.waktu}</span>
+                            </div>
+                            
+                            {/* Human-readable text */}
+                            <p className="text-slate-650 leading-relaxed font-medium break-words">{log.keterangan}</p>
+                            
+                            {/* Tindakan Badge */}
+                            <div className="mt-2 flex">
+                              <span className={`px-1.5 py-0.5 rounded-[4px] text-[8px] font-extrabold border uppercase tracking-wider ${badgeColor}`}>
+                                {log.tindakan}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )
+                ) : (
+                  // CRM Follow-Up Tab
+                  <div className="space-y-4">
+                    {/* Form Jadwalkan Aktivitas Baru */}
+                    <div
+                      className="p-3.5 bg-white border border-slate-200 rounded-xl space-y-3 shadow-3xs text-slate-800"
+                    >
+                      <div className="text-[10px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                        <span>📅</span> Jadwalkan Follow-up Baru
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-slate-500 block">Tipe</label>
+                          <select
+                            value={newOrderActivity.tipe}
+                            onChange={(e) => setNewOrderActivity({ ...newOrderActivity, tipe: e.target.value })}
+                            className="w-full text-[11px] p-1.5 border border-slate-200 rounded bg-slate-50 text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-450"
+                          >
+                            <option value="whatsapp">WhatsApp</option>
+                            <option value="call">Telepon</option>
+                            <option value="design_check">Konfirmasi Desain</option>
+                            <option value="payment_followup">Follow-up Bayar</option>
+                            <option value="other">Lainnya</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-slate-500 block">Jatuh Tempo</label>
+                          <input
+                            type="date"
+                            value={newOrderActivity.waktu_jatuh_tempo}
+                            onChange={(e) => setNewOrderActivity({ ...newOrderActivity, waktu_jatuh_tempo: e.target.value })}
+                            className="w-full text-[11px] p-1.5 border border-slate-200 rounded bg-slate-50 text-slate-900 focus:outline-none"
+                            required
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-slate-500 block">Keterangan / Rencana Tindakan</label>
+                        <textarea
+                          value={newOrderActivity.keterangan}
+                          onChange={(e) => setNewOrderActivity({ ...newOrderActivity, keterangan: e.target.value })}
+                          placeholder="Cth: WA ingatkan pelunasan sisa tagihan..."
+                          className="w-full text-[11px] p-1.5 border border-slate-200 rounded bg-slate-50 text-slate-900 focus:outline-none resize-none"
+                          rows="2"
+                          required
+                        />
+                      </div>
+                      
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!newOrderActivity.keterangan) {
+                            alert('Isi keterangan rencana follow-up!');
+                            return;
+                          }
+                          try {
+                            await apiClient.post('/customer-activities/', {
+                              order: editModalData.id,
+                              tipe: newOrderActivity.tipe,
+                              keterangan: newOrderActivity.keterangan,
+                              waktu_jatuh_tempo: newOrderActivity.waktu_jatuh_tempo,
+                            });
+                            setNewOrderActivity({
+                              tipe: 'whatsapp',
+                              keterangan: '',
+                              waktu_jatuh_tempo: new Date().toISOString().slice(0, 10),
+                            });
+                            await fetchOrderActivities(editModalData.id);
+                            alert('Aktivitas follow-up berhasil dijadwalkan!');
+                          } catch (err) {
+                            console.error('Gagal menjadwalkan aktivitas:', err);
+                            alert('Gagal menjadwalkan aktivitas.');
+                          }
+                        }}
+                        className="w-full py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[10px] font-extrabold shadow-sm transition-colors cursor-pointer"
+                      >
+                        Jadwalkan Aktivitas
+                      </button>
+                    </div>
+
+                    {/* Daftar Aktivitas untuk Order ini */}
+                    <div className="space-y-2 pt-2">
+                      <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Daftar Jadwal Follow-Up</div>
+                      
+                      {loadingOrderActivities ? (
+                        <div className="text-center py-4 text-slate-400 text-[10px]">Memuat jadwal...</div>
+                      ) : orderActivities.length === 0 ? (
+                        <p className="text-center py-4 text-slate-400 text-[10px] italic">Belum ada aktivitas dijadwalkan.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {orderActivities.map((act) => {
+                            const isOverdue = !act.selesai && new Date(act.waktu_jatuh_tempo) < new Date().setHours(0,0,0,0);
+                            const tipeLabelMap = {
+                              whatsapp: 'WhatsApp',
+                              call: 'Telepon',
+                              design_check: 'Desain',
+                              payment_followup: 'Tagihan',
+                              other: 'Lainnya',
+                            };
+                            return (
+                              <div
+                                key={act.id}
+                                className={`p-3 rounded-xl border flex justify-between items-start text-[10.5px] ${
+                                  act.selesai
+                                    ? 'bg-slate-100/60 border-slate-200 opacity-75'
+                                    : isOverdue
+                                      ? 'bg-red-50/40 border-red-200'
+                                      : 'bg-white border-slate-200/80 shadow-3xs'
+                                }`}
+                              >
+                                <div className="space-y-1.5 max-w-[75%]">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span
+                                      className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider ${
+                                        act.tipe === 'whatsapp'
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                          : act.tipe === 'payment_followup'
+                                            ? 'bg-red-50 text-red-700 border border-red-100'
+                                            : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                                      }`}
+                                    >
+                                      {tipeLabelMap[act.tipe] || act.tipe}
+                                    </span>
+                                    <span className={`text-[9px] font-bold ${isOverdue ? 'text-red-600' : 'text-slate-450'}`}>
+                                      {new Date(act.waktu_jatuh_tempo).toLocaleDateString('id-ID', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric',
+                                      })}
+                                      {isOverdue && ' (Terlambat)'}
+                                    </span>
+                                  </div>
+                                  <p className="text-slate-750 font-medium leading-relaxed">{act.keterangan}</p>
+                                  <p className="text-[8.5px] text-slate-400">
+                                    PIC: <span className="font-bold">{act.pic_username}</span>
+                                  </p>
+                                </div>
+
+                                {!act.selesai && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        await apiClient.post(`/customer-activities/${act.id}/complete/`);
+                                        await fetchOrderActivities(editModalData.id);
+                                        alert('Aktivitas ditandai selesai!');
+                                      } catch (err) {
+                                        console.error('Gagal menyelesaikan aktivitas:', err);
+                                      }
+                                    }}
+                                    className="px-2 py-1 bg-emerald-650 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[9px] font-extrabold shadow-sm transition-colors cursor-pointer"
+                                  >
+                                    Selesai
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
           </div>
         </div>
       )}

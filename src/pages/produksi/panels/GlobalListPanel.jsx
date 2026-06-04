@@ -514,7 +514,7 @@ export default function GlobalListPanel() {
                     )}
                     {order.catatan_pelanggan && (
                       <div className="mt-2 text-[10px] text-amber-700 bg-amber-50 border border-amber-100 rounded px-3 py-1.5">
-                        📝 {order.catatan_pelanggan}
+                        Catatan Pelanggan: {order.catatan_pelanggan}
                       </div>
                     )}
 

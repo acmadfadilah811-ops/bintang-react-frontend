@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   FileSpreadsheet,
   X,
@@ -6,10 +7,13 @@ import {
   ChevronRight,
   MessageCircle,
   ExternalLink,
+  AlertTriangle,
 } from 'lucide-react';
 import { parsePreviousNotes } from '../jobConstants';
+import KomplainModal from '../../orders/KomplainModal';
 
 export default function WorkspaceReviewModal({ workspaceJob, onRevisi, onClose }) {
+  const [isKomplainOpen, setIsKomplainOpen] = useState(false);
   if (!workspaceJob) return null;
 
   const { job, orderItemData } = workspaceJob;
@@ -80,6 +84,16 @@ export default function WorkspaceReviewModal({ workspaceJob, onRevisi, onClose }
                   <MessageCircle size={12} className="shrink-0" />
                   Hubungi via WA ({orderItemData.nomorWa})
                 </a>
+              )}
+              {orderItemData?.orderId && (
+                <button
+                  type="button"
+                  onClick={() => setIsKomplainOpen(true)}
+                  className="inline-flex items-center gap-1 font-bold text-[10px] text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded-md border border-rose-200 transition-colors shadow-sm cursor-pointer"
+                >
+                  <AlertTriangle size={12} className="shrink-0" />
+                  Catat Komplain
+                </button>
               )}
             </div>
           </div>
@@ -274,6 +288,17 @@ export default function WorkspaceReviewModal({ workspaceJob, onRevisi, onClose }
           Tutup
         </button>
       </div>
+      <KomplainModal
+        isOpen={isKomplainOpen}
+        onClose={() => setIsKomplainOpen(false)}
+        order={{
+          id: orderItemData?.orderId,
+          nama: orderItemData?.customerName || 'Pelanggan',
+          nomor_wa: orderItemData?.nomorWa || '',
+        }}
+        defaultFotoBukti={job?.gdrive_output_link}
+        onSuccess={() => setIsKomplainOpen(false)}
+      />
     </div>
   );
 }

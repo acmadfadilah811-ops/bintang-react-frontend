@@ -7,6 +7,7 @@ export const MENU_FEATURES = [
   { id: 'customers', label: 'Pelanggan (Customers)', path: '/customers' },
   { id: 'attendance', label: 'Absensi (Attendance)', path: '/attendance' },
   { id: 'employees', label: 'Karyawan (Employees)', path: '/employees' },
+  { id: 'payroll', label: 'Penggajian & BoM (Payroll)', path: '/payroll' },
   { id: 'announcements', label: 'Pengumuman (Announcements)', path: '/announcements' },
   { id: 'reports', label: 'Laporan Kerja (Reports)', path: '/reports' },
   { id: 'inventory', label: 'Inventori (Inventory)', path: '/inventory' },
@@ -19,9 +20,12 @@ export const MENU_FEATURES = [
 export const DEFAULT_PERMISSIONS = {
   owner: [
     'dashboard',
+    'orders',
+    'jobs',
     'customers',
     'attendance',
     'employees',
+    'payroll',
     'announcements',
     'reports',
     'inventory',
@@ -32,9 +36,12 @@ export const DEFAULT_PERMISSIONS = {
   ],
   manager: [
     'dashboard',
+    'orders',
+    'jobs',
     'customers',
     'attendance',
     'employees',
+    'payroll',
     'announcements',
     'reports',
     'inventory',
@@ -55,6 +62,7 @@ export const DEFAULT_PERMISSIONS = {
   ],
   staff: ['staff-dashboard', 'jobs'],
 };
+
 
 // Perizinan yang WAJIB dimiliki dan tidak bisa dihapus per-role
 const LOCKED_PERMISSIONS = {
@@ -122,15 +130,7 @@ export function hasMenuAccess(role, featureId) {
   if (!role) return false;
   const currentRole = role.toLowerCase();
 
-  // Owner & Manager do not have access to 'orders' or 'jobs' features
-  if (
-    (currentRole === 'owner' || currentRole === 'manager') &&
-    (featureId === 'orders' || featureId === 'jobs')
-  ) {
-    return false;
-  }
-
-  // Owner memiliki akses penuh tanpa kecuali (selain fitur di atas)
+  // Owner memiliki akses penuh tanpa kecuali
   if (currentRole === 'owner') return true;
 
   // Cek locked permissions terlebih dahulu

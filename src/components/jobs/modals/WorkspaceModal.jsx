@@ -7,9 +7,11 @@ import {
   FolderOpen,
   ChevronRight,
   MessageCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { parsePreviousNotes } from '../jobConstants';
 import apiClient from '../../../api/apiClient';
+import KomplainModal from '../../orders/KomplainModal';
 
 const defaultRow = () => ({ keterangan: '', jumlah: '', satuan: '', catatan: '' });
 const defaultMaterial = () => ({ item_id: '', item_nama: '', satuan: '', qty: '', catatan: '' });
@@ -26,6 +28,7 @@ export default function WorkspaceModal({
   onVerifySuccess,
   onClose,
 }) {
+  const [isKomplainOpen, setIsKomplainOpen] = useState(false);
   const [tableRows, setTableRows] = useState(() => {
     const existing = workspaceJob?.job?.catatan_staff;
     return Array.isArray(existing) && existing.length > 0 ? existing : [defaultRow()];
@@ -53,14 +56,34 @@ export default function WorkspaceModal({
     setMaterialUsage((m) => m.map((row, idx) => (idx === i ? { ...row, [field]: val } : row)));
   const selectInventoryItem = (i, itemId) => {
     const found = inventoryItems.find((it) => it.id === itemId);
-    if (found)
+    if (found) {
+      let suggestedQty = '';
+      let autoNote = '';
+      const isRoll = found.satuan?.toLowerCase() === 'm²' || found.satuan?.toLowerCase() === 'm2' || found.kategori?.toLowerCase() === 'bahan cetak';
+      if (isRoll && workspaceJob?.orderItemData) {
+        const p = parseFloat(workspaceJob.orderItemData.panjang) || 0;
+        const l = parseFloat(workspaceJob.orderItemData.lebar) || 0;
+        const q = parseFloat(workspaceJob.orderItemData.qty) || 1;
+        if (p > 0 && l > 0) {
+          suggestedQty = String(p * l * q);
+          autoNote = `Konversi UoM: ${p}x${l}m x ${q} pcs`;
+        }
+      }
       setMaterialUsage((m) =>
         m.map((row, idx) =>
           idx === i
-            ? { ...row, item_id: found.id, item_nama: found.nama, satuan: found.satuan }
+            ? { 
+                ...row, 
+                item_id: found.id, 
+                item_nama: found.nama, 
+                satuan: found.satuan,
+                qty: suggestedQty || row.qty || '1',
+                catatan: autoNote || row.catatan || ''
+              }
             : row
         )
       );
+    }
   };
 
   const handleSubmit = (e) => {
@@ -147,6 +170,17 @@ export default function WorkspaceModal({
                     <MessageCircle size={12} className="shrink-0" />
                     Hubungi via WA ({workspaceJob.orderItemData.nomorWa})
                   </a>
+                )}
+                {/* Button Catat Komplain */}
+                {workspaceJob.orderItemData?.orderId && (
+                  <button
+                    type="button"
+                    onClick={() => setIsKomplainOpen(true)}
+                    className="inline-flex items-center gap-1 font-bold text-[10px] text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded-md border border-rose-200 transition-colors shadow-sm cursor-pointer"
+                  >
+                    <AlertTriangle size={12} className="shrink-0" />
+                    Catat Komplain
+                  </button>
                 )}
               </div>
             </div>
@@ -338,7 +372,7 @@ export default function WorkspaceModal({
           <div className="bg-white border border-slate-300 rounded-lg shadow-sm overflow-hidden">
             <div className="bg-amber-600 text-white px-3 py-1.5 flex items-center justify-between">
               <span className="text-xs font-bold">
-                📦 Pemakaian Bahan Inventori (Otomatis Potong Stok)
+                Pemakaian Bahan Inventori (Otomatis Potong Stok)
               </span>
               <button
                 type="button"
@@ -458,86 +492,23 @@ export default function WorkspaceModal({
               </div>
             </div>
           </div>
-
-          {/* OTP & Selesaikan Pekerjaan */}
+          {/* Selesaikan Pekerjaan */}
           {workspaceJob.job?.status_pekerjaan === 'dikerjakan' && (
-            <div className="bg-white border border-slate-300 rounded-lg shadow-sm p-3">
-              <h3 className="text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
-                Verifikasi OTP & Teruskan/Selesaikan Pekerjaan
+            <div className="bg-white border border-slate-300 rounded-lg shadow-sm p-3.5 border-indigo-100 bg-indigo-50/10">
+              <h3 className="text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                Teruskan / Selesaikan Pekerjaan
               </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
-                {/* Kolom 1: Status & Request OTP */}
-                <div className="space-y-1.5">
-                  <p className="text-[11px] text-slate-600">
-                    Pekerjaan ini memerlukan verifikasi kode OTP dari Admin sebelum dapat diteruskan
-                    atau diselesaikan.
-                  </p>
-
-                  {workspaceJob.job.otp_sent && workspaceJob.job.otp_code ? (
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center">
-                      <span className="text-[9px] text-emerald-700 font-bold block mb-0.5">
-                        OTP DISETUJUI ADMIN:
-                      </span>
-                      <span className="font-mono text-xl font-black text-emerald-800 tracking-[0.2em]">
-                        {workspaceJob.job.otp_code}
-                      </span>
-                      <p className="text-[8px] text-emerald-600 mt-0.5">
-                        Masukkan kode di atas untuk verifikasi.
-                      </p>
-                    </div>
-                  ) : workspaceJob.job.otp_requested ? (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-center text-xs text-amber-700 font-semibold flex flex-col items-center gap-1 animate-pulse">
-                      <span>⏳ Menunggu kode OTP dari Admin...</span>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => onRequestOtp(workspaceJob.job.id)}
-                      className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold rounded-md text-[10px] flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer"
-                    >
-                      Minta OTP dari Admin
-                    </button>
-                  )}
-                </div>
-
-                {/* Kolom 2: Form Input OTP */}
-                <div className="border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-3 space-y-1.5">
-                  <label className="block text-[11px] font-bold text-slate-700">
-                    Masukkan 6 Digit OTP
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      maxLength={6}
-                      placeholder="XXXXXX"
-                      id="workspace-otp-input"
-                      className="flex-1 text-center font-mono text-base font-bold tracking-[0.1em] py-1 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-slate-900 text-xs"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const inputOtp = document
-                          .getElementById('workspace-otp-input')
-                          ?.value?.trim();
-                        if (!workspaceJob.job.otp_sent || !workspaceJob.job.otp_code) {
-                          alert(
-                            'Admin belum mengirimkan kode OTP untuk job ini. Silakan klik "Minta OTP" terlebih dahulu.'
-                          );
-                          return;
-                        }
-                        if (inputOtp === workspaceJob.job.otp_code) {
-                          onVerifySuccess(workspaceJob.job);
-                        } else {
-                          alert('Kode OTP tidak valid!');
-                        }
-                      }}
-                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-md text-[10px] cursor-pointer transition-colors shadow-sm"
-                    >
-                      Verifikasi
-                    </button>
-                  </div>
-                </div>
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+                <p className="text-[11px] text-slate-500 leading-normal max-w-md">
+                  Pekerjaan ini telah siap untuk diselesaikan atau diteruskan ke divisi berikutnya. Tidak memerlukan verifikasi kode OTP dari Admin.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onVerifySuccess(workspaceJob.job)}
+                  className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-lg text-xs shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1"
+                >
+                  Selesaikan & Teruskan Pekerjaan &rarr;
+                </button>
               </div>
             </div>
           )}
@@ -573,6 +544,19 @@ export default function WorkspaceModal({
           </button>
         </div>
       </form>
+      <KomplainModal
+        isOpen={isKomplainOpen}
+        onClose={() => setIsKomplainOpen(false)}
+        order={{
+          id: workspaceJob.orderItemData?.orderId,
+          nama: workspaceJob.orderItemData?.customerName,
+          nomor_wa: workspaceJob.orderItemData?.nomorWa,
+        }}
+        defaultFotoBukti={workspaceJob.job?.gdrive_output_link}
+        onSuccess={() => {
+          setIsKomplainOpen(false);
+        }}
+      />
     </div>
   );
 }

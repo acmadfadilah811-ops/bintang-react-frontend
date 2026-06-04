@@ -53,19 +53,27 @@ export default function Inventory() {
   const [exporting, setExporting] = useState(false);
 
   // ── Fetch Data ────────────────────────────────────────────
-  const fetchItems = async () => {
+  const fetchItems = async (isSilent = false) => {
     try {
+      if (!isSilent) setLoading(true);
       const res = await apiClient.get('/inventory/');
       setItems(res.data);
     } catch (err) {
       console.error('Gagal memuat inventori:', err);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchItems();
+
+    // Polling background setiap 10 detik agar stok sinkron real-time
+    const intervalId = setInterval(() => {
+      fetchItems(true); // Silent refresh
+    }, 10000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   // ── Filter & Search (client-side) ─────────────────────────
@@ -445,22 +453,22 @@ export default function Inventory() {
                                   {item.history.map((h) => (
                                     <div
                                       key={h.id}
-                                      className="flex gap-4 p-2 bg-white rounded border border-slate-200"
+                                      className="flex gap-4 p-2 bg-white rounded border border-slate-200 text-xs items-start"
                                     >
-                                      <span className="font-mono text-slate-400 w-24">
+                                      <span className="font-mono text-slate-400 w-24 shrink-0">
                                         {new Date(h.waktu).toLocaleDateString()}
                                       </span>
                                       <span
-                                        className={`font-bold w-16 ${h.delta > 0 ? 'text-emerald-600' : 'text-red-600'}`}
+                                        className={`font-bold w-16 shrink-0 ${h.delta > 0 ? 'text-emerald-600' : 'text-red-600'}`}
                                       >
                                         {h.delta > 0 ? '+' : ''}
                                         {h.delta}
                                       </span>
-                                      <span className="text-slate-600 flex-1">
+                                      <span className="text-slate-600 flex-1 min-w-0 break-words">
                                         {h.keterangan || '-'}
                                       </span>
-                                      <span className="text-slate-400 text-[10px] italic">
-                                        Oleh: {h.user_nama}
+                                      <span className="text-slate-400 text-[10px] italic shrink-0">
+                                        Oleh: {h.user_nama || 'Sistem'}
                                       </span>
                                     </div>
                                   ))}
@@ -509,7 +517,7 @@ export default function Inventory() {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
             <div className="bg-emerald-700 text-white px-5 py-4 flex justify-between items-center">
               <div>
-                <h2 className="font-bold text-sm">📦 Restock Barang</h2>
+                <h2 className="font-bold text-sm">Restock Barang</h2>
                 <p className="text-emerald-200 text-xs mt-0.5">
                   {adjustItem.nama} — Stok:{' '}
                   <strong>

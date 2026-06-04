@@ -15,6 +15,16 @@ import {
   CalendarClock,
   AlertCircle,
   Play,
+  LayoutGrid,
+  BookOpen,
+  Briefcase,
+  DollarSign,
+  BarChart3,
+  Sparkles,
+  Bell,
+  Settings,
+  ClipboardList,
+  ChevronDown,
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -31,11 +41,14 @@ export default function Dashboard() {
   const [repeatDaily, setRepeatDaily] = useState(false);
   const [sessionData, setSessionData] = useState(null);
   const [unlockRequests, setUnlockRequests] = useState([]);
+  const [activeTab, setActiveTab] = useState('finansial');
+  const [complaints, setComplaints] = useState([]);
 
   // Staff States (untuk staff biasa)
   const [personalAttendance, setPersonalAttendance] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [expandedSection, setExpandedSection] = useState(null);
 
   // Update jam real-time setiap detik
   useEffect(() => {
@@ -148,6 +161,9 @@ export default function Dashboard() {
       fetchPersonalAttendance();
     } else {
       fetchSessionData();
+      apiClient.get('/komplain/')
+        .then((res) => setComplaints(res.data))
+        .catch((err) => console.error('Gagal mengambil komplain:', err));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPrivileged, fetchSessionData]);
@@ -439,576 +455,643 @@ export default function Dashboard() {
     },
   ];
 
+  const toggleSection = (key) => setExpandedSection((prev) => (prev === key ? null : key));
+
   return (
     <div className="space-y-6 w-full select-none">
-      {/* ── BARIS 1: ANALYTICS + SESI ABSENSI ────────────────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
-        {/* KIRI: Line Chart Omset & 4 Stat Cards di bawahnya (8 kolom) */}
-        <div className="xl:col-span-8 flex flex-col gap-4 bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
-          {/* Header Omset */}
-          <div className="flex justify-between items-start border-b border-slate-50 pb-3">
-            <div>
-              <h2 className="text-sm font-bold text-slate-800">Dashboard Analitik</h2>
-              <p className="text-[10px] text-slate-400 mt-0.5">
-                Pendapatan dan performa penjualan 6 bulan terakhir.
-              </p>
-            </div>
-            <div className="text-right">
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-450">
-                Bulan Ini
-              </span>
-              <div className="text-lg font-black text-slate-800 leading-none mt-0.5">
-                {formatRupiah(data?.omset_bulan_ini)}
-              </div>
-            </div>
-          </div>
 
-          {/* SVG Line Chart */}
-          <div className="w-full h-44 mt-2">
-            {omsetBulan.length > 0 ? (
-              <svg
-                viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-                className="w-full h-full"
-                preserveAspectRatio="none"
-              >
-                <defs>
-                  <linearGradient id="omsetGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#4318FF" stopOpacity="0.2" />
-                    <stop offset="100%" stopColor="#4318FF" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-                {/* Grid Lines */}
-                <line
-                  x1="20"
-                  y1={svgHeight - 15}
-                  x2={svgWidth - 20}
-                  y2={svgHeight - 15}
-                  stroke="#F1F5F9"
-                  strokeWidth="1"
-                />
-                <line
-                  x1="20"
-                  y1={svgHeight / 2}
-                  x2={svgWidth - 20}
-                  y2={svgHeight / 2}
-                  stroke="#F1F5F9"
-                  strokeWidth="0.5"
-                  strokeDasharray="3"
-                />
-                <line
-                  x1="20"
-                  y1="20"
-                  x2={svgWidth - 20}
-                  y2={20}
-                  stroke="#F1F5F9"
-                  strokeWidth="0.5"
-                  strokeDasharray="3"
-                />
+      {/* ── HEADER SELAMAT DATANG ──────────────────────────── */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-2xs">
+        <h1 className="text-xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
+          Selamat Datang, <span className="text-indigo-650 capitalize">{user?.username}</span>
+        </h1>
+        <p className="text-xs text-slate-400 mt-0.5 font-medium">
+          {currentTime.toLocaleDateString('id-ID', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })}
+        </p>
+      </div>
 
-                {/* Area under the line */}
-                {areaD && <path d={areaD} fill="url(#omsetGradient)" />}
-
-                {/* Line path */}
-                {pathD && (
-                  <path
-                    d={pathD}
-                    fill="none"
-                    stroke="#4318FF"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                )}
-
-                {/* Dots */}
-                {points.map((p, idx) => (
-                  <g key={idx}>
-                    <circle
-                      cx={p.x}
-                      cy={p.y}
-                      r="3"
-                      fill="#4318FF"
-                      stroke="#FFFFFF"
-                      strokeWidth="1.5"
-                    />
-                  </g>
-                ))}
-              </svg>
-            ) : (
-              <div className="flex items-center justify-center h-full text-slate-350 text-xs">
-                Data grafik belum tersedia
-              </div>
-            )}
-          </div>
-
-          {/* X-Axis labels */}
-          <div className="flex justify-between px-5 text-[8.5px] font-bold text-slate-400 uppercase">
-            {omsetBulan.map((item, idx) => (
-              <span key={idx}>{item.bulan.slice(0, 3)}</span>
-            ))}
-          </div>
-
-          {/* 4 Stat Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4 pt-4 border-t border-slate-50">
-            {statCards.map((card, i) => {
-              const Icon = card.icon;
-              return (
-                <div
-                  key={i}
-                  className="bg-slate-50/50 border border-slate-100 rounded-xl p-3 flex items-center justify-between transition-all hover:bg-slate-50"
-                >
-                  <div className="min-w-0">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-0.5 truncate">
-                      {card.label}
-                    </p>
-                    <h3 className="text-sm font-black text-slate-800 leading-none truncate">
-                      {card.value}
-                    </h3>
-                  </div>
-                  <div
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ml-1 ${card.iconBg}`}
-                  >
-                    <Icon size={14} className={card.iconColor} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* KANAN: Traffic -> Sesi & Kehadiran Absensi (4 kolom) */}
-        <div className="xl:col-span-4 bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
-          <div className="border-b border-slate-50 pb-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-slate-800">Sesi & Kehadiran Absensi</h2>
-              {sessionData?.is_active && (
-                <span className="text-[8px] font-black px-1.5 py-0.5 rounded border border-emerald-200 bg-emerald-50 text-emerald-600 uppercase tracking-wider flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
-                  Sesi Aktif
-                </span>
-              )}
-            </div>
-            <p className="text-[10px] text-slate-400 mt-0.5">
-              Pemantauan tingkat kehadiran staff hari ini.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 py-4 items-center">
-            {/* Donut Chart */}
-            <div className="flex flex-col items-center">
-              <div
-                className="relative w-24 h-24 rounded-full flex items-center justify-center shadow-inner"
-                style={{ background: attendanceDonutGradient }}
-              >
-                <div className="absolute w-18 h-18 bg-white rounded-full flex flex-col items-center justify-center shadow-sm">
-                  <span className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">
-                    Hadir
-                  </span>
-                  <span className="text-xs font-black text-slate-800">
-                    {countHadir + countTerlambat} / {totalStaff}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Legend Kehadiran */}
-            <div className="space-y-2">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                  <span>Tepat Waktu</span>
-                </div>
-                <span className="text-xs font-black text-slate-800 pl-3.5 mt-0.5">
-                  {countHadir} Org ({pctHadir}%)
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-                  <span>Terlambat</span>
-                </div>
-                <span className="text-xs font-black text-slate-800 pl-3.5 mt-0.5">
-                  {countTerlambat} Org ({pctTerlambat}%)
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
-                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
-                  <span>Belum Absen</span>
-                </div>
-                <span className="text-xs font-black text-slate-800 pl-3.5 mt-0.5">
-                  {countBelumAbsen} Org ({pctBelumAbsen}%)
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Form Atur Sesi Absensi */}
-          <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-3 mt-1 space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex flex-col">
-                <span className="text-[8px] font-black text-slate-400 uppercase tracking-wide mb-1">
-                  Jam Masuk
-                </span>
-                <input
-                  type="time"
-                  value={waktuMulai}
-                  onChange={(e) => setWaktuMulai(e.target.value)}
-                  className="text-xs font-bold px-2 py-1 bg-white border border-slate-200 rounded focus:outline-none focus:border-blue-500 cursor-pointer"
-                />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[8px] font-black text-slate-400 uppercase tracking-wide mb-1">
-                  Batas Absen
-                </span>
-                <input
-                  type="time"
-                  value={batasMaksimal}
-                  onChange={(e) => setBatasMaksimal(e.target.value)}
-                  className="text-xs font-bold px-2 py-1 bg-white border border-slate-200 rounded focus:outline-none focus:border-blue-500 cursor-pointer"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="repeatDailyCheck"
-                checked={repeatDaily}
-                onChange={(e) => setRepeatDaily(e.target.checked)}
-                className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500 border-slate-200 cursor-pointer"
-              />
-              <label
-                htmlFor="repeatDailyCheck"
-                className="text-[9px] font-bold text-slate-655 text-slate-600 cursor-pointer select-none"
-              >
-                Jadwalkan otomatis setiap hari
-              </label>
-            </div>
-
-            <button
-              onClick={handleStartSession}
-              disabled={actionLoading}
-              className="w-full justify-center py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black rounded shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
+      {/* ── APP SWITCHER (Premium Horizontal Cards) ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {[
+          { name: 'Penjualan', path: '/orders', icon: ShoppingCart, desc: 'Quotations & Sales', color: 'bg-gradient-to-r from-rose-500 to-orange-400' },
+          { name: 'Papan Kerja', path: '/produksi', icon: ClipboardList, desc: 'Production SPK', color: 'bg-gradient-to-r from-blue-600 to-cyan-400' },
+          { name: 'Inventori', path: '/inventory', icon: Package, desc: 'Inventory & BoM', color: 'bg-gradient-to-r from-purple-600 to-indigo-600' },
+          { name: 'Kepegawaian', path: '/attendance', icon: CalendarClock, desc: 'HR & Timesheets', color: 'bg-gradient-to-r from-teal-600 to-emerald-400' },
+          { name: 'Pengaturan', path: '/settings', icon: Settings, desc: 'System Settings', color: 'bg-gradient-to-r from-slate-700 to-slate-500' }
+        ].map((app, idx) => {
+          const AppIcon = app.icon;
+          return (
+            <a
+              key={idx}
+              href={app.path}
+              className={`flex items-center p-4 rounded-2xl text-white shadow-sm hover:shadow-md transition-all transform hover:-translate-y-1 cursor-pointer overflow-hidden relative ${app.color}`}
             >
-              <Play size={10} /> Update Sesi Absensi
-            </button>
-          </div>
+              {/* Decorative background circles */}
+              <div className="absolute -right-4 -bottom-4 w-20 h-20 rounded-full bg-white/10" />
+              <div className="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-white/5" />
 
-          {/* Unlock Requests Alert (jika ada) */}
-          {unlockRequests.length > 0 && (
-            <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <AlertCircle size={14} className="text-amber-500 shrink-0" />
-                <span className="text-[9px] font-bold text-amber-800 truncate">
-                  Ada {unlockRequests.length} permohonan buka absen pending.
+              {/* Icon Container */}
+              <div className="bg-white/15 p-2.5 rounded-xl flex items-center justify-center shrink-0">
+                <AppIcon size={22} className="text-white" />
+              </div>
+
+              {/* Text info */}
+              <div className="flex flex-col ml-3 text-left z-10">
+                <span className="text-xs font-black uppercase tracking-wider leading-none">
+                  {app.name}
+                </span>
+                <span className="text-[9px] text-white/80 font-medium mt-1 leading-none">
+                  {app.desc}
                 </span>
               </div>
-              <button
-                onClick={() => alert('Gunakan sidebar atau panel bawahan untuk memproses izin')}
-                className="text-[9px] text-amber-700 font-extrabold underline whitespace-nowrap"
-              >
-                Lihat
-              </button>
-            </div>
-          )}
-        </div>
+            </a>
+          );
+        })}
       </div>
 
-      {/* ── BARIS 2: 4 COLORFUL STATS CARDS ────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {statusCards.map((card, i) => (
-          <div
-            key={i}
-            className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center justify-between shadow-sm"
-          >
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                {card.title}
-              </p>
-              <h3 className="text-xl font-black text-slate-800">{card.count} Order</h3>
-            </div>
-
-            {/* SVG Chart Mini */}
-            <div className="shrink-0">
-              {card.type === 'bars' ? (
-                <svg className="w-12 h-8" viewBox="0 0 60 40">
-                  <rect
-                    x="5"
-                    y="15"
-                    width="6"
-                    height="25"
-                    rx="1.5"
-                    fill={card.chartColor}
-                    opacity="0.3"
-                  />
-                  <rect x="17" y="5" width="6" height="35" rx="1.5" fill={card.chartColor} />
-                  <rect
-                    x="29"
-                    y="20"
-                    width="6"
-                    height="20"
-                    rx="1.5"
-                    fill={card.chartColor}
-                    opacity="0.5"
-                  />
-                  <rect x="41" y="10" width="6" height="30" rx="1.5" fill={card.chartColor} />
-                </svg>
-              ) : (
-                <svg className="w-16 h-8" viewBox="0 0 100 40">
-                  <path
-                    d="M 5 30 Q 20 5 40 25 T 75 10 T 95 35"
-                    fill="none"
-                    stroke={card.chartColor}
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              )}
-            </div>
-          </div>
-        ))}
+      {/* ── SUB-TAB NAVIGATION BAR ─────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-px">
+        {[
+          { id: 'finansial', label: 'Ringkasan Finansial', icon: TrendingUp },
+          { id: 'spk', label: 'Papan Kerja (SPK)', icon: ClipboardList },
+          { id: 'presensi', label: 'Presensi Karyawan', icon: CalendarClock },
+          { id: 'komplain', label: 'Komplain & Garansi', icon: AlertCircle },
+        ].map((tab) => {
+          const TabIcon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold transition-all border-b-2 cursor-pointer
+                ${
+                  isActive
+                    ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50 rounded-t-lg font-black'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                }`}
+            >
+              <TabIcon size={14} />
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* ── BARIS 3: ONLINE STAFF TIMELINE + LEADERBOARD ─────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
-        {/* KIRI: Status Absensi Hari Ini (timeline style) (5 kolom) */}
-        <div className="xl:col-span-5 bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col">
-          <div className="border-b border-slate-50 pb-3 mb-4 flex items-center justify-between shrink-0">
-            <div>
-              <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                <Activity size={14} className="text-indigo-500" /> Kehadiran Staff Hari Ini
-              </h2>
-              <p className="text-[10px] text-slate-400 mt-0.5">
-                Timeline check-in dan online status staff saat ini.
-              </p>
-            </div>
-            <button className="text-slate-300 hover:text-slate-500">
-              <MoreHorizontal size={16} />
-            </button>
-          </div>
-
-          {/* Timeline Wrapper */}
-          <div className="relative flex-1 overflow-y-auto pl-4 border-l border-slate-100 space-y-4 max-h-[360px] custom-scrollbar">
-            {staffList.length > 0 ? (
-              staffList.map((staff, i) => {
-                const absensi = staff.absensi_hari_ini;
-                const isOnline = staff.is_online;
-                const sudahAbsen = absensi && absensi.status !== 'belum_absen';
-
-                // Color node
-                let nodeBg = 'bg-slate-200';
-                if (sudahAbsen) {
-                  if (absensi.status === 'hadir') {
-                    nodeBg = 'bg-emerald-500';
-                  } else {
-                    nodeBg = 'bg-amber-500';
-                  }
-                }
-
-                return (
-                  <div key={i} className="relative flex items-start gap-4 pb-1 group">
-                    {/* Node Dot on Timeline Line */}
-                    <div
-                      className={`absolute -left-[22px] top-1 w-3 h-3 rounded-full ${nodeBg} border-2 border-white shadow-sm flex items-center justify-center`}
-                    ></div>
-
-                    {/* Avatar Initial */}
-                    <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs uppercase shadow-sm">
-                      {staff.username.charAt(0)}
-                    </div>
-
-                    {/* Staff info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-slate-800 capitalize truncate">
-                          {staff.username}
-                        </span>
-                        <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">
-                          {staff.divisi_nama || 'Staff'}
-                        </span>
-                      </div>
-
-                      {/* Check-in time & Online Badge */}
-                      <div className="flex items-center justify-between mt-1 gap-2">
-                        <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                          <Clock size={10} className="text-slate-400" />
-                          {sudahAbsen && absensi.jam_masuk
-                            ? `Masuk: ${new Date(absensi.jam_masuk).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`
-                            : 'Belum Clock In'}
-                        </span>
-
-                        {/* Status Online */}
-                        <span
-                          className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase flex items-center gap-1 ${
-                            isOnline
-                              ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                              : 'bg-slate-50 text-slate-400 border-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`w-1 h-1 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}
-                          ></span>
-                          {isOnline ? 'ON' : 'OFF'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="py-12 text-center text-slate-300 text-xs">
-                Tidak ada staff terdaftar.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* KANAN: Leaderboard Staff Podium + List (7 kolom) */}
-        <div className="xl:col-span-7 bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-50 shrink-0">
-            <div>
-              <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                <Crown size={14} className="text-amber-500 animate-pulse" /> Leaderboard Staff
-              </h2>
-              <p className="text-[10px] text-slate-400 mt-0.5">
-                Pemeringkat performa staff berdasarkan penyelesaian tugas.
-              </p>
-            </div>
-            <button className="text-slate-300 hover:text-slate-500">
-              <MoreHorizontal size={16} />
-            </button>
-          </div>
-
-          {/* Podium (Top 3) */}
-          {data?.top_staff?.length > 0 && (
-            <div className="py-4 bg-gradient-to-b from-indigo-50/10 to-white border-b border-slate-50 flex justify-center items-end gap-5 shrink-0 select-none">
-              {/* Peringkat 2 */}
-              {data.top_staff[1] && (
-                <div className="flex flex-col items-center w-24">
-                  <div className="relative">
-                    <div className="w-10 h-10 rounded-full border-2 border-slate-300 bg-slate-50 flex items-center justify-center font-bold text-slate-655 text-slate-600 text-xs uppercase shadow shadow-inner">
-                      {data.top_staff[1].nama.charAt(0)}
-                    </div>
-                    <span className="absolute -bottom-1 -right-1 w-4.5 h-4.5 bg-slate-300 text-slate-800 rounded-full flex items-center justify-center font-black text-[8.5px] border border-white">
-                      2
-                    </span>
-                  </div>
-                  <span className="text-[9.5px] font-bold text-slate-700 capitalize mt-1.5 truncate w-full text-center">
-                    {data.top_staff[1].nama}
-                  </span>
-                  <span className="text-[8px] text-slate-400 font-extrabold uppercase mt-0.5">
-                    {data.top_staff[1].jumlah_job_selesai} Jobs
-                  </span>
-                  <span className="text-[9px] text-indigo-600 font-black mt-0.5">
-                    {formatRupiah(data.top_staff[1].total_insentif)}
-                  </span>
-                </div>
-              )}
-
-              {/* Peringkat 1 */}
-              {data.top_staff[0] && (
-                <div className="flex flex-col items-center w-28 -translate-y-1">
-                  <div className="relative">
-                    <Crown
-                      size={14}
-                      className="text-amber-505 text-amber-500 absolute -top-3 left-1/2 -translate-x-1/2 drop-shadow animate-bounce"
-                    />
-                    <div className="w-12 h-12 rounded-full border-3 border-amber-400 bg-amber-50 flex items-center justify-center font-black text-slate-800 text-sm uppercase shadow-md">
-                      {data.top_staff[0].nama.charAt(0)}
-                    </div>
-                    <span className="absolute -bottom-1 -right-1 w-5 h-5 bg-amber-400 text-white rounded-full flex items-center justify-center font-black text-[9px] border-2 border-white">
-                      1
-                    </span>
-                  </div>
-                  <span className="text-xs font-black text-slate-905 text-slate-900 capitalize mt-1.5 truncate w-full text-center">
-                    {data.top_staff[0].nama}
-                  </span>
-                  <span className="text-[9px] text-amber-600 font-extrabold uppercase mt-0.5">
-                    {data.top_staff[0].jumlah_job_selesai} Jobs
-                  </span>
-                  <span className="text-[9px] text-emerald-600 font-black mt-0.5">
-                    {formatRupiah(data.top_staff[0].total_insentif)}
-                  </span>
-                </div>
-              )}
-
-              {/* Peringkat 3 */}
-              {data.top_staff[2] && (
-                <div className="flex flex-col items-center w-24">
-                  <div className="relative">
-                    <div className="w-10 h-10 rounded-full border-2 border-orange-200 bg-orange-50/20 flex items-center justify-center font-bold text-orange-850 text-orange-800 text-xs uppercase shadow shadow-inner">
-                      {data.top_staff[2].nama.charAt(0)}
-                    </div>
-                    <span className="absolute -bottom-1 -right-1 w-4.5 h-4.5 bg-orange-300 text-orange-950 rounded-full flex items-center justify-center font-black text-[8.5px] border border-white">
-                      3
-                    </span>
-                  </div>
-                  <span className="text-[9.5px] font-bold text-slate-700 capitalize mt-1.5 truncate w-full text-center">
-                    {data.top_staff[2].nama}
-                  </span>
-                  <span className="text-[8px] text-slate-400 font-extrabold uppercase mt-0.5">
-                    {data.top_staff[2].jumlah_job_selesai} Jobs
-                  </span>
-                  <span className="text-[9px] text-orange-600 font-black mt-0.5">
-                    {formatRupiah(data.top_staff[2].total_insentif)}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Table Header */}
-          <div className="grid grid-cols-12 px-5 py-2 bg-slate-50 border-b border-slate-100 text-[8.5px] font-black text-slate-405 text-slate-400 uppercase tracking-widest shrink-0">
-            <div className="col-span-1">#</div>
-            <div className="col-span-4">Nama Staff</div>
-            <div className="col-span-3">Role</div>
-            <div className="col-span-2 text-center">Job Selesai</div>
-            <div className="col-span-2 text-right">Total Insentif</div>
-          </div>
-
-          {/* Table List */}
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-50 max-h-[220px] custom-scrollbar">
-            {data?.top_staff?.length > 0 ? (
-              data.top_staff.map((staff, i) => {
-                const rankIcons = [
-                  <Trophy key={0} size={12} className="text-amber-500" />,
-                  <Medal key={1} size={12} className="text-slate-450" />,
-                  <Medal key={2} size={12} className="text-orange-400" />,
-                ];
+      {/* ── TAB CONTENT AREA ────────────────────────────────── */}
+      <div className="mt-4 transition-all duration-300">
+        
+        {/* TAB 1: RINGKASAN FINANSIAL */}
+        {activeTab === 'finansial' && (
+          <div className="space-y-6">
+            {/* KPI Cards Grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {statCards.map((card, i) => {
+                const Icon = card.icon;
                 return (
                   <div
                     key={i}
-                    className="grid grid-cols-12 px-5 py-2 items-center hover:bg-slate-50/50 transition-colors text-[10.5px]"
+                    className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center justify-between shadow-2xs hover:shadow-xs transition-all"
                   >
-                    <div className="col-span-1 flex items-center">
-                      {rankIcons[i] || (
-                        <span className="text-[9px] font-black text-slate-400">{i + 1}</span>
-                      )}
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-0.5 truncate">
+                        {card.label}
+                      </p>
+                      <h3 className="text-sm font-black text-slate-800 leading-none truncate">
+                        {card.value}
+                      </h3>
                     </div>
-                    <div className="col-span-4 font-bold text-slate-800 capitalize truncate">
-                      {staff.nama}
-                    </div>
-                    <div className="col-span-3">
-                      <span className="text-[8px] bg-slate-100 text-slate-500 border border-slate-200/80 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
-                        Staff
-                      </span>
-                    </div>
-                    <div className="col-span-2 text-center font-black text-slate-700">
-                      {staff.jumlah_job_selesai}
-                    </div>
-                    <div className="col-span-2 text-right font-black text-emerald-600">
-                      {formatRupiah(staff.total_insentif)}
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ml-1 ${card.iconBg}`}>
+                      <Icon size={14} className={card.iconColor} />
                     </div>
                   </div>
                 );
-              })
-            ) : (
-              <div className="py-8 text-center text-slate-300 text-xs">Data belum tersedia</div>
-            )}
+              })}
+            </div>
+
+            {/* Line Chart & Status Pipeline */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              {/* Left: Line Chart */}
+              <div className="lg:col-span-8 bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex justify-between items-start border-b border-slate-50 pb-3 mb-4">
+                  <div>
+                    <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">Perkembangan Omset</h2>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Pendapatan dan performa penjualan 6 bulan terakhir.
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-450">Bulan Ini</span>
+                    <div className="text-base font-black text-slate-800 leading-none mt-0.5">
+                      {formatRupiah(data?.omset_bulan_ini)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* SVG Graph */}
+                <div className="w-full h-44 mt-2">
+                  {omsetBulan.length > 0 ? (
+                    <svg
+                      viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+                      className="w-full h-full"
+                      preserveAspectRatio="none"
+                    >
+                      <defs>
+                        <linearGradient id="omsetGradientSleek" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#4318FF" stopOpacity="0.2" />
+                          <stop offset="100%" stopColor="#4318FF" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+                      <line x1="20" y1={svgHeight - 15} x2={svgWidth - 20} y2={svgHeight - 15} stroke="#F1F5F9" strokeWidth="1" />
+                      <line x1="20" y1={svgHeight / 2} x2={svgWidth - 20} y2={svgHeight / 2} stroke="#F1F5F9" strokeWidth="0.5" strokeDasharray="3" />
+                      <line x1="20" y1="20" x2={svgWidth - 20} y2="20" stroke="#F1F5F9" strokeWidth="0.5" strokeDasharray="3" />
+
+                      {areaD && <path d={areaD} fill="url(#omsetGradientSleek)" />}
+                      {pathD && (
+                        <path
+                          d={pathD}
+                          fill="none"
+                          stroke="#4318FF"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      )}
+                      {points.map((p, idx) => (
+                        <g key={idx}>
+                          <circle cx={p.x} cy={p.y} r="3" fill="#4318FF" stroke="#FFFFFF" strokeWidth="1.5" />
+                        </g>
+                      ))}
+                    </svg>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-slate-400 text-xs">
+                      Data grafik belum tersedia
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex justify-between px-5 text-[8.5px] font-bold text-slate-400 uppercase mt-2">
+                  {omsetBulan.map((item, idx) => (
+                    <span key={idx}>{item.bulan.slice(0, 3)}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right: Operational status Cards (Review, Proses, dll) */}
+              <div className="lg:col-span-4 flex flex-col gap-4">
+                <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+                  <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 mb-3 border-b border-slate-50 pb-2">Status Operasional</h2>
+                  <div className="space-y-3">
+                    {statusCards.map((card, i) => (
+                      <div key={i} className={`flex items-center justify-between p-3 rounded-xl ${card.colorClass}`}>
+                        <div>
+                          <p className="text-[10px] font-bold opacity-80 uppercase tracking-wider">{card.title}</p>
+                          <h3 className="text-base font-black mt-0.5">{card.count} Order</h3>
+                        </div>
+                        <div className="shrink-0 opacity-80">
+                          {card.type === 'bars' ? (
+                            <svg className="w-10 h-7" viewBox="0 0 60 40">
+                              <rect x="5" y="15" width="6" height="25" rx="1.5" fill={card.chartColor} opacity="0.3" />
+                              <rect x="17" y="5" width="6" height="35" rx="1.5" fill={card.chartColor} />
+                              <rect x="29" y="20" width="6" height="20" rx="1.5" fill={card.chartColor} opacity="0.5" />
+                              <rect x="41" y="10" width="6" height="30" rx="1.5" fill={card.chartColor} />
+                            </svg>
+                          ) : (
+                            <svg className="w-14 h-7" viewBox="0 0 100 40">
+                              <path d="M 5 30 Q 20 5 40 25 T 75 10 T 95 35" fill="none" stroke={card.chartColor} strokeWidth="2.5" strokeLinecap="round" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* TAB 2: PAPAN KERJA (SPK) */}
+        {activeTab === 'spk' && (
+          <div className="grid grid-cols-1 gap-5">
+            {/* Leaderboard Staff podium + list */}
+            <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col w-full">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-50 shrink-0">
+                <div>
+                  <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Crown size={14} className="text-amber-500" /> Leaderboard Staff
+                  </h2>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Pemeringkat performa staff berdasarkan penyelesaian tugas.
+                  </p>
+                </div>
+              </div>
+
+              {/* Podium (Top 3) */}
+              {data?.top_staff?.length > 0 && (
+                <div className="py-4 bg-gradient-to-b from-indigo-50/10 to-white border-b border-slate-50 flex justify-center items-end gap-5 shrink-0 select-none">
+                  {/* Peringkat 2 */}
+                  {data.top_staff[1] && (
+                    <div className="flex flex-col items-center w-24">
+                      <div className="relative">
+                        <div className="w-10 h-10 rounded-full border-2 border-slate-300 bg-slate-50 flex items-center justify-center font-bold text-slate-600 text-xs uppercase shadow shadow-inner">
+                          {data.top_staff[1].nama.charAt(0)}
+                        </div>
+                        <span className="absolute -bottom-1 -right-1 w-4.5 h-4.5 bg-slate-300 text-slate-800 rounded-full flex items-center justify-center font-black text-[8.5px] border border-white">
+                          2
+                        </span>
+                      </div>
+                      <span className="text-[9.5px] font-bold text-slate-700 capitalize mt-1.5 truncate w-full text-center">
+                        {data.top_staff[1].nama}
+                      </span>
+                      <span className="text-[8px] text-slate-400 font-extrabold uppercase mt-0.5">
+                        {data.top_staff[1].jumlah_job_selesai} Jobs
+                      </span>
+                      <span className="text-[9px] text-indigo-650 font-black mt-0.5">
+                        {formatRupiah(data.top_staff[1].total_insentif)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Peringkat 1 */}
+                  {data.top_staff[0] && (
+                    <div className="flex flex-col items-center w-28 -translate-y-1">
+                      <div className="relative">
+                        <Crown size={14} className="text-amber-500 absolute -top-3 left-1/2 -translate-x-1/2 drop-shadow animate-bounce" />
+                        <div className="w-12 h-12 rounded-full border-3 border-amber-400 bg-amber-50 flex items-center justify-center font-black text-slate-800 text-sm uppercase shadow-md">
+                          {data.top_staff[0].nama.charAt(0)}
+                        </div>
+                        <span className="absolute -bottom-1 -right-1 w-5 h-5 bg-amber-400 text-white rounded-full flex items-center justify-center font-black text-[9px] border-2 border-white">
+                          1
+                        </span>
+                      </div>
+                      <span className="text-xs font-black text-slate-900 capitalize mt-1.5 truncate w-full text-center">
+                        {data.top_staff[0].nama}
+                      </span>
+                      <span className="text-[9px] text-amber-600 font-extrabold uppercase mt-0.5">
+                        {data.top_staff[0].jumlah_job_selesai} Jobs
+                      </span>
+                      <span className="text-[9px] text-emerald-600 font-black mt-0.5">
+                        {formatRupiah(data.top_staff[0].total_insentif)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Peringkat 3 */}
+                  {data.top_staff[2] && (
+                    <div className="flex flex-col items-center w-24">
+                      <div className="relative">
+                        <div className="w-10 h-10 rounded-full border-2 border-orange-200 bg-orange-50/20 flex items-center justify-center font-bold text-orange-850 text-orange-800 text-xs uppercase shadow shadow-inner">
+                          {data.top_staff[2].nama.charAt(0)}
+                        </div>
+                        <span className="absolute -bottom-1 -right-1 w-4.5 h-4.5 bg-orange-300 text-orange-950 rounded-full flex items-center justify-center font-black text-[8.5px] border border-white">
+                          3
+                        </span>
+                      </div>
+                      <span className="text-[9.5px] font-bold text-slate-700 capitalize mt-1.5 truncate w-full text-center">
+                        {data.top_staff[2].nama}
+                      </span>
+                      <span className="text-[8px] text-slate-400 font-extrabold uppercase mt-0.5">
+                        {data.top_staff[2].jumlah_job_selesai} Jobs
+                      </span>
+                      <span className="text-[9px] text-orange-600 font-black mt-0.5">
+                        {formatRupiah(data.top_staff[2].total_insentif)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Table Header */}
+              <div className="grid grid-cols-12 px-5 py-2 bg-slate-50 border-b border-slate-100 text-[8.5px] font-black text-slate-400 uppercase tracking-widest shrink-0">
+                <div className="col-span-1">#</div>
+                <div className="col-span-4">Nama Staff</div>
+                <div className="col-span-3">Role</div>
+                <div className="col-span-2 text-center">Job Selesai</div>
+                <div className="col-span-2 text-right">Total Insentif</div>
+              </div>
+
+              {/* Table List */}
+              <div className="divide-y divide-slate-50 max-h-[300px] overflow-y-auto custom-scrollbar">
+                {data?.top_staff?.length > 0 ? (
+                  data.top_staff.map((staff, i) => {
+                    const rankIcons = [
+                      <Trophy key={0} size={12} className="text-amber-500" />,
+                      <Medal key={1} size={12} className="text-slate-450" />,
+                      <Medal key={2} size={12} className="text-orange-400" />,
+                    ];
+                    return (
+                      <div
+                        key={i}
+                        className="grid grid-cols-12 px-5 py-2.5 items-center hover:bg-slate-50/50 transition-colors text-[10.5px]"
+                      >
+                        <div className="col-span-1 flex items-center">
+                          {rankIcons[i] || (
+                            <span className="text-[9px] font-black text-slate-400">{i + 1}</span>
+                          )}
+                        </div>
+                        <div className="col-span-4 font-bold text-slate-800 capitalize truncate">
+                          {staff.nama}
+                        </div>
+                        <div className="col-span-3">
+                          <span className="text-[8px] bg-slate-100 text-slate-500 border border-slate-200/80 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
+                            Staff
+                          </span>
+                        </div>
+                        <div className="col-span-2 text-center font-black text-slate-700">
+                          {staff.jumlah_job_selesai}
+                        </div>
+                        <div className="col-span-2 text-right font-black text-emerald-600">
+                          {formatRupiah(staff.total_insentif)}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="py-8 text-center text-slate-300 text-xs">Data belum tersedia</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: PRESENSI KARYAWAN */}
+        {activeTab === 'presensi' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            {/* Left: Online staff list (8 cols) */}
+            <div className="lg:col-span-8 flex flex-col gap-4">
+              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col">
+                <div className="border-b border-slate-50 pb-3 mb-4">
+                  <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Activity size={14} className="text-indigo-500" /> Kehadiran Staff Hari Ini
+                  </h2>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Timeline check-in dan online status staff saat ini.
+                  </p>
+                </div>
+
+                <div className="relative flex-1 overflow-y-auto pl-4 border-l border-slate-100 space-y-4 max-h-[300px] custom-scrollbar">
+                  {staffList.length > 0 ? (
+                    staffList.map((staff, i) => {
+                      const absensi = staff.absensi_hari_ini;
+                      const isOnline = staff.is_online;
+                      const sudahAbsen = absensi && absensi.status !== 'belum_absen';
+
+                      let nodeBg = 'bg-slate-200';
+                      if (sudahAbsen) {
+                        nodeBg = absensi.status === 'hadir' ? 'bg-emerald-500' : 'bg-amber-500';
+                      }
+
+                      return (
+                        <div key={i} className="relative flex items-start gap-4 pb-1 group">
+                          <div className={`absolute -left-[22px] top-1 w-3 h-3 rounded-full ${nodeBg} border-2 border-white shadow-sm`} />
+                          <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs uppercase shadow-sm">
+                            {staff.username.charAt(0)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-black text-slate-800 capitalize truncate">
+                                {staff.username}
+                              </span>
+                              <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">
+                                {staff.divisi_nama || 'Staff'}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between mt-1 gap-2">
+                              <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                                <Clock size={10} className="text-slate-400" />
+                                {sudahAbsen && absensi.jam_masuk
+                                  ? `Masuk: ${new Date(absensi.jam_masuk).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`
+                                  : 'Belum Clock In'}
+                              </span>
+                              <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase flex items-center gap-1 ${
+                                isOnline ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-200'
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+                                {isOnline ? 'ON' : 'OFF'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="py-12 text-center text-slate-300 text-xs">
+                      Tidak ada staff terdaftar.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Persentase Kehadiran Donut + Accordions (4 cols) */}
+            <div className="lg:col-span-4 flex flex-col gap-4">
+              {/* Donut Chart */}
+              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-50 mb-3">
+                  <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">Tingkat Kehadiran</h2>
+                  {sessionData?.is_active && (
+                    <span className="text-[8px] font-black px-1.5 py-0.5 rounded border border-emerald-200 bg-emerald-50 text-emerald-600 uppercase tracking-wider flex items-center gap-1">
+                      Sesi Aktif
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-col items-center">
+                  <div
+                    className="relative w-24 h-24 rounded-full flex items-center justify-center shadow-inner"
+                    style={{ background: attendanceDonutGradient }}
+                  >
+                    <div className="absolute w-18 h-18 bg-white rounded-full flex flex-col items-center justify-center shadow-sm">
+                      <span className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">Hadir</span>
+                      <span className="text-xs font-black text-slate-800">
+                        {countHadir + countTerlambat} / {totalStaff}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 w-full mt-4 text-center text-[10px] font-bold text-slate-500 border-t border-slate-50 pt-3">
+                    <div>
+                      <span className="text-emerald-600 font-black">{countHadir}</span> Tepat
+                    </div>
+                    <div>
+                      <span className="text-amber-500 font-black">{countTerlambat}</span> Telat
+                    </div>
+                    <div>
+                      <span className="text-rose-500 font-black">{countBelumAbsen}</span> Absen
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ACCORDION: Atur Sesi Absensi */}
+              <div className="border border-slate-100 rounded-xl overflow-hidden shadow-2xs">
+                <button
+                  onClick={() => toggleSection('sesi')}
+                  className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  <span className="text-[10px] font-black text-slate-700 uppercase tracking-wider">
+                    Atur Sesi Absensi
+                  </span>
+                  <ChevronDown
+                    size={14}
+                    className={`text-slate-400 transition-transform duration-200 ${expandedSection === 'sesi' ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {expandedSection === 'sesi' && (
+                  <div className="px-4 py-3 space-y-3 bg-white border-t border-slate-100">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex flex-col">
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-wide mb-1">Jam Masuk</span>
+                        <input
+                          type="time"
+                          value={waktuMulai}
+                          onChange={(e) => setWaktuMulai(e.target.value)}
+                          className="text-xs font-bold px-2 py-1 bg-white border border-slate-200 rounded focus:outline-none focus:border-blue-500 cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-wide mb-1">Batas Absen</span>
+                        <input
+                          type="time"
+                          value={batasMaksimal}
+                          onChange={(e) => setBatasMaksimal(e.target.value)}
+                          className="text-xs font-bold px-2 py-1 bg-white border border-slate-200 rounded focus:outline-none focus:border-blue-500 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="repeatDailyCheck"
+                        checked={repeatDaily}
+                        onChange={(e) => setRepeatDaily(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500 border-slate-200 cursor-pointer"
+                      />
+                      <label htmlFor="repeatDailyCheck" className="text-[9px] font-bold text-slate-600 cursor-pointer select-none">
+                        Otomatis harian
+                      </label>
+                    </div>
+                    <button
+                      onClick={handleStartSession}
+                      disabled={actionLoading}
+                      className="w-full justify-center py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black rounded shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Play size={10} /> Update Sesi
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* ACCORDION: Permohonan Buka Absen */}
+              <div className="border border-slate-100 rounded-xl overflow-hidden shadow-2xs">
+                <button
+                  onClick={() => toggleSection('unlock')}
+                  className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  <span className="text-[10px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    Permohonan Buka Absen
+                    {unlockRequests.length > 0 && (
+                      <span className="bg-amber-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">
+                        {unlockRequests.length}
+                      </span>
+                    )}
+                  </span>
+                  <ChevronDown
+                    size={14}
+                    className={`text-slate-400 transition-transform duration-200 ${expandedSection === 'unlock' ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {expandedSection === 'unlock' && (
+                  <div className="px-4 py-3 space-y-2 bg-white border-t border-slate-100 max-h-[220px] overflow-y-auto custom-scrollbar">
+                    {unlockRequests.length > 0 ? (
+                      unlockRequests.map((req, idx) => (
+                        <div key={idx} className="flex items-start justify-between gap-2 bg-slate-50 border border-slate-100 rounded-lg p-2">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold text-slate-800 truncate">{req.staff_nama || 'Staff'}</p>
+                            <p className="text-[9px] text-slate-550 italic truncate">"{req.alasan}"</p>
+                          </div>
+                          <span className="text-[8px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-black uppercase shrink-0">{req.status}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-[10px] text-slate-400 italic text-center py-2">
+                        Tidak ada permohonan pending.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: KOMPLAIN & GARANSI */}
+        {activeTab === 'komplain' && (
+          <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+            <div className="border-b border-slate-50 pb-3 mb-4">
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-750 flex items-center gap-1.5">
+                <AlertCircle size={14} className="text-rose-500" /> Log Keluhan Pelanggan Terbaru
+              </h2>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                Daftar komplain dan garansi pesanan dari pelanggan.
+              </p>
+            </div>
+
+            {/* List Keluhan */}
+            <div className="divide-y divide-slate-100 overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-650">
+                <thead>
+                  <tr className="bg-slate-50 text-[9px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                    <th className="py-2.5 px-4">Order ID</th>
+                    <th className="py-2.5 px-4">Pelanggan</th>
+                    <th className="py-2.5 px-4">Jenis Keluhan</th>
+                    <th className="py-2.5 px-4">Deskripsi</th>
+                    <th className="py-2.5 px-4">Status</th>
+                    <th className="py-2.5 px-4">Resolusi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {complaints.length > 0 ? (
+                    (Array.isArray(complaints) ? complaints : complaints?.results || []).slice(0, 10).map((c) => (
+                      <tr key={c.id} className="hover:bg-slate-550/10 transition-colors">
+                        <td className="py-3 px-4 font-mono font-bold text-indigo-600">#{c.order_id || c.order}</td>
+                        <td className="py-3 px-4 font-bold text-slate-800 capitalize">{c.staff_nama || c.pelanggan_nama || 'Pelanggan'}</td>
+                        <td className="py-3 px-4 font-semibold text-rose-600">{c.jenis_display || c.jenis}</td>
+                        <td className="py-3 px-4 max-w-xs truncate" title={c.deskripsi}>{c.deskripsi}</td>
+                        <td className="py-3 px-4">
+                          <span className={`text-[8.5px] font-black px-2 py-0.5 rounded border uppercase
+                            ${
+                              c.status === 'selesai'
+                                ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                : 'bg-amber-50 text-amber-600 border-amber-100'
+                            }`}
+                          >
+                            {c.status_display || c.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 font-medium text-slate-500 italic max-w-xs truncate" title={c.catatan_resolusi || '-'}>
+                          {c.catatan_resolusi || '-'}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="text-center py-8 text-slate-400 italic">
+                        Tidak ada komplain pelanggan tercatat.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
+
     </div>
   );
 }

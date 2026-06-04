@@ -32,6 +32,231 @@ export default function Reports() {
   const [expandedStaffId, setExpandedStaffId] = useState(null);
   const [expandedDivisi, setExpandedDivisi] = useState(null);
 
+  // --- Spreadsheet States & Functions ---
+  const [spreadsheetGrid, setSpreadsheetGrid] = useState([]);
+  const [selectedCell, setSelectedCell] = useState(null); // { r, c }
+  const [pivotConfig, setPivotConfig] = useState({
+    rowField: 'staff', // 'staff' | 'divisi' | 'produk'
+    valField: 'insentif', // 'insentif' | 'durasi' | 'qty'
+    aggType: 'sum', // 'sum' | 'avg' | 'count'
+  });
+
+  const evaluateCell = (formulaStr, currentGrid) => {
+    if (!formulaStr || !String(formulaStr).startsWith('=')) {
+      return formulaStr;
+    }
+    const cleanFormula = String(formulaStr).substring(1).toUpperCase().trim();
+    
+    // Pattern matches like SUM(J3:J12)
+    const match = cleanFormula.match(/^([A-Z]+)\(([A-Z]+)(\d+):([A-Z]+)(\d+)\)$/);
+    if (!match) {
+      return '#VALUE!';
+    }
+    
+    const [_, func, colStartLetter, rowStartStr, colEndLetter, rowEndStr] = match;
+    const startRow = parseInt(rowStartStr) - 1;
+    const endRow = parseInt(rowEndStr) - 1;
+    
+    const letterToIdx = (l) => l.charCodeAt(0) - 65; // A=0, B=1, ...
+    const startCol = letterToIdx(colStartLetter);
+    const endCol = letterToIdx(colEndLetter);
+    
+    // Gather values in range
+    const values = [];
+    for (let r = Math.min(startRow, endRow); r <= Math.max(startRow, endRow); r++) {
+      for (let c = Math.min(startCol, endCol); c <= Math.max(startCol, endCol); c++) {
+        if (currentGrid[r] && currentGrid[r][c]) {
+          const val = parseFloat(currentGrid[r][c].computed || currentGrid[r][c].value || 0);
+          if (!isNaN(val)) {
+            values.push(val);
+          }
+        }
+      }
+    }
+    
+    if (func === 'SUM') {
+      return values.reduce((sum, v) => sum + v, 0);
+    }
+    if (func === 'AVERAGE' || func === 'AVG') {
+      return values.length > 0 ? (values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(1) : 0;
+    }
+    if (func === 'COUNT') {
+      return values.length;
+    }
+    if (func === 'MIN') {
+      return values.length > 0 ? Math.min(...values) : 0;
+    }
+    if (func === 'MAX') {
+      return values.length > 0 ? Math.max(...values) : 0;
+    }
+    
+    return '#REF!';
+  };
+
+  const recalculateGrid = (currentGrid) => {
+    const newGrid = currentGrid.map((row) => row.map((cell) => ({ ...cell })));
+    for (let pass = 0; pass < 2; pass++) {
+      for (let r = 0; r < newGrid.length; r++) {
+        for (let c = 0; c < newGrid[r].length; c++) {
+          const cell = newGrid[r][c];
+          if (cell.value && String(cell.value).startsWith('=')) {
+            cell.computed = String(evaluateCell(cell.value, newGrid));
+          } else {
+            cell.computed = cell.value;
+          }
+        }
+      }
+    }
+    return newGrid;
+  };
+
+  const initSpreadsheetWithJobs = useCallback(() => {
+    const ROWS = 35;
+    const COLS = 11;
+    const grid = [];
+    for (let r = 0; r < ROWS; r++) {
+      const row = [];
+      for (let c = 0; c < COLS; c++) {
+        row.push({ value: '', computed: '' });
+      }
+      grid.push(row);
+    }
+    
+    const headers = [
+      'Date',        // A
+      'Job ID',      // B
+      'Order ID',    // C
+      'Customer',    // D
+      'Product',     // E
+      'Qty',         // F
+      'Division',    // G
+      'PIC Staff',   // H
+      'Duration (m)',// I
+      'Incentive (Rp)', // J
+      'HPP Bahan'    // K
+    ];
+    headers.forEach((h, idx) => {
+      grid[0][idx] = { value: h, computed: h, isHeader: true };
+    });
+    
+    const maxJobs = Math.min(detailedJobs.length, 25);
+    for (let i = 0; i < maxJobs; i++) {
+      const job = detailedJobs[i];
+      const r = i + 1;
+      grid[r][0] = { value: job.waktu_selesai || '', computed: job.waktu_selesai || '' };
+      grid[r][1] = { value: job.id || '', computed: String(job.id || '') };
+      grid[r][2] = { value: job.order_id || '', computed: String(job.order_id || '') };
+      grid[r][3] = { value: job.order_nama || '', computed: job.order_nama || '' };
+      grid[r][4] = { value: job.jenis_produk || '', computed: job.jenis_produk || '' };
+      grid[r][5] = { value: job.qty || 0, computed: String(job.qty || 0) };
+      grid[r][6] = { value: job.divisi || '', computed: job.divisi || '' };
+      grid[r][7] = { value: job.pic_fullname || '', computed: job.pic_fullname || '' };
+      grid[r][8] = { value: job.durasi_menit || 0, computed: String(job.durasi_menit || 0) };
+      grid[r][9] = { value: job.insentif || 0, computed: String(job.insentif || 0) };
+      grid[r][10] = { value: job.hpp_bahan || 0, computed: String(job.hpp_bahan || 0) };
+    }
+    
+    const totalRowIdx = maxJobs + 2;
+    if (totalRowIdx < ROWS) {
+      grid[totalRowIdx][0] = { value: 'Total / Rata-rata', computed: 'Total / Rata-rata', isLabel: true };
+      grid[totalRowIdx][5] = { value: `=SUM(F2:F${totalRowIdx})`, computed: '' };
+      grid[totalRowIdx][8] = { value: `=AVERAGE(I2:I${totalRowIdx})`, computed: '' };
+      grid[totalRowIdx][9] = { value: `=SUM(J2:J${totalRowIdx})`, computed: '' };
+      grid[totalRowIdx][10] = { value: `=SUM(K2:K${totalRowIdx})`, computed: '' };
+      
+      grid[totalRowIdx - 1][5] = { value: 'Total Qty', computed: 'Total Qty', isLabel: true };
+      grid[totalRowIdx - 1][8] = { value: 'Avg Dur', computed: 'Avg Dur', isLabel: true };
+      grid[totalRowIdx - 1][9] = { value: 'Total Ins', computed: 'Total Ins', isLabel: true };
+      grid[totalRowIdx - 1][10] = { value: 'Total HPP', computed: 'Total HPP', isLabel: true };
+    }
+    
+    setSpreadsheetGrid(recalculateGrid(grid));
+  }, [detailedJobs]);
+
+  useEffect(() => {
+    if (detailedJobs.length > 0) {
+      initSpreadsheetWithJobs();
+    }
+  }, [detailedJobs, initSpreadsheetWithJobs]);
+
+  const generatePivotTable = () => {
+    const groups = {};
+    detailedJobs.forEach((job) => {
+      let key = 'Lainnya';
+      if (pivotConfig.rowField === 'staff') key = job.pic_fullname || 'Tanpa Staff';
+      else if (pivotConfig.rowField === 'divisi') key = job.divisi || 'Tanpa Divisi';
+      else if (pivotConfig.rowField === 'produk') key = job.jenis_produk || 'Tanpa Produk';
+      
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(job);
+    });
+    
+    const ROWS = 35;
+    const COLS = 11;
+    const grid = [];
+    for (let r = 0; r < ROWS; r++) {
+      const row = [];
+      for (let c = 0; c < COLS; c++) {
+        row.push({ value: '', computed: '' });
+      }
+      grid.push(row);
+    }
+    
+    grid[0][0] = { value: pivotConfig.rowField.toUpperCase(), computed: pivotConfig.rowField.toUpperCase(), isHeader: true };
+    grid[0][1] = { value: `${pivotConfig.valField.toUpperCase()} (${pivotConfig.aggType.toUpperCase()})`, computed: `${pivotConfig.valField.toUpperCase()} (${pivotConfig.aggType.toUpperCase()})`, isHeader: true };
+    
+    let currentIdx = 1;
+    Object.keys(groups).forEach((key) => {
+      const jobs = groups[key];
+      let finalVal = 0;
+      
+      const getVal = (job) => {
+        if (pivotConfig.valField === 'insentif') return job.insentif || 0;
+        if (pivotConfig.valField === 'durasi') return job.durasi_menit || 0;
+        if (pivotConfig.valField === 'qty') return job.qty || 0;
+        return 0;
+      };
+      
+      if (pivotConfig.aggType === 'sum') {
+        finalVal = jobs.reduce((sum, j) => sum + getVal(j), 0);
+      } else if (pivotConfig.aggType === 'avg') {
+        const total = jobs.reduce((sum, j) => sum + getVal(j), 0);
+        finalVal = jobs.length > 0 ? (total / jobs.length).toFixed(1) : 0;
+      } else if (pivotConfig.aggType === 'count') {
+        finalVal = jobs.length;
+      }
+      
+      grid[currentIdx][0] = { value: key, computed: key };
+      grid[currentIdx][1] = { value: finalVal, computed: String(finalVal) };
+      currentIdx++;
+    });
+    
+    grid[currentIdx][0] = { value: 'GRAND TOTAL', computed: 'GRAND TOTAL', isLabel: true };
+    grid[currentIdx][1] = { value: `=SUM(B2:B${currentIdx})`, computed: '' };
+    
+    setSpreadsheetGrid(recalculateGrid(grid));
+  };
+
+  const downloadSpreadsheetCSV = () => {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    spreadsheetGrid.forEach((row) => {
+      const rowData = row.map((cell) => {
+        const val = cell.computed !== undefined ? cell.computed : cell.value;
+        return `"${String(val).replace(/"/g, '""')}"`;
+      }).join(",");
+      csvContent += rowData + "\r\n";
+    });
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `pivot_spreadsheet_${range}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
   const fetchReport = useCallback(() => {
     setLoading(true);
     apiClient
@@ -328,6 +553,20 @@ export default function Reports() {
           <Users size={13} />
           <span>Laporan Per Staff</span>
         </button>
+        <button
+          onClick={() => {
+            setActiveTab('spreadsheet');
+            setSearchTerm('');
+          }}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+            activeTab === 'spreadsheet'
+              ? 'bg-white text-indigo-700 shadow-md shadow-slate-100'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Grid size={13} className="text-emerald-500" />
+          <span>Live Spreadsheet</span>
+        </button>
       </div>
 
       {/* METRIC CARDS AND CHARTS: Rendered dynamically or in global tab */}
@@ -579,6 +818,11 @@ export default function Reports() {
             {activeTab === 'staff' && (
               <>
                 <Users className="w-4 h-4 text-indigo-500" /> Evaluasi dan Insentif Per Staff
+              </>
+            )}
+            {activeTab === 'spreadsheet' && (
+              <>
+                <Grid className="w-4 h-4 text-emerald-600" /> Live Pivot Spreadsheet Grid
               </>
             )}
           </h2>
@@ -1097,6 +1341,183 @@ export default function Reports() {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {activeTab === 'spreadsheet' && (
+          <div className="p-6 space-y-6 bg-slate-50/50">
+            {/* Control Panel: Pivot Settings, CSV, Reset */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-end">
+              <div className="lg:col-span-8 bg-white border border-slate-200 rounded-2xl p-4 shadow-3xs flex flex-wrap gap-4 items-center">
+                <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                  Config Pivot
+                </div>
+                <div className="h-6 w-px bg-slate-200"></div>
+                
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-500 font-bold">Baris:</span>
+                  <select
+                    value={pivotConfig.rowField}
+                    onChange={(e) => setPivotConfig({ ...pivotConfig, rowField: e.target.value })}
+                    className="border border-slate-250 bg-slate-50 rounded px-2.5 py-1 text-slate-700 font-bold outline-none"
+                  >
+                    <option value="staff">Staf PIC</option>
+                    <option value="divisi">Divisi Kerja</option>
+                    <option value="produk">Produk / Jenis</option>
+                  </select>
+                </div>
+                
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-500 font-bold">Kolom Nilai:</span>
+                  <select
+                    value={pivotConfig.valField}
+                    onChange={(e) => setPivotConfig({ ...pivotConfig, valField: e.target.value })}
+                    className="border border-slate-250 bg-slate-50 rounded px-2.5 py-1 text-slate-700 font-bold outline-none"
+                  >
+                    <option value="insentif">Insentif (Rp)</option>
+                    <option value="durasi">Durasi (Menit)</option>
+                    <option value="qty">Qty Pekerjaan</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-500 font-bold">Agregasi:</span>
+                  <select
+                    value={pivotConfig.aggType}
+                    onChange={(e) => setPivotConfig({ ...pivotConfig, aggType: e.target.value })}
+                    className="border border-slate-250 bg-slate-50 rounded px-2.5 py-1 text-slate-700 font-bold outline-none"
+                  >
+                    <option value="sum">SUM (Jumlah)</option>
+                    <option value="avg">AVG (Rata-rata)</option>
+                    <option value="count">COUNT (Banyaknya)</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={generatePivotTable}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black px-4 py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer"
+                >
+                  Generate Pivot
+                </button>
+              </div>
+
+              <div className="lg:col-span-4 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={initSpreadsheetWithJobs}
+                  className="bg-white border border-slate-250 hover:bg-slate-50 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl shadow-3xs transition-all cursor-pointer"
+                >
+                  Reset Grid Data
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadSpreadsheetCSV}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-3xs transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Download size={13} />
+                  Download CSV
+                </button>
+              </div>
+            </div>
+
+            {/* Formula Bar */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-3xs space-y-3">
+              <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest font-mono select-none">
+                  {selectedCell ? `${String.fromCharCode(65 + selectedCell.c)}${selectedCell.r + 1}` : 'CELL'}
+                </div>
+                <div className="h-5 w-px bg-slate-200"></div>
+                <div className="text-xs font-bold text-slate-400 font-serif italic select-none">fx</div>
+                <input
+                  type="text"
+                  value={
+                    selectedCell
+                      ? spreadsheetGrid[selectedCell.r]?.[selectedCell.c]?.value || ''
+                      : ''
+                  }
+                  disabled={!selectedCell}
+                  onChange={(e) => {
+                    if (!selectedCell) return;
+                    const newGrid = spreadsheetGrid.map((row, rIdx) =>
+                      row.map((cell, cIdx) => {
+                        if (rIdx === selectedCell.r && cIdx === selectedCell.c) {
+                          return { ...cell, value: e.target.value };
+                        }
+                        return cell;
+                      })
+                    );
+                    setSpreadsheetGrid(recalculateGrid(newGrid));
+                  }}
+                  placeholder="Pilih sel di bawah, lalu masukkan nilai manual atau rumus (Cth: =SUM(J2:J12) atau 50000)"
+                  className="flex-1 bg-transparent border-none outline-none text-xs font-mono text-slate-800"
+                />
+              </div>
+
+              {/* Spreadsheet Grid */}
+              <div className="overflow-x-auto w-full border border-slate-200/80 rounded-xl bg-slate-100/30">
+                <table className="w-full text-left text-xs border-collapse min-w-[1000px]">
+                  <thead>
+                    <tr className="bg-slate-100 select-none">
+                      <th className="w-10 border border-slate-200 text-center bg-slate-200/60 font-black text-slate-500 text-[10px]"></th>
+                      {Array.from({ length: 11 }).map((_, cIdx) => (
+                        <th
+                          key={cIdx}
+                          className="px-3 py-1.5 border border-slate-200 text-center bg-slate-200/60 font-black text-slate-500 font-mono text-[10px]"
+                        >
+                          {String.fromCharCode(65 + cIdx)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {spreadsheetGrid.map((row, rIdx) => (
+                      <tr key={rIdx} className="bg-white">
+                        {/* Row Index Column */}
+                        <td className="border border-slate-200 text-center bg-slate-100 font-mono font-bold text-slate-400 text-[10px] py-1 select-none">
+                          {rIdx + 1}
+                        </td>
+                        {row.map((cell, cIdx) => {
+                          const isSelected = selectedCell && selectedCell.r === rIdx && selectedCell.c === cIdx;
+                          const isHeader = cell.isHeader;
+                          const isLabel = cell.isLabel;
+                          
+                          let cellStyle = "border border-slate-200 px-2 py-1 text-[11px] font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] transition-all cursor-pointer ";
+                          if (isSelected) {
+                            cellStyle += "ring-2 ring-indigo-500 bg-indigo-50/40 z-10 relative ";
+                          } else if (isHeader) {
+                            cellStyle += "bg-slate-50 font-black text-slate-700 text-center font-sans tracking-wide uppercase ";
+                          } else if (isLabel) {
+                            cellStyle += "bg-slate-50/50 font-bold text-slate-500 font-sans ";
+                          } else if (cell.value && String(cell.value).startsWith('=')) {
+                            cellStyle += "font-bold text-indigo-700 bg-indigo-50/20 ";
+                          } else {
+                            cellStyle += "text-slate-650 hover:bg-slate-50/50 ";
+                          }
+
+                          return (
+                            <td
+                              key={cIdx}
+                              onClick={() => {
+                                setSelectedCell({ r: rIdx, c: cIdx });
+                              }}
+                              className={cellStyle}
+                              title={cell.value ? `Val: ${cell.value}\nComputed: ${cell.computed}` : ''}
+                            >
+                              {cell.computed !== undefined
+                                ? ( (cIdx === 9 || cIdx === 10) && !isNaN(parseFloat(cell.computed)) && !isHeader
+                                  ? formatRupiah(parseFloat(cell.computed))
+                                  : cell.computed )
+                                : cell.value}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
       </div>

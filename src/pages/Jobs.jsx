@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Kanban, Download } from 'lucide-react';
+import { Kanban, Download, Grid } from 'lucide-react';
 import apiClient from '../api/apiClient';
 
 // ─── Hook & Komponen ──────────────────────────────────────
@@ -11,8 +11,6 @@ import ManagerTable from '../components/jobs/ManagerTable';
 import EditJobModal from '../components/jobs/modals/EditJobModal';
 import ForwardJobModal from '../components/jobs/modals/ForwardJobModal';
 import WorkspaceModal from '../components/jobs/modals/WorkspaceModal';
-import AdminOtpModal from '../components/jobs/modals/AdminOtpModal';
-import StaffOtpModal from '../components/jobs/modals/StaffOtpModal';
 import QueueStartModal from '../components/jobs/modals/QueueStartModal';
 import FailedDetailModal from '../components/jobs/modals/FailedDetailModal';
 import FailedReasonModal from '../components/jobs/modals/FailedReasonModal';
@@ -49,27 +47,220 @@ export default function Jobs() {
   const [editJob, setEditJob] = useState(null);
   const [forwardJob, setForwardJob] = useState(null);
   const [workspaceJob, setWorkspaceJob] = useState(null); // { job, orderItemData, fromStart }
-  const [adminOtpModal, setAdminOtpModal] = useState(null); // { job, otpCode }
-  const [staffOtpModal, setStaffOtpModal] = useState(null); // { job }
   const [queueStartJob, setQueueStartJob] = useState(null); // { job, orderInfo }
   const [failedDetailJob, setFailedDetailJob] = useState(null); // { job, orderInfo }
   const [failedReasonJob, setFailedReasonJob] = useState(null); // { job, orderInfo, pendingData }
   const [workspaceReviewJob, setWorkspaceReviewJob] = useState(null); // { job, orderItemData }
 
+  // ─── Spreadsheet States & Functions ───────────
+  const [viewMode, setViewMode] = useState('standard'); // 'standard' | 'spreadsheet'
+  const [spreadsheetGrid, setSpreadsheetGrid] = useState([]);
+  const [selectedCell, setSelectedCell] = useState(null); // { r, c }
+  const [pivotConfig, setPivotConfig] = useState({
+    rowField: 'staff',
+    valField: 'insentif',
+    aggType: 'sum',
+  });
+
+  const evaluateCell = (formulaStr, currentGrid) => {
+    if (!formulaStr || !String(formulaStr).startsWith('=')) {
+      return formulaStr;
+    }
+    const cleanFormula = String(formulaStr).substring(1).toUpperCase().trim();
+    const match = cleanFormula.match(/^([A-Z]+)\(([A-Z]+)(\d+):([A-Z]+)(\d+)\)$/);
+    if (!match) return '#VALUE!';
+    
+    const [_, func, colStartLetter, rowStartStr, colEndLetter, rowEndStr] = match;
+    const startRow = parseInt(rowStartStr) - 1;
+    const endRow = parseInt(rowEndStr) - 1;
+    
+    const letterToIdx = (l) => l.charCodeAt(0) - 65;
+    const startCol = letterToIdx(colStartLetter);
+    const endCol = letterToIdx(colEndLetter);
+    
+    const values = [];
+    for (let r = Math.min(startRow, endRow); r <= Math.max(startRow, endRow); r++) {
+      for (let c = Math.min(startCol, endCol); c <= Math.max(startCol, endCol); c++) {
+        if (currentGrid[r] && currentGrid[r][c]) {
+          const val = parseFloat(currentGrid[r][c].computed || currentGrid[r][c].value || 0);
+          if (!isNaN(val)) values.push(val);
+        }
+      }
+    }
+    
+    if (func === 'SUM') return values.reduce((sum, v) => sum + v, 0);
+    if (func === 'AVERAGE' || func === 'AVG') return values.length > 0 ? (values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(1) : 0;
+    if (func === 'COUNT') return values.length;
+    if (func === 'MIN') return values.length > 0 ? Math.min(...values) : 0;
+    if (func === 'MAX') return values.length > 0 ? Math.max(...values) : 0;
+    return '#REF!';
+  };
+
+  const recalculateGrid = (currentGrid) => {
+    const newGrid = currentGrid.map((row) => row.map((cell) => ({ ...cell })));
+    for (let pass = 0; pass < 2; pass++) {
+      for (let r = 0; r < newGrid.length; r++) {
+        for (let c = 0; c < newGrid[r].length; c++) {
+          const cell = newGrid[r][c];
+          if (cell.value && String(cell.value).startsWith('=')) {
+            cell.computed = String(evaluateCell(cell.value, newGrid));
+          } else {
+            cell.computed = cell.value;
+          }
+        }
+      }
+    }
+    return newGrid;
+  };
+
+  const initSpreadsheetWithJobs = useCallback(() => {
+    const ROWS = 35;
+    const COLS = 10;
+    const grid = [];
+    for (let r = 0; r < ROWS; r++) {
+      const row = [];
+      for (let c = 0; c < COLS; c++) {
+        row.push({ value: '', computed: '' });
+      }
+      grid.push(row);
+    }
+    
+    const headers = [
+      'Job ID',      // A
+      'Order ID',    // B
+      'Customer',    // C
+      'Product',     // D
+      'Stage / Div', // E
+      'PIC Operator',// F
+      'Status',      // G
+      'Duration (m)',// H
+      'Incentive (Rp)', // I
+      'HPP Bahan'    // J
+    ];
+    headers.forEach((h, idx) => {
+      grid[0][idx] = { value: h, computed: h, isHeader: true };
+    });
+    
+    const maxJobs = Math.min(jobs.length, 25);
+    for (let i = 0; i < maxJobs; i++) {
+      const job = jobs[i];
+      const r = i + 1;
+      const order = orderMap[job.order_item] || {};
+      
+      grid[r][0] = { value: job.id || '', computed: String(job.id || '') };
+      grid[r][1] = { value: order.orderId || '', computed: String(order.orderId || '') };
+      grid[r][2] = { value: order.customerName || '', computed: order.customerName || '' };
+      grid[r][3] = { value: order.jenisProduk || '', computed: order.jenisProduk || '' };
+      grid[r][4] = { value: job.tahap_nama || '', computed: job.tahap_nama || '' };
+      grid[r][5] = { value: job.pic_nama || 'Belum Ada', computed: job.pic_nama || 'Belum Ada' };
+      grid[r][6] = { value: job.status_pekerjaan || '', computed: job.status_pekerjaan || '' };
+      grid[r][7] = { value: job.durasi_menit || 0, computed: String(job.durasi_menit || 0) };
+      grid[r][8] = { value: job.insentif || 0, computed: String(job.insentif || 0) };
+      grid[r][9] = { value: job.hpp_bahan || 0, computed: String(job.hpp_bahan || 0) };
+    }
+    
+    const totalRowIdx = maxJobs + 2;
+    if (totalRowIdx < ROWS) {
+      grid[totalRowIdx][0] = { value: 'Total / Rata-rata', computed: 'Total / Rata-rata', isLabel: true };
+      grid[totalRowIdx][7] = { value: `=AVERAGE(H2:H${totalRowIdx})`, computed: '' };
+      grid[totalRowIdx][8] = { value: `=SUM(I2:I${totalRowIdx})`, computed: '' };
+      grid[totalRowIdx][9] = { value: `=SUM(J2:J${totalRowIdx})`, computed: '' };
+      
+      grid[totalRowIdx - 1][7] = { value: 'Avg Dur', computed: 'Avg Dur', isLabel: true };
+      grid[totalRowIdx - 1][8] = { value: 'Total Ins', computed: 'Total Ins', isLabel: true };
+      grid[totalRowIdx - 1][9] = { value: 'Total HPP', computed: 'Total HPP', isLabel: true };
+    }
+    
+    setSpreadsheetGrid(recalculateGrid(grid));
+  }, [jobs, orderMap]);
+
+  useEffect(() => {
+    if (jobs.length > 0) {
+      initSpreadsheetWithJobs();
+    }
+  }, [jobs, initSpreadsheetWithJobs]);
+
+  const generatePivotTable = () => {
+    const groups = {};
+    jobs.forEach((job) => {
+      let key = 'Lainnya';
+      if (pivotConfig.rowField === 'staff') key = job.pic_nama || 'Tanpa PIC';
+      else if (pivotConfig.rowField === 'divisi') key = job.tahap_nama || 'Tanpa Tahap';
+      else if (pivotConfig.rowField === 'produk') {
+        const order = orderMap[job.order_item] || {};
+        key = order.jenisProduk || 'Tanpa Produk';
+      }
+      
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(job);
+    });
+    
+    const ROWS = 35;
+    const COLS = 10;
+    const grid = [];
+    for (let r = 0; r < ROWS; r++) {
+      const row = [];
+      for (let c = 0; c < COLS; c++) {
+        row.push({ value: '', computed: '' });
+      }
+      grid.push(row);
+    }
+    
+    grid[0][0] = { value: pivotConfig.rowField.toUpperCase(), computed: pivotConfig.rowField.toUpperCase(), isHeader: true };
+    grid[0][1] = { value: `${pivotConfig.valField.toUpperCase()} (${pivotConfig.aggType.toUpperCase()})`, computed: `${pivotConfig.valField.toUpperCase()} (${pivotConfig.aggType.toUpperCase()})`, isHeader: true };
+    
+    let currentIdx = 1;
+    Object.keys(groups).forEach((key) => {
+      const gJobs = groups[key];
+      let finalVal = 0;
+      
+      const getVal = (j) => {
+        if (pivotConfig.valField === 'insentif') return j.insentif || 0;
+        if (pivotConfig.valField === 'durasi') return j.durasi_menit || 0;
+        if (pivotConfig.valField === 'qty') return 1;
+        return 0;
+      };
+      
+      if (pivotConfig.aggType === 'sum') {
+        finalVal = gJobs.reduce((sum, j) => sum + getVal(j), 0);
+      } else if (pivotConfig.aggType === 'avg') {
+        const total = gJobs.reduce((sum, j) => sum + getVal(j), 0);
+        finalVal = gJobs.length > 0 ? (total / gJobs.length).toFixed(1) : 0;
+      } else if (pivotConfig.aggType === 'count') {
+        finalVal = gJobs.length;
+      }
+      
+      grid[currentIdx][0] = { value: key, computed: key };
+      grid[currentIdx][1] = { value: finalVal, computed: String(finalVal) };
+      currentIdx++;
+    });
+    
+    grid[currentIdx][0] = { value: 'GRAND TOTAL', computed: 'GRAND TOTAL', isLabel: true };
+    grid[currentIdx][1] = { value: `=SUM(B2:B${currentIdx})`, computed: '' };
+    
+    setSpreadsheetGrid(recalculateGrid(grid));
+  };
+
+  const downloadSpreadsheetCSV = () => {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    spreadsheetGrid.forEach((row) => {
+      const rowData = row.map((cell) => {
+        const val = cell.computed !== undefined ? cell.computed : cell.value;
+        return `"${String(val).replace(/"/g, '""')}"`;
+      }).join(",");
+      csvContent += rowData + "\r\n";
+    });
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `laporan_pekerjaan.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
   // ─── Sync Modal States ──────────────────────────────
   useEffect(() => {
-    if (staffOtpModal) {
-      const updatedJob = jobs.find((j) => j.id === staffOtpModal.job.id);
-      if (updatedJob && JSON.stringify(updatedJob) !== JSON.stringify(staffOtpModal.job)) {
-        setStaffOtpModal((prev) => ({ ...prev, job: updatedJob }));
-      }
-    }
-    if (adminOtpModal) {
-      const updatedJob = jobs.find((j) => j.id === adminOtpModal.job.id);
-      if (updatedJob && JSON.stringify(updatedJob) !== JSON.stringify(adminOtpModal.job)) {
-        setAdminOtpModal((prev) => ({ ...prev, job: updatedJob }));
-      }
-    }
     if (workspaceJob) {
       const updatedJob = jobs.find((j) => j.id === workspaceJob.job.id);
       if (updatedJob && JSON.stringify(updatedJob) !== JSON.stringify(workspaceJob.job)) {
@@ -84,65 +275,6 @@ export default function Jobs() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobs]);
-
-  // ─── OTP Generator ───────────────────────────────────
-  const generateAdminOtp = async (job) => {
-    const otpCode = String(Math.floor(100000 + Math.random() * 900000));
-    try {
-      await apiClient.patch(`/jobs/${job.id}/`, { otp_code: otpCode });
-      await fetchData(true);
-      setAdminOtpModal({ job, otpCode });
-    } catch (err) {
-      const errorMsg =
-        err.response?.data?.error ||
-        err.response?.data?.detail ||
-        JSON.stringify(err.response?.data) ||
-        err.message;
-      alert(`Gagal menyimpan kode OTP ke database: ${errorMsg}`);
-    }
-  };
-
-  // ─── Clear OTP Request when Sent ─────────────────────
-  const handleSendOtp = async (jobId) => {
-    try {
-      await apiClient.patch(`/jobs/${jobId}/`, { otp_sent: true, otp_requested: false });
-      await fetchData(true);
-      setAdminOtpModal(null);
-    } catch (err) {
-      const errorMsg =
-        err.response?.data?.error ||
-        err.response?.data?.detail ||
-        JSON.stringify(err.response?.data) ||
-        err.message;
-      alert(`Gagal mengirim OTP: ${errorMsg}`);
-    }
-  };
-
-  // ─── Staff request OTP ────────────────────────────────
-  const handleRequestOtp = async (jobId) => {
-    try {
-      await apiClient.patch(`/jobs/${jobId}/`, {
-        otp_requested: true,
-        otp_sent: false,
-        otp_code: '',
-      });
-      await fetchData(true);
-      alert('Permintaan OTP berhasil dikirim ke Admin!');
-    } catch (err) {
-      const errorMsg =
-        err.response?.data?.error ||
-        err.response?.data?.detail ||
-        JSON.stringify(err.response?.data) ||
-        err.message;
-      alert(`Gagal meminta OTP: ${errorMsg}`);
-    }
-  };
-
-  // ─── Staff OTP verify → buka ForwardModal ────────────
-  const handleStaffVerifyOtp = (job) => {
-    setStaffOtpModal(null);
-    setForwardJob(job);
-  };
 
   // ─── Buka workspace sesuai kolom status ──────────────
   const openWorkspace = (job) => {
@@ -331,24 +463,269 @@ export default function Jobs() {
               : 'Selesaikan job dan minta OTP Admin untuk lanjut proses'}
           </p>
         </div>
-        {isManager && (
-          <button
-            onClick={handleExport}
-            disabled={exporting}
-            className="flex items-center gap-1.5 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-md px-2.5 py-1.5 text-[11px] font-bold hover:bg-emerald-100 shadow-sm disabled:opacity-50"
-          >
-            <Download size={12} /> {exporting ? 'Exporting...' : 'Export Excel'}
-          </button>
-        )}
+        
+        <div className="flex items-center gap-3">
+          {/* View Toggles */}
+          <div className="flex border border-slate-200 rounded-lg p-0.5 bg-slate-50 text-[10px] font-bold">
+            <button
+              onClick={() => setViewMode('standard')}
+              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                viewMode === 'standard'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              {isManager ? 'Table View' : 'Kanban View'}
+            </button>
+            <button
+              onClick={() => setViewMode('spreadsheet')}
+              className={`px-3 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
+                viewMode === 'spreadsheet'
+                  ? 'bg-white text-emerald-700 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Grid size={10} className="text-emerald-500" />
+              Spreadsheet
+            </button>
+          </div>
+
+          {isManager && (
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="flex items-center gap-1.5 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-md px-2.5 py-1.5 text-[11px] font-bold hover:bg-emerald-100 shadow-sm disabled:opacity-50 cursor-pointer"
+            >
+              <Download size={12} /> {exporting ? 'Exporting...' : 'Export Excel'}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* ── View berdasarkan role ── */}
-      {isManager ? (
+      {/* ── View berdasarkan role dan viewMode ── */}
+      {viewMode === 'spreadsheet' ? (
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 h-[calc(100vh-140px)] animate-fade-in">
+          {/* Formula and Control Panel */}
+          <div className="p-4 bg-slate-50/50 border-b border-slate-200 space-y-3 shrink-0">
+            <div className="flex flex-wrap gap-4 items-center justify-between">
+              <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-xl p-2 shadow-3xs">
+                <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider pl-1">
+                  Config Pivot
+                </div>
+                <div className="h-6 w-px bg-slate-200"></div>
+                
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-500 font-bold">Baris:</span>
+                  <select
+                    value={pivotConfig.rowField}
+                    onChange={(e) => setPivotConfig({ ...pivotConfig, rowField: e.target.value })}
+                    className="border border-slate-250 bg-slate-50 rounded px-2.5 py-1 text-slate-700 font-bold outline-none text-xs"
+                  >
+                    <option value="staff">Staf PIC</option>
+                    <option value="divisi">Tahap Divisi</option>
+                    <option value="produk">Produk / Jenis</option>
+                  </select>
+                </div>
+                
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-500 font-bold">Nilai:</span>
+                  <select
+                    value={pivotConfig.valField}
+                    onChange={(e) => setPivotConfig({ ...pivotConfig, valField: e.target.value })}
+                    className="border border-slate-250 bg-slate-50 rounded px-2.5 py-1 text-slate-700 font-bold outline-none text-xs"
+                  >
+                    <option value="insentif">Insentif (Rp)</option>
+                    <option value="durasi">Durasi (Menit)</option>
+                    <option value="qty">Banyak Pekerjaan</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-500 font-bold">Agregasi:</span>
+                  <select
+                    value={pivotConfig.aggType}
+                    onChange={(e) => setPivotConfig({ ...pivotConfig, aggType: e.target.value })}
+                    className="border border-slate-250 bg-slate-50 rounded px-2.5 py-1 text-slate-700 font-bold outline-none text-xs"
+                  >
+                    <option value="sum">SUM</option>
+                    <option value="avg">AVG</option>
+                    <option value="count">COUNT</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={generatePivotTable}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black px-3.5 py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer"
+                >
+                  Pivot Table
+                </button>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={initSpreadsheetWithJobs}
+                  className="bg-white border border-slate-250 hover:bg-slate-50 text-slate-700 text-xs font-bold px-3.5 py-2 rounded-xl shadow-3xs transition-all cursor-pointer border border-slate-200"
+                >
+                  Reset Grid
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadSpreadsheetCSV}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-3xs transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Download size={13} />
+                  Download CSV
+                </button>
+              </div>
+            </div>
+
+            {/* Formula Bar */}
+            <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-4xs">
+              <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest font-mono select-none">
+                {selectedCell ? `${String.fromCharCode(65 + selectedCell.c)}${selectedCell.r + 1}` : 'CELL'}
+              </div>
+              <div className="h-5 w-px bg-slate-200"></div>
+              <div className="text-xs font-bold text-slate-400 font-serif italic select-none">fx</div>
+              <input
+                type="text"
+                value={
+                  selectedCell
+                    ? spreadsheetGrid[selectedCell.r]?.[selectedCell.c]?.value || ''
+                    : ''
+                }
+                disabled={!selectedCell}
+                onChange={(e) => {
+                  if (!selectedCell) return;
+                  const newGrid = spreadsheetGrid.map((row, rIdx) =>
+                    row.map((cell, cIdx) => {
+                      if (rIdx === selectedCell.r && cIdx === selectedCell.c) {
+                        return { ...cell, value: e.target.value };
+                      }
+                      return cell;
+                    })
+                  );
+                  setSpreadsheetGrid(recalculateGrid(newGrid));
+                }}
+                placeholder="Pilih sel di bawah, lalu masukkan nilai manual atau rumus (Cth: =SUM(J2:J12) atau 50000)"
+                className="flex-1 bg-transparent border-none outline-none text-xs font-mono text-slate-800"
+              />
+            </div>
+
+            {/* Interactive Database Actions */}
+            {(() => {
+              const selectedRowJobId = selectedCell && spreadsheetGrid[selectedCell.r]?.[0]?.value;
+              const selectedJob = selectedRowJobId ? jobs.find(j => String(j.id) === String(selectedRowJobId)) : null;
+              if (!selectedJob) return null;
+              return (
+                <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-2.5 flex flex-wrap items-center justify-between gap-3 animate-fade-in shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-indigo-650 bg-indigo-600 animate-pulse"></span>
+                    <span className="text-xs font-bold text-indigo-900">
+                      JOB SELEKTIF: #{selectedJob.id} &bull; {(orderMap[selectedJob.order_item]?.customerName) || 'Klien'} &bull; {(orderMap[selectedJob.order_item]?.jenisProduk) || 'Produk'}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    {!isManager ? (
+                      <button
+                        onClick={() => openWorkspace(selectedJob)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold px-3 py-1 rounded-lg shadow-sm cursor-pointer"
+                      >
+                        Buka Papan Kerja
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setEditJob(selectedJob)}
+                        className="bg-slate-700 hover:bg-slate-800 text-white text-[10px] font-bold px-3 py-1 rounded-lg shadow-sm cursor-pointer"
+                      >
+                        Edit Info Job
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Grid Table */}
+          <div className="overflow-x-auto overflow-y-auto flex-1 bg-slate-100/30 custom-scrollbar">
+            <table className="w-full text-left text-xs border-collapse min-w-[1000px]">
+              <thead>
+                <tr className="bg-slate-100 select-none sticky top-0 z-10">
+                  <th className="w-10 border border-slate-200 text-center bg-slate-200/60 font-black text-slate-500 text-[10px] py-1.5"></th>
+                  {Array.from({ length: 10 }).map((_, cIdx) => (
+                    <th
+                      key={cIdx}
+                      className="px-3 py-1.5 border border-slate-200 text-center bg-slate-200/60 font-black text-slate-500 font-mono text-[10px]"
+                    >
+                      {String.fromCharCode(65 + cIdx)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {spreadsheetGrid.map((row, rIdx) => (
+                  <tr key={rIdx} className="bg-white">
+                    {/* Row Index Column */}
+                    <td className="border border-slate-200 text-center bg-slate-100 font-mono font-bold text-slate-400 text-[10px] py-1 select-none">
+                      {rIdx + 1}
+                    </td>
+                    {row.map((cell, cIdx) => {
+                      const isSelected = selectedCell && selectedCell.r === rIdx && selectedCell.c === cIdx;
+                      const isHeader = cell.isHeader;
+                      const isLabel = cell.isLabel;
+                      
+                      let cellStyle = "border border-slate-200 px-2 py-1 text-[11px] font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] transition-all cursor-pointer ";
+                      if (isSelected) {
+                        cellStyle += "ring-2 ring-indigo-500 bg-indigo-50/40 z-10 relative ";
+                      } else if (isHeader) {
+                        cellStyle += "bg-slate-50 font-black text-slate-700 text-center font-sans tracking-wide uppercase ";
+                      } else if (isLabel) {
+                        cellStyle += "bg-slate-50/50 font-bold text-slate-500 font-sans ";
+                      } else if (cell.value && String(cell.value).startsWith('=')) {
+                        cellStyle += "font-bold text-indigo-700 bg-indigo-50/20 ";
+                      } else {
+                        cellStyle += "text-slate-650 hover:bg-slate-50/50 ";
+                      }
+
+                      const formatRupiah = (number) => {
+                        return new Intl.NumberFormat('id-ID', {
+                          style: 'currency',
+                          currency: 'IDR',
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0,
+                        }).format(number);
+                      };
+
+                      return (
+                        <td
+                          key={cIdx}
+                          onClick={() => {
+                            setSelectedCell({ r: rIdx, c: cIdx });
+                          }}
+                          className={cellStyle}
+                          title={cell.value ? `Val: ${cell.value}\nComputed: ${cell.computed}` : ''}
+                        >
+                          {cell.computed !== undefined
+                            ? ( (cIdx === 8 || cIdx === 9) && !isNaN(parseFloat(cell.computed)) && !isHeader
+                              ? formatRupiah(parseFloat(cell.computed))
+                              : cell.computed )
+                            : cell.value}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : isManager ? (
         <ManagerTable
           jobs={jobs}
           orderMap={orderMap}
           staffList={staffList}
-          onGenerateOtp={generateAdminOtp}
           onEdit={setEditJob}
         />
       ) : (
@@ -399,21 +776,7 @@ export default function Jobs() {
           MODALS
       ════════════════════════════════════════ */}
 
-      <AdminOtpModal
-        modal={adminOtpModal}
-        orderMap={orderMap}
-        staffList={staffList}
-        onSendOtp={handleSendOtp}
-        onClose={() => setAdminOtpModal(null)}
-      />
-
-      <StaffOtpModal
-        modal={staffOtpModal}
-        orderMap={orderMap}
-        onSubmit={handleStaffVerifyOtp}
-        onRequestOtp={handleRequestOtp}
-        onClose={() => setStaffOtpModal(null)}
-      />
+      {/* OTP Modals Removed */}
 
       <ForwardJobModal
         job={forwardJob}
@@ -462,7 +825,6 @@ export default function Jobs() {
               else alert(result.error);
             }
           }}
-          onRequestOtp={handleRequestOtp}
           onVerifySuccess={(job) => {
             setWorkspaceJob(null);
             setForwardJob(job);

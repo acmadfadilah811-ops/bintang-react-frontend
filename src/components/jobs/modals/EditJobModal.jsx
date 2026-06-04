@@ -26,6 +26,8 @@ export default function EditJobModal({
 
   if (!job) return null;
   const orderInfo = orderMap[job.order_item];
+  // Job yang sudah selesai/batal tidak bisa dibalik statusnya
+  const isLocked = ['selesai', 'batal', 'gagal'].includes(job.status_pekerjaan);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -53,21 +55,36 @@ export default function EditJobModal({
             <label className="block text-xs font-bold text-slate-700 mb-1">
               Status Pekerjaan Internal
             </label>
-            <select
-              value={formData.status_pekerjaan}
-              onChange={(e) => setFormData((f) => ({ ...f, status_pekerjaan: e.target.value }))}
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            >
-              {STAFF_COLUMNS.map((col) => (
-                <option key={col.id} value={col.id}>
-                  {col.label}
-                </option>
-              ))}
-            </select>
+            {isLocked ? (
+              <div className="flex items-center gap-2">
+                <span className={`px-3 py-1.5 rounded-lg text-xs font-extrabold border uppercase tracking-wide ${
+                  job.status_pekerjaan === 'selesai'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : job.status_pekerjaan === 'gagal'
+                      ? 'bg-rose-50 text-rose-700 border-rose-200'
+                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                }`}>
+                  {job.status_pekerjaan === 'selesai' ? '✓ Selesai' : job.status_pekerjaan === 'gagal' ? '✗ Gagal' : 'Dibatalkan'}
+                </span>
+                <span className="text-[10px] text-slate-400 italic">Status terkunci — tidak dapat diubah</span>
+              </div>
+            ) : (
+              <select
+                value={formData.status_pekerjaan}
+                onChange={(e) => setFormData((f) => ({ ...f, status_pekerjaan: e.target.value }))}
+                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              >
+                {STAFF_COLUMNS.map((col) => (
+                  <option key={col.id} value={col.id}>
+                    {col.label}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
-          {/* FIX: Tahap Divisi — sekarang bisa diubah */}
-          {isManager && (
+          {/* FIX: Tahap Divisi — hanya tampil jika belum selesai */}
+          {isManager && !isLocked && (
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 Tahap / Divisi Saat Ini

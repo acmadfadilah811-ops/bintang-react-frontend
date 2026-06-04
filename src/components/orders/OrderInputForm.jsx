@@ -46,6 +46,28 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
   useEffect(() => {
     if (isOpen) {
       fetchPrices();
+      setFormData({
+        waktu: new Date().toISOString().slice(0, 16), // Format YYYY-MM-DDTHH:MM
+        nomor_wa: '',
+        nama: '',
+        catatan_pelanggan: '',
+        metode_pembayaran: 'tunai',
+        status_global: 'review',
+        dp_dibayar: 0,
+        diskon_persen: 0,
+        items: [
+          {
+            jenis_produk: '',
+            bahan: '',
+            panjang: 0,
+            lebar: 0,
+            harga_per_m2: 0,
+            qty: 1,
+            keterangan_detail: '',
+            is_meteran: true,
+          },
+        ],
+      });
     }
   }, [isOpen]);
 
@@ -101,6 +123,7 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
     nama: '',
     catatan_pelanggan: '',
     metode_pembayaran: 'tunai',
+    status_global: 'review',
     dp_dibayar: 0,
     diskon_persen: 0,
     items: [
@@ -197,7 +220,7 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
         waktu: new Date(formData.waktu).toISOString(),
         catatan_pelanggan: formData.catatan_pelanggan,
         metode_pembayaran: formData.metode_pembayaran,
-        status_global: 'review',
+        status_global: formData.status_global || 'review',
         dp_dibayar: parseInt(formData.dp_dibayar) || 0,
         diskon_persen: parseFloat(formData.diskon_persen) || 0,
       });
@@ -527,6 +550,22 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
               <div className="space-y-4 mb-6">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-400 mb-1.5 uppercase">
+                    Klasifikasi / Status Order
+                  </label>
+                  <select
+                    value={formData.status_global}
+                    onChange={(e) =>
+                      setFormData({ ...formData, status_global: e.target.value })
+                    }
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-md text-[13px] text-white outline-none focus:ring-1 focus:ring-slate-500 cursor-pointer"
+                  >
+                    <option value="review">Fix Order (Menunggu Review)</option>
+                    <option value="draft">Draft Penawaran</option>
+                    <option value="quotation">Kirim Penawaran (Quotation)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 mb-1.5 uppercase">
                     Metode Pembayaran
                   </label>
                   <select
@@ -534,7 +573,7 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
                     onChange={(e) =>
                       setFormData({ ...formData, metode_pembayaran: e.target.value })
                     }
-                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-md text-[13px] text-white outline-none focus:ring-1 focus:ring-slate-500"
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-md text-[13px] text-white outline-none focus:ring-1 focus:ring-slate-500 cursor-pointer"
                   >
                     <option value="tunai">Tunai / Cash</option>
                     <option value="transfer">Transfer Bank</option>

@@ -1,3 +1,5 @@
+import { MapPin } from 'lucide-react';
+
 /**
  * JobCard — Kartu job minimal di papan kanban staff.
  * Props: job, orderInfo, onOpenWorkspace
@@ -24,7 +26,10 @@ export default function JobCard({ job, orderInfo, onOpenWorkspace }) {
         {orderInfo?.jenisProduk || '...'}
       </p>
       {job?.tahap_nama && (
-        <p className="text-[9px] text-slate-400 truncate mt-0.5">📍 {job.tahap_nama}</p>
+        <p className="text-[9px] text-slate-400 mt-0.5 flex items-center">
+          <MapPin size={10} className="mr-1 text-slate-400 shrink-0" />
+          <span className="truncate">{job.tahap_nama}</span>
+        </p>
       )}
     </div>
   );

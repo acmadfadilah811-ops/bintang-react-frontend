@@ -11,18 +11,19 @@ import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import StaffDashboard from './pages/StaffDashboard';
 import Orders from './pages/Orders';
-import Jobs from './pages/Jobs';
 import Inventory from './pages/Inventory';
 import Customers from './pages/Customers';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import Employees from './pages/Employees';
+import Payroll from './pages/Payroll';
 import Attendance from './pages/Attendance';
 import BukuBesar from './pages/BukuBesar';
 import Announcements from './pages/Announcements';
 import Pricelist from './pages/Pricelist';
 import Divisi from './pages/Divisi';
 import Reports from './pages/Reports';
+import Komplain from './pages/Komplain';
 import { useAuth } from './context/AuthContext';
 import ProductionApp from './pages/produksi/ProductionApp';
 
@@ -181,15 +182,17 @@ function App() {
                 {/* Operasional */}
                 <Route path="/orders" element={<Orders />} />
                 <Route path="/orders/create" element={<Orders />} />
-                <Route path="/jobs" element={<Jobs />} />
+                <Route path="/jobs" element={<Navigate to="/produksi" replace />} />
                 <Route path="/produksi/*" element={<ProductionApp />} />
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/attendance" element={<Attendance />} />
+                <Route path="/komplain" element={<Komplain />} />
 
                 {/* Tim */}
                 <Route path="/customers" element={<Customers />} />
                 <Route path="/users" element={<Employees />} />
                 <Route path="/employees" element={<Employees />} />
+                <Route path="/payroll" element={<Payroll />} />
                 <Route path="/divisi" element={<Divisi />} />
 
                 {/* Laporan & Lainnya */}

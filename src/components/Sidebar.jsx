@@ -22,6 +22,7 @@ import {
   ChevronDown,
   BarChart3,
   Layers,
+  AlertTriangle,
 } from 'lucide-react';
 
 const groupedMenuOwnerManager = [
@@ -33,8 +34,9 @@ const groupedMenuOwnerManager = [
     isGroup: true,
     submenus: [
       { path: '/orders', label: 'Pesanan', icon: ShoppingCart },
-      { path: '/produksi', label: 'Papan Produksi', icon: Kanban },
+      { path: '/produksi', label: 'Papan Kerja (SPK)', icon: Kanban },
       { path: '/customers', label: 'Pelanggan', icon: User },
+      { path: '/komplain', label: 'Komplain & Garansi', icon: AlertTriangle },
     ],
   },
   {
@@ -45,6 +47,7 @@ const groupedMenuOwnerManager = [
     submenus: [
       { path: '/attendance', label: 'Absensi', icon: CalendarClock },
       { path: '/employees', label: 'Karyawan', icon: Briefcase },
+      { path: '/payroll', label: 'Penggajian & BoM', icon: DollarSign },
       { path: '/divisi', label: 'Divisi & Tahap', icon: Layers },
       { path: '/announcements', label: 'Pengumuman', icon: Bell },
       { path: '/reports', label: 'Laporan Kerja', icon: BarChart3 },
@@ -67,13 +70,13 @@ const groupedMenuOwnerManager = [
 
 const menuStaff = [
   { path: '/staff-dashboard', label: 'Dashboard', icon: LayoutDashboard, isGroup: false },
-  { path: '/produksi', label: 'Papan Produksi', icon: Kanban, isGroup: false },
+  { path: '/produksi', label: 'Papan Kerja (SPK)', icon: Kanban, isGroup: false },
   { path: '/profile', label: 'Profil', icon: User, isGroup: false },
 ];
 
 const menuAdmin = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, isGroup: false },
-  { path: '/produksi', label: 'Papan Produksi', icon: Kanban, isGroup: false },
+  { path: '/produksi', label: 'Papan Kerja (SPK)', icon: Kanban, isGroup: false },
   { path: '/profile', label: 'Profil', icon: User, isGroup: false },
   { path: '/settings', label: 'Pengaturan', icon: Settings, isGroup: false },
 ];
@@ -117,6 +120,7 @@ export default function Sidebar() {
     if (path === '/customers') return 'customers';
     if (path === '/attendance') return 'attendance';
     if (path === '/employees') return 'employees';
+    if (path === '/payroll') return 'payroll';
     if (path === '/announcements') return 'announcements';
     if (path === '/reports') return 'reports';
     if (path === '/inventory') return 'inventory';
