@@ -18,6 +18,18 @@ import { useAuth } from '../context/AuthContext';
 export default function Customers() {
   const { user } = useAuth();
   const [customers, setCustomers] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [stats, setStats] = useState({
+    total_customers: 0,
+    total_revenue: 0,
+    avg_order_value: 0,
+    total_piutang: 0,
+    top_customers: [],
+  });
+  const [loadingStats, setLoadingStats] = useState(true);
+
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -59,10 +71,10 @@ export default function Customers() {
   const fetchCustomerOrders = async (phone) => {
     try {
       setLoadingOrders(true);
-      const res = await apiClient.get('/orders/');
-      const filtered = res.data.filter((o) => o.nomor_wa === phone);
-      setCustomerOrders(filtered);
-      await fetchCustomerActivities(filtered);
+      const res = await apiClient.get(`/orders/?nomor_wa=${phone}`);
+      const rawOrders = Array.isArray(res.data) ? res.data : (res.data.results || []);
+      setCustomerOrders(rawOrders);
+      await fetchCustomerActivities(rawOrders);
     } catch (err) {
       console.error('Gagal memuat history order:', err);
     } finally {
@@ -76,12 +88,37 @@ export default function Customers() {
   const [isSavingCustomer, setIsSavingCustomer] = useState(false);
   const [isSavingPayment, setIsSavingPayment] = useState(false);
 
-  const fetchCustomers = async (isSilent = false) => {
+  const fetchStats = async () => {
+    try {
+      setLoadingStats(true);
+      const res = await apiClient.get('/contacts/stats/');
+      setStats(res.data);
+    } catch (err) {
+      console.error('Gagal memuat statistik pelanggan:', err);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  const fetchCustomers = async (isSilent = false, page = 1) => {
     try {
       if (!isSilent) setLoading(true);
-      const res = await apiClient.get('/contacts/');
-      const sorted = res.data.sort((a, b) => (b.total_spent || 0) - (a.total_spent || 0));
-      setCustomers(sorted);
+      const res = await apiClient.get(
+        `/contacts/?page=${page}&page_size=50&search=${encodeURIComponent(searchTerm)}&tab=${activeCustomerTab}`
+      );
+      if (res.data && res.data.results) {
+        setCustomers(res.data.results);
+        setTotalCount(res.data.count);
+        setTotalPages(Math.ceil(res.data.count / 50));
+      } else {
+        // Fallback jika pagination dinonaktifkan di backend
+        const sorted = Array.isArray(res.data)
+          ? res.data.sort((a, b) => (b.total_spent || 0) - (a.total_spent || 0))
+          : [];
+        setCustomers(sorted);
+        setTotalCount(sorted.length);
+        setTotalPages(1);
+      }
     } catch (err) {
       console.error('Gagal memuat data pelanggan:', err);
     } finally {
@@ -89,35 +126,37 @@ export default function Customers() {
     }
   };
 
+  // Load stats once on mount
   useEffect(() => {
-    fetchCustomers();
-
-    // Polling background setiap 10 detik agar data selalu real-time dan up-to-date
-    const intervalId = setInterval(() => {
-      fetchCustomers(true); // Silent refresh
-    }, 10000);
-
-    return () => clearInterval(intervalId);
+    fetchStats();
   }, []);
 
-  const filteredCustomers = customers.filter((customer) => {
-    const matchesSearch =
-      customer.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.nomor_wa.includes(searchTerm) ||
-      (customer.keterangan || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTab =
-      activeCustomerTab === 'all' ||
-      (activeCustomerTab === 'piutang' && (customer.total_piutang || 0) > 0);
-    return matchesSearch && matchesTab;
-  });
+  // Fetch customers when page, active tab or search changes (with debounced/direct trigger)
+  useEffect(() => {
+    fetchCustomers(false, currentPage);
+  }, [currentPage, activeCustomerTab]);
 
-  const topCustomers = customers.slice(0, 5);
-  const totalRevenue = customers.reduce((sum, c) => sum + (c.total_spent || 0), 0);
-  const totalPiutang = customers.reduce((sum, c) => sum + (c.total_piutang || 0), 0);
-  const avgOrderValue =
-    customers.reduce((sum, c) => sum + (c.total_order || 0), 0) > 0
-      ? totalRevenue / customers.reduce((sum, c) => sum + (c.total_order || 0), 0)
-      : 0;
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchCustomers(true, 1);
+  }, [searchTerm]);
+
+  // Polling data real-time
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchCustomers(true, currentPage);
+      fetchStats();
+    }, 15000);
+
+    return () => clearInterval(intervalId);
+  }, [currentPage, searchTerm, activeCustomerTab]);
+
+  const filteredCustomers = customers;
+
+  const topCustomers = stats.top_customers || [];
+  const totalRevenue = stats.total_revenue || 0;
+  const totalPiutang = stats.total_piutang || 0;
+  const avgOrderValue = stats.avg_order_value || 0;
 
   const handleAddCustomer = async () => {
     if (!newCustomer.name || !newCustomer.phone) return;
@@ -392,7 +431,7 @@ export default function Customers() {
                 </button>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Menampilkan {filteredCustomers.length} pelanggan
+                Total {totalCount} pelanggan
               </p>
             </div>
             <div className="relative w-full sm:w-56">
@@ -530,6 +569,59 @@ export default function Customers() {
               </tbody>
             </table>
           </div>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-t border-slate-200">
+              <div className="text-xs text-slate-500">
+                Menampilkan <span className="font-semibold">{Math.min(totalCount, (currentPage - 1) * 50 + 1)}</span> sampai{' '}
+                <span className="font-semibold">{Math.min(totalCount, currentPage * 50)}</span> dari{' '}
+                <span className="font-semibold">{totalCount}</span> pelanggan
+              </div>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-2.5 py-1 text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white rounded transition-colors cursor-pointer"
+                >
+                  Sebelumnya
+                </button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, idx) => {
+                  let targetPage = currentPage;
+                  if (currentPage <= 3) {
+                    targetPage = idx + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    targetPage = totalPages - 4 + idx;
+                  } else {
+                    targetPage = currentPage - 2 + idx;
+                  }
+                  
+                  if (targetPage < 1 || targetPage > totalPages) return null;
+                  
+                  return (
+                    <button
+                      key={targetPage}
+                      onClick={() => setCurrentPage(targetPage)}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded border transition-colors cursor-pointer ${
+                        currentPage === targetPage
+                          ? 'bg-slate-800 border-slate-800 text-white'
+                          : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      {targetPage}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-2.5 py-1 text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white rounded transition-colors cursor-pointer"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Column: Top Customers */}

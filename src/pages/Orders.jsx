@@ -29,6 +29,23 @@ export default function Orders() {
   const location = useLocation();
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [statsData, setStatsData] = useState({
+    total_count: 0,
+    total_piutang: 0,
+    piutang_count: 0,
+    draft: 0,
+    quotation: 0,
+    review: 0,
+    desain: 0,
+    proses: 0,
+    ready: 0,
+    selesai: 0,
+    batal: 0,
+  });
+  const [loadingStats, setLoadingStats] = useState(true);
   const [staffList, setStaffList] = useState([]);
 
   useEffect(() => {
@@ -93,22 +110,43 @@ export default function Orders() {
 
   const isManager = ['owner', 'manager'].includes(user?.role);
 
-  // Fetch Data API
-  const fetchOrders = async () => {
+  const fetchStats = async () => {
     try {
-      setLoading(true);
-      const res = await apiClient.get('/orders/');
-      setOrders(res.data);
+      setLoadingStats(true);
+      const res = await apiClient.get('/orders/stats/');
+      setStatsData(res.data);
     } catch (err) {
-      console.error('Gagal menarik data:', err);
+      console.error('Gagal menarik statistik orders:', err);
     } finally {
-      setLoading(false);
+      setLoadingStats(false);
+    }
+  };
+
+  const fetchOrders = async (isSilent = false, page = 1) => {
+    try {
+      if (!isSilent) setLoading(true);
+      const res = await apiClient.get(
+        `/orders/?page=${page}&page_size=50&search=${encodeURIComponent(searchQuery)}&tab=${activeTab}`
+      );
+      if (res.data && res.data.results) {
+        setOrders(res.data.results);
+        setTotalCount(res.data.count);
+        setTotalPages(Math.ceil(res.data.count / 50));
+      } else {
+        const raw = Array.isArray(res.data) ? res.data : [];
+        setOrders(raw);
+        setTotalCount(raw.length);
+        setTotalPages(1);
+      }
+    } catch (err) {
+      console.error('Gagal menarik data orders:', err);
+    } finally {
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchOrders();
-    // Fetch daftar staff untuk dropdown assign
+    fetchStats();
     apiClient
       .get('/users/')
       .then((res) => {
@@ -116,6 +154,25 @@ export default function Orders() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    fetchOrders(false, currentPage);
+  }, [currentPage, activeTab]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchOrders(true, 1);
+  }, [searchQuery]);
+
+  // Polling data real-time
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchOrders(true, currentPage);
+      fetchStats();
+    }, 15000);
+
+    return () => clearInterval(intervalId);
+  }, [currentPage, searchQuery, activeTab]);
 
   // Tutup dropdown jika user klik di luar area tabel
   useEffect(() => {
@@ -137,52 +194,21 @@ export default function Orders() {
   };
 
   const stats = useMemo(() => {
-    const counts = {
-      draft: 0,
-      quotation: 0,
-      pending: 0,
-      desain: 0,
-      progress: 0,
-      ready: 0,
-      completed: 0,
-      cancelled: 0,
-      piutang: 0,
-      total_piutang_amount: 0,
+    return {
+      draft: statsData.draft || 0,
+      quotation: statsData.quotation || 0,
+      pending: statsData.review || 0,
+      desain: statsData.desain || 0,
+      progress: statsData.proses || 0,
+      ready: statsData.ready || 0,
+      completed: statsData.selesai || 0,
+      cancelled: statsData.batal || 0,
+      piutang: statsData.piutang_count || 0,
+      total_piutang_amount: statsData.total_piutang || 0,
     };
-    orders.forEach((order) => {
-      const type = getStatusType(order.status_global);
-      if (type === 'draft') counts.draft++;
-      if (type === 'quotation') counts.quotation++;
-      if (type === 'pending') counts.pending++;
-      if (type === 'desain') counts.desain++;
-      if (type === 'printing') counts.progress++;
-      if (type === 'ready') counts.ready++;
-      if (type === 'completed') counts.completed++;
-      if (type === 'cancelled') counts.cancelled++;
+  }, [statsData]);
 
-      if (order.sisa_tagihan > 0 && order.status_global !== 'batal') {
-        counts.piutang++;
-        counts.total_piutang_amount += order.sisa_tagihan;
-      }
-    });
-    return counts;
-  }, [orders]);
-
-  const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
-      const searchData = `${order.id} ${(order.nama || '').toLowerCase()} ${(order.nomor_wa || '').toLowerCase()}`;
-      const matchesSearch = searchData.includes(searchQuery.toLowerCase());
-
-      const type = getStatusType(order.status_global);
-      const matchesTab =
-        activeTab === 'all' ||
-        (activeTab === 'piutang'
-          ? order.sisa_tagihan > 0 && order.status_global !== 'batal'
-          : type === activeTab);
-
-      return matchesSearch && matchesTab;
-    });
-  }, [orders, searchQuery, activeTab]);
+  const filteredOrders = orders;
 
   const renderBadge = (statusText = '') => {
     const type = getStatusType(statusText);
@@ -660,6 +686,59 @@ export default function Orders() {
               )}
             </tbody>
           </table>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-t border-slate-200">
+              <div className="text-xs text-slate-500">
+                Menampilkan <span className="font-semibold">{Math.min(totalCount, (currentPage - 1) * 50 + 1)}</span> sampai{' '}
+                <span className="font-semibold">{Math.min(totalCount, currentPage * 50)}</span> dari{' '}
+                <span className="font-semibold">{totalCount}</span> pesanan
+              </div>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-2.5 py-1 text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white rounded transition-colors cursor-pointer"
+                >
+                  Sebelumnya
+                </button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, idx) => {
+                  let targetPage = currentPage;
+                  if (currentPage <= 3) {
+                    targetPage = idx + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    targetPage = totalPages - 4 + idx;
+                  } else {
+                    targetPage = currentPage - 2 + idx;
+                  }
+                  
+                  if (targetPage < 1 || targetPage > totalPages) return null;
+                  
+                  return (
+                    <button
+                      key={targetPage}
+                      onClick={() => setCurrentPage(targetPage)}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded border transition-colors cursor-pointer ${
+                        currentPage === targetPage
+                          ? 'bg-slate-800 border-slate-800 text-white'
+                          : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      {targetPage}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-2.5 py-1 text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white rounded transition-colors cursor-pointer"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
