@@ -53,9 +53,14 @@ export default function WhatsAppChat() {
         : response.data?.chats || response.data?.records || [];
 
       // Sort chats by date (newest first) if available
-      const sortedChats = data.map(chat => {
+      const sortedChats = data.filter(Boolean).map(chat => {
         const timestamp = chat.messageTimestamp || chat.updatedAt || chat.createdAt;
-        return { ...chat, resolvedTimestamp: timestamp ? new Date(timestamp * 1000).getTime() : 0 };
+        const jid = chat.remoteJid || chat.id || '';
+        return { 
+          ...chat, 
+          id: jid,
+          resolvedTimestamp: timestamp ? new Date(timestamp * 1000).getTime() : 0 
+        };
       }).sort((a, b) => b.resolvedTimestamp - a.resolvedTimestamp);
 
       setChats(sortedChats);
