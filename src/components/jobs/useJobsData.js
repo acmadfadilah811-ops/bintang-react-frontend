@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import apiClient from '../../api/apiClient';
 import { STAFF_COLUMNS } from './jobConstants';
+import { playSuccess } from '../../utils/notificationSounds';
 
 /**
  * useJobsData — Custom hook untuk semua state & handler di halaman Jobs.
@@ -18,29 +19,25 @@ export function useJobsData() {
   const [staffList, setStaffList] = useState([]);
 
   const playNotificationSound = (filename) => {
-    try {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      const cleanBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-      const audio = new Audio(`${cleanBase}audio/${filename}`);
-      audio.play().catch((e) => console.log('Autoplay dicegah oleh browser, abaikan.', e));
-    } catch (error) {
-      console.log('Gagal memutar audio', error);
-    }
+    // Legacy fallback wrapper — routes to Web Audio API utility
+    if (filename === 'selesai.mp3') playSuccess();
   };
 
   // ─── Fetch utama ──────────────────────────────────────
   const fetchData = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      // Gunakan allSettled agar jika /orders/ gagal 403 (staff belum clock-in),
-      // papan produksi tetap bisa tampil dengan data jobs saja.
       const [jobsRes, ordersRes] = await Promise.allSettled([
         apiClient.get('/jobs/'),
         apiClient.get('/orders/'),
       ]);
 
       if (jobsRes.status === 'fulfilled') {
-        setJobs(jobsRes.value.data);
+        // Handle both paginated and non-paginated responses
+        const rawJobs = Array.isArray(jobsRes.value.data)
+          ? jobsRes.value.data
+          : (jobsRes.value.data?.results ?? []);
+        setJobs(rawJobs);
         setError(null);
       } else {
         console.error('Gagal memuat data jobs:', jobsRes.reason);
@@ -52,8 +49,11 @@ export function useJobsData() {
       }
 
       if (ordersRes.status === 'fulfilled') {
+        const raw = Array.isArray(ordersRes.value.data)
+          ? ordersRes.value.data
+          : (ordersRes.value.data?.results ?? []);
         const map = {};
-        ordersRes.value.data.forEach((order) => {
+        raw.forEach((order) => {
           order.items?.forEach((item) => {
             map[item.id] = {
               orderItemId: item.id,
@@ -74,7 +74,6 @@ export function useJobsData() {
         });
         setOrderMap(map);
       }
-      // Jika ordersRes gagal (403), orderMap tetap kosong tapi jobs tetap tampil
     } catch (err) {
       console.error('Gagal memuat data jobs:', err);
     } finally {
@@ -82,16 +81,39 @@ export function useJobsData() {
     }
   };
 
+  // ✅ FIX: Add isMounted cleanup to prevent setState on unmounted component
   useEffect(() => {
-    fetchData();
-    apiClient
-      .get('/tahap-proses/')
-      .then((res) => setTahapList(res.data))
-      .catch(() => {});
-    apiClient
-      .get('/users/')
-      .then((res) => setStaffList(res.data.filter((u) => u.role === 'staff')))
-      .catch(() => {});
+    let isMounted = true;
+
+    const init = async () => {
+      if (!isMounted) return;
+      await fetchData();
+
+      if (!isMounted) return;
+      try {
+        const [tahapRes, staffRes] = await Promise.allSettled([
+          apiClient.get('/tahap-proses/'),
+          apiClient.get('/users/'),
+        ]);
+        if (!isMounted) return;
+        if (tahapRes.status === 'fulfilled') {
+          const rawTahap = Array.isArray(tahapRes.value.data)
+            ? tahapRes.value.data
+            : (tahapRes.value.data?.results ?? []);
+          setTahapList(rawTahap);
+        }
+        if (staffRes.status === 'fulfilled') {
+          const rawStaff = Array.isArray(staffRes.value.data)
+            ? staffRes.value.data
+            : (staffRes.value.data?.results ?? []);
+          setStaffList(rawStaff.filter((u) => u.role === 'staff'));
+        }
+      } catch { /* silently ignore */ }
+    };
+
+    init();
+    return () => { isMounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ─── Grouping untuk kanban staff ──────────────────────
