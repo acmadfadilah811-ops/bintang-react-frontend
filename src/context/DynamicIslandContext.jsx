@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { playSoundForType } from '../utils/notificationSounds';
 
 const DynamicIslandContext = createContext(null);
 
@@ -105,23 +106,8 @@ export function DynamicIslandProvider({ children }) {
     // Dismiss current first
     setActiveNotification(null);
 
-    // Play chime sound
-    try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
-      oscillator.frequency.setValueAtTime(800, audioCtx.currentTime + 0.12);
-      gainNode.gain.setValueAtTime(0.06, audioCtx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
-      oscillator.start();
-      oscillator.stop(audioCtx.currentTime + 0.25);
-    } catch (e) {
-      console.warn('Sound blocked by browser:', e);
-    }
+    // Play type-aware notification sound
+    playSoundForType(type);
 
     // Tiny delay to trigger CSS entry animation
     setTimeout(() => {

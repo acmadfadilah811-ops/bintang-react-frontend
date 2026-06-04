@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/apiClient';
-import { Clock, Play, CheckCircle2, XCircle, AlertCircle, MessageSquare } from 'lucide-react';
+import { Clock, Play, CheckCircle2, XCircle, AlertCircle, MessageSquare, Bell } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { playAlert, playSuccess, playReject } from '../../utils/notificationSounds';
 
 export default function AttendanceSessionManager() {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ export default function AttendanceSessionManager() {
   const [actionLoading, setActionLoading] = useState(false);
 
   const canManageSession = ['owner', 'manager'].includes(user?.role?.toLowerCase());
+  const prevRequestCountRef = useRef(null); // Track previous unlock request count
 
   const fetchData = useCallback(async () => {
     try {
@@ -38,7 +40,16 @@ export default function AttendanceSessionManager() {
           `${String(dateMulai.getHours()).padStart(2, '0')}:${String(dateMulai.getMinutes()).padStart(2, '0')}`
         );
       }
-      setUnlockRequests(requestsRes.data);
+      const newRequests = requestsRes.data;
+      setUnlockRequests(newRequests);
+
+      // Play alert sound if new unlock requests have arrived since last poll
+      if (canManageSession && prevRequestCountRef.current !== null) {
+        if (newRequests.length > prevRequestCountRef.current) {
+          playAlert();
+        }
+      }
+      prevRequestCountRef.current = newRequests.length;
     } catch (err) {
       console.error('Gagal mengambil data sesi absensi', err);
     } finally {
@@ -46,9 +57,26 @@ export default function AttendanceSessionManager() {
     }
   }, [canManageSession]);
 
+  // Initial fetch
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Poll every 30 seconds for new unlock requests
+  useEffect(() => {
+    if (!canManageSession) return;
+    const interval = setInterval(() => {
+      apiClient.get('/hr/unlock-requests/').then(res => {
+        const newRequests = res.data;
+        if (prevRequestCountRef.current !== null && newRequests.length > prevRequestCountRef.current) {
+          playAlert();
+          setUnlockRequests(newRequests);
+        }
+        prevRequestCountRef.current = newRequests.length;
+      }).catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [canManageSession]);
 
   const handleStartSession = async () => {
     try {
@@ -70,6 +98,9 @@ export default function AttendanceSessionManager() {
     try {
       setActionLoading(true);
       await apiClient.post(`/hr/unlock-requests/${id}/${action}/`);
+      // Play sound feedback for manager action
+      if (action === 'approve') playSuccess();
+      else if (action === 'reject') playReject();
       await fetchData();
     } catch (err) {
       alert(err.response?.data?.detail || 'Gagal memproses permohonan');

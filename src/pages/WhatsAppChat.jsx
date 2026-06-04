@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, Send, User, Loader, RefreshCw, Phone, MessageSquare, Clock, Paperclip, FileText, X } from 'lucide-react';
 import apiClient from '../api/apiClient';
+import { playMessage } from '../utils/notificationSounds';
 
 export default function WhatsAppChat() {
   const [searchParams] = useSearchParams();
@@ -24,6 +25,7 @@ export default function WhatsAppChat() {
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const prevMessageCountRef = useRef(null); // track incoming message count for sound trigger
 
   // Fetch chats on mount
   useEffect(() => {
@@ -86,6 +88,13 @@ export default function WhatsAppChat() {
         const timeB = b.messageTimestamp || 0;
         return timeA - timeB;
       });
+
+      // Detect new INCOMING messages since last fetch
+      const incomingCount = sortedMessages.filter(m => !m.key?.fromMe && !m.fromMe).length;
+      if (prevMessageCountRef.current !== null && incomingCount > prevMessageCountRef.current) {
+        playMessage();
+      }
+      prevMessageCountRef.current = incomingCount;
 
       setMessages(sortedMessages);
     } catch (error) {
