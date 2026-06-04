@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Send, User, Loader, RefreshCw, Phone, MessageSquare, Clock } from 'lucide-react';
+import { Search, Send, User, Loader, RefreshCw, Phone, MessageSquare, Clock, Paperclip, FileText, X } from 'lucide-react';
 import apiClient from '../api/apiClient';
 
 export default function WhatsAppChat() {
@@ -13,7 +13,13 @@ export default function WhatsAppChat() {
   const [sending, setSending] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Attachment states
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [fileModalOpen, setFileModalOpen] = useState(false);
+  const [fileCaption, setFileCaption] = useState('');
+
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Fetch chats on mount
   useEffect(() => {
@@ -36,14 +42,12 @@ export default function WhatsAppChat() {
     if (showLoader) setLoadingChats(true);
     try {
       const response = await apiClient.get('/whatsapp/chats/');
-      // Evolution API can return array directly or wrapped in an object
       const data = Array.isArray(response.data)
         ? response.data
         : response.data?.chats || response.data?.records || [];
 
       // Sort chats by date (newest first) if available
       const sortedChats = data.map(chat => {
-        // Resolve a readable last message time or timestamp
         const timestamp = chat.messageTimestamp || chat.updatedAt || chat.createdAt;
         return { ...chat, resolvedTimestamp: timestamp ? new Date(timestamp * 1000).getTime() : 0 };
       }).sort((a, b) => b.resolvedTimestamp - a.resolvedTimestamp);
@@ -111,12 +115,66 @@ export default function WhatsAppChat() {
         number: cleanNumber,
         text: textToSend
       });
-      // Fetch fresh messages
       fetchMessages(activeChat.id, false);
       fetchChats(false);
     } catch (error) {
       console.error('Error sending message:', error);
       alert('Gagal mengirim pesan WhatsApp. Pastikan API Gateway aktif.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const triggerFileSelect = () => {
+    fileInputRef.current.click();
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setSelectedFile(file);
+    setFileModalOpen(true);
+    e.target.value = ''; // reset file input
+  };
+
+  const handleSendFileSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedFile || !activeChat || sending) return;
+
+    setSending(true);
+    const cleanNumber = activeChat.id.split('@')[0];
+    
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('number', cleanNumber);
+    formData.append('caption', fileCaption);
+
+    // Optimistically add placeholder
+    const isImage = selectedFile.type.startsWith('image/');
+    const tempMsg = {
+      key: { fromMe: true, id: `temp-${Date.now()}` },
+      message: isImage 
+        ? { imageMessage: { caption: fileCaption || `📷 Gambar: ${selectedFile.name}` } }
+        : { conversation: `📄 Dokumen: ${selectedFile.name}${fileCaption ? ` - ${fileCaption}` : ''}` },
+      messageTimestamp: Math.floor(Date.now() / 1000)
+    };
+    setMessages(prev => [...prev, tempMsg]);
+    
+    setFileModalOpen(false);
+    setFileCaption('');
+    setSelectedFile(null);
+
+    try {
+      await apiClient.post('/whatsapp/send-media/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      fetchMessages(activeChat.id, false);
+      fetchChats(false);
+    } catch (error) {
+      console.error('Error sending media:', error);
+      alert('Gagal mengirim file. Pastikan server media Anda aktif.');
     } finally {
       setSending(false);
     }
@@ -326,7 +384,22 @@ export default function WhatsAppChat() {
 
               {/* Message Send Form */}
               <div className="bg-white border-t border-slate-200 p-4 shrink-0">
-                <form onSubmit={handleSendMessage} className="flex gap-2">
+                <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={triggerFileSelect}
+                    disabled={sending}
+                    className="p-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-500 hover:text-slate-700 rounded-xl transition-all flex items-center justify-center shrink-0 cursor-pointer"
+                    title="Kirim File / Resi / Invoice / Gambar"
+                  >
+                    <Paperclip size={18} />
+                  </button>
                   <input
                     type="text"
                     value={newMessage}
@@ -364,6 +437,89 @@ export default function WhatsAppChat() {
           )}
         </div>
       </div>
+
+      {/* File Upload Confirmation Modal */}
+      {fileModalOpen && selectedFile && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full p-6 relative flex flex-col transform scale-100 transition-all duration-300">
+            <button
+              onClick={() => {
+                setFileModalOpen(false);
+                setSelectedFile(null);
+                setFileCaption('');
+              }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 rounded-full p-1 hover:bg-slate-50 transition-all cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+
+            <h3 className="text-sm font-extrabold text-slate-900 mb-4">
+              Kirim File ke {getChatName(activeChat)}
+            </h3>
+
+            {/* File Info / Preview */}
+            <div className="bg-slate-50 rounded-xl p-4 mb-4 flex flex-col items-center justify-center border border-slate-200/60">
+              {selectedFile.type.startsWith('image/') ? (
+                <img
+                  src={URL.createObjectURL(selectedFile)}
+                  alt="Preview"
+                  className="max-h-48 object-contain rounded-lg shadow-sm mb-2"
+                />
+              ) : (
+                <div className="bg-indigo-50 text-indigo-500 p-4 rounded-full mb-2">
+                  <FileText size={32} />
+                </div>
+              )}
+              <span className="text-xs font-bold text-slate-800 max-w-xs truncate">{selectedFile.name}</span>
+              <span className="text-[10px] text-slate-400 font-bold mt-0.5">
+                {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+              </span>
+            </div>
+
+            {/* Caption Input */}
+            <form onSubmit={handleSendFileSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Teks Keterangan (Opsional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Tambahkan keterangan..."
+                  value={fileCaption}
+                  onChange={(e) => setFileCaption(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-xl text-xs font-semibold focus:outline-none transition-all text-slate-800"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFileModalOpen(false);
+                    setSelectedFile(null);
+                    setFileCaption('');
+                  }}
+                  className="flex-1 py-2.5 border border-slate-200 text-slate-650 hover:bg-slate-50 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={sending}
+                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-600/10 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  {sending ? (
+                    <Loader size={14} className="animate-spin" />
+                  ) : (
+                    <Send size={14} />
+                  )}
+                  Kirim File
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
