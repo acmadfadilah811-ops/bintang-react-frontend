@@ -26,6 +26,7 @@ import Reports from './pages/Reports';
 import Komplain from './pages/Komplain';
 import { useAuth } from './context/AuthContext';
 import ProductionApp from './pages/produksi/ProductionApp';
+import WhatsAppChat from './pages/WhatsAppChat';
 
 let globalAlertTrigger = null;
 
@@ -186,6 +187,7 @@ function App() {
                 <Route path="/produksi/*" element={<ProductionApp />} />
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/attendance" element={<Attendance />} />
+                <Route path="/whatsapp-chat" element={<WhatsAppChat />} />
                 <Route path="/komplain" element={<Komplain />} />
 
                 {/* Tim */}
