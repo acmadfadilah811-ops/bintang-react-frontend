@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/apiClient';
-import { Clock, Play, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Clock, Play, CheckCircle2, XCircle, AlertCircle, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function AttendanceSessionManager() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [sessionData, setSessionData] = useState(null);
   const [unlockRequests, setUnlockRequests] = useState([]);
@@ -236,6 +238,18 @@ export default function AttendanceSessionManager() {
                     >
                       <XCircle size={14} /> Tolak
                     </button>
+                    {req.staff_no_wa && (
+                      <button
+                        onClick={() => {
+                          const cleanNumber = req.staff_no_wa.replace('+', '').replace(' ', '').replace('-', '');
+                          navigate(`/whatsapp-chat?number=${cleanNumber}`);
+                        }}
+                        className="flex-1 flex items-center justify-center gap-1 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded border border-indigo-200 text-[10px] font-bold transition-colors cursor-pointer"
+                        title="Chat Staff via WhatsApp"
+                      >
+                        <MessageSquare size={14} /> Chat Staff
+                      </button>
+                    )}
                   </div>
                 </div>
               ))

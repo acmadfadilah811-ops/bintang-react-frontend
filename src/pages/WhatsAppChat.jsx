@@ -1,8 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Send, User, Loader, RefreshCw, Phone, MessageSquare, Clock, Paperclip, FileText, X } from 'lucide-react';
 import apiClient from '../api/apiClient';
 
 export default function WhatsAppChat() {
+  const [searchParams] = useSearchParams();
+  const targetNumber = searchParams.get('number');
+
   const [chats, setChats] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -53,6 +57,14 @@ export default function WhatsAppChat() {
       }).sort((a, b) => b.resolvedTimestamp - a.resolvedTimestamp);
 
       setChats(sortedChats);
+
+      if (targetNumber) {
+        const matchingChat = sortedChats.find(chat => chat.id.split('@')[0] === targetNumber);
+        if (matchingChat) {
+          setActiveChat(matchingChat);
+          fetchMessages(matchingChat.id, true);
+        }
+      }
     } catch (error) {
       console.error('Error fetching WhatsApp chats:', error);
     } finally {
