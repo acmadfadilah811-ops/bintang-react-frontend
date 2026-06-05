@@ -124,7 +124,7 @@ export default function WhatsAppChat() {
     if (!newMessage.trim() || !activeChat || sending) return;
 
     setSending(true);
-    const cleanNumber = activeChat.id.split('@')[0];
+    const targetJid = activeChat.id;
     const textToSend = newMessage;
     setNewMessage(''); // Clear input immediately for responsiveness
 
@@ -138,7 +138,7 @@ export default function WhatsAppChat() {
 
     try {
       await apiClient.post('/whatsapp/send/', {
-        number: cleanNumber,
+        number: targetJid,
         text: textToSend
       });
       fetchMessages(activeChat.id, false);
@@ -168,11 +168,11 @@ export default function WhatsAppChat() {
     if (!selectedFile || !activeChat || sending) return;
 
     setSending(true);
-    const cleanNumber = activeChat.id.split('@')[0];
+    const targetJid = activeChat.id;
     
     const formData = new FormData();
     formData.append('file', selectedFile);
-    formData.append('number', cleanNumber);
+    formData.append('number', targetJid);
     formData.append('caption', fileCaption);
 
     // Optimistically add placeholder
