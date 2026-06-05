@@ -389,14 +389,12 @@ export default function Orders() {
               <Download className="w-3.5 h-3.5" /> {exporting ? 'Exporting...' : 'Export Excel'}
             </button>
           )}
-          {!isManager && (
-            <button
-              onClick={() => setIsManualModalOpen(true)}
-              className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" /> New Order
-            </button>
-          )}
+          <button
+            onClick={() => setIsManualModalOpen(true)}
+            className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" /> New Order
+          </button>
         </div>
       </div>
 

@@ -213,11 +213,19 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
     try {
       setIsSubmitting(true);
 
+      let parsedWaktu = new Date().toISOString();
+      if (formData.waktu) {
+        const d = new Date(formData.waktu);
+        if (!isNaN(d.getTime())) {
+          parsedWaktu = d.toISOString();
+        }
+      }
+
       // 1. Buat Header Order
       const orderRes = await apiClient.post('/orders/', {
         nomor_wa: formData.nomor_wa,
         nama: formData.nama,
-        waktu: new Date(formData.waktu).toISOString(),
+        waktu: parsedWaktu,
         catatan_pelanggan: formData.catatan_pelanggan,
         metode_pembayaran: formData.metode_pembayaran,
         status_global: formData.status_global || 'review',
