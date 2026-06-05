@@ -86,7 +86,11 @@ export function getPermissions() {
       // Override base dengan data kustom yang tersimpan per-role
       Object.keys(parsed).forEach((role) => {
         if (Array.isArray(parsed[role])) {
-          base[role] = parsed[role];
+          // Gabungkan dengan default permissions baru yang mungkin ditambahkan di update kode terbaru
+          const defaults = DEFAULT_PERMISSIONS[role] || [];
+          const savedPerms = parsed[role];
+          const newDefaults = defaults.filter(p => !savedPerms.includes(p));
+          base[role] = [...savedPerms, ...newDefaults];
         }
       });
     } catch (e) {

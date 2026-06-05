@@ -82,9 +82,8 @@ export default function WhatsAppChat() {
 
   const fetchMessages = async (chatId, showLoader = true) => {
     if (showLoader) setLoadingMessages(true);
-    const cleanNumber = chatId.split('@')[0];
     try {
-      const response = await apiClient.get(`/whatsapp/messages/?number=${cleanNumber}&limit=50`);
+      const response = await apiClient.get(`/whatsapp/messages/?number=${encodeURIComponent(chatId)}&limit=50`);
       const data = Array.isArray(response.data) ? response.data : [];
       
       // Sort messages by timestamp ascending
