@@ -543,7 +543,7 @@ export default function Customers() {
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-slate-500">
-                        {customer.last_order !== '-' ? (
+                        {customer.last_order && customer.last_order !== '-' ? (
                           customer.last_order.split(' ')[0]
                         ) : (
                           <span className="italic">Belum pernah</span>
