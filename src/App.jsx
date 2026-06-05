@@ -133,6 +133,10 @@ function App() {
       try {
         audioFile = new Audio(clickSoundUrl);
         audioFile.volume = 0.15;
+        audioFile.addEventListener('error', () => {
+          console.warn('Audio clickSoundUrl load failed, clearing audioFile reference');
+          audioFile = null;
+        });
       } catch (e) {
         console.warn('Gagal menginisialisasi audio clickSoundUrl:', e);
       }

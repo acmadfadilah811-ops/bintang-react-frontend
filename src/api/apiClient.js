@@ -38,6 +38,18 @@ const processQueue = (error, token = null) => {
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // 1. Timeout / Network / 5xx error handling and client-side labeling
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      console.error('[API Connection Timeout]:', error.config?.url);
+      error.isTimeout = true;
+    } else if (!error.response) {
+      console.error('[API Network Error]: No response received from server. Check internet connection.', error);
+      error.isNetworkError = true;
+    } else if (error.response.status >= 500) {
+      console.error(`[API Server Error ${error.response.status}]:`, error.response.data || error.message);
+      error.isServerError = true;
+    }
+
     const originalRequest = error.config;
 
     // Hanya proses 401 dan yang belum pernah di-retry

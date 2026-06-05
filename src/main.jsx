@@ -17,6 +17,24 @@ class LocalErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     console.error("LocalErrorBoundary caught an uncaught error:", error, errorInfo);
+    
+    // Log uncaught client error to backend database / logs
+    const baseApi = import.meta.env.VITE_API_URL || 'https://bintang-adv.duckdns.org/api';
+    try {
+      fetch(`${baseApi.replace(/\/$/, '')}/log-client-error/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          error: error?.message || String(error),
+          info: errorInfo,
+          url: window.location.href,
+        }),
+      }).catch(err => console.warn('Failed to log client error to backend:', err));
+    } catch (e) {
+      console.warn('Failed to send client error logs:', e);
+    }
   }
 
   render() {
