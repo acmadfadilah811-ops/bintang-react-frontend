@@ -3,10 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { Search, Send, User, Loader, RefreshCw, Phone, MessageSquare, Clock, Paperclip, FileText, X } from 'lucide-react';
 import apiClient from '../api/apiClient';
 import { playMessage } from '../utils/notificationSounds';
+import { useDynamicIsland } from '../context/DynamicIslandContext';
 
 export default function WhatsAppChat() {
   const [searchParams] = useSearchParams();
   const targetNumber = searchParams.get('number');
+  const { triggerNotification } = useDynamicIsland();
 
   const [chats, setChats] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
@@ -97,6 +99,19 @@ export default function WhatsAppChat() {
       const incomingCount = sortedMessages.filter(m => !m.key?.fromMe && !m.fromMe).length;
       if (prevMessageCountRef.current !== null && incomingCount > prevMessageCountRef.current) {
         playMessage();
+        
+        // Trigger Dynamic Island notification
+        const incomingMessages = sortedMessages.filter(m => !m.key?.fromMe && !m.fromMe);
+        const latestMsg = incomingMessages[incomingMessages.length - 1];
+        if (latestMsg) {
+          const senderName = activeChat ? (activeChat.name || activeChat.pushName || activeChat.id.split('@')[0]) : 'Pelanggan';
+          const msgText = getMessageText(latestMsg);
+          triggerNotification({
+            type: 'whatsapp',
+            title: `Pesan WA: ${senderName}`,
+            message: msgText || 'Mengirimkan media',
+          });
+        }
       }
       prevMessageCountRef.current = incomingCount;
 

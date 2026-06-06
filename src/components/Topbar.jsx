@@ -31,6 +31,7 @@ import {
   LogOut,
   Grid,
   ChevronRight,
+  MessageSquare,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -320,13 +321,16 @@ export default function Topbar() {
                     ? 'bg-purple-500/20 text-purple-400'
                     : activeNotification.type === 'attendance'
                       ? 'bg-emerald-500/20 text-emerald-400'
-                      : 'bg-amber-500/20 text-amber-400'
+                      : activeNotification.type === 'message' || activeNotification.type === 'whatsapp'
+                        ? 'bg-emerald-500/20 text-emerald-400'
+                        : 'bg-amber-500/20 text-amber-400'
               }`}
             >
               {activeNotification.type === 'announcement' && <BellRing size={16} />}
               {activeNotification.type === 'job' && <Sparkles size={16} />}
               {activeNotification.type === 'attendance' && <UserCheck size={16} />}
               {activeNotification.type === 'permission' && <AlertCircle size={16} />}
+              {(activeNotification.type === 'message' || activeNotification.type === 'whatsapp') && <MessageSquare size={16} />}
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-[10px] font-black text-slate-200 tracking-wide uppercase leading-none truncate">
