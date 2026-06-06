@@ -5,7 +5,6 @@ import apiClient from '../../../api/apiClient';
 
 // Hook & Komponen
 import { useJobsData } from '../../../components/jobs/useJobsData';
-import ManagerTable from '../../../components/jobs/ManagerTable';
 import EditJobModal from '../../../components/jobs/modals/EditJobModal';
 import ForwardJobModal from '../../../components/jobs/modals/ForwardJobModal';
 
@@ -34,7 +33,6 @@ export default function PapanKerjaSpkPanel() {
   const [forwardJob, setForwardJob] = useState(null);
 
   // Spreadsheet States & Functions
-  const [viewMode, setViewMode] = useState('standard'); // 'standard' | 'spreadsheet'
   const [spreadsheetGrid, setSpreadsheetGrid] = useState([]);
   const [selectedCell, setSelectedCell] = useState(null); // { r, c }
   const [pivotConfig, setPivotConfig] = useState({
@@ -264,31 +262,6 @@ export default function PapanKerjaSpkPanel() {
         </div>
         
         <div className="flex items-center gap-2">
-          {/* View Toggles */}
-          <div className="flex border border-slate-200 rounded-lg p-0.5 bg-slate-50 text-[10px] font-bold">
-            <button
-              onClick={() => setViewMode('standard')}
-              className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
-                viewMode === 'standard'
-                  ? 'bg-white text-indigo-700 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Table View
-            </button>
-            <button
-              onClick={() => setViewMode('spreadsheet')}
-              className={`px-3 py-1.5 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
-                viewMode === 'spreadsheet'
-                  ? 'bg-white text-emerald-750 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <Grid size={11} className="text-emerald-500" />
-              Spreadsheet
-            </button>
-          </div>
-
           <button
             onClick={handleExport}
             disabled={exporting}
@@ -301,8 +274,7 @@ export default function PapanKerjaSpkPanel() {
 
       {/* Main View Area */}
       <div className="flex-1 min-h-0 flex flex-col">
-        {viewMode === 'spreadsheet' ? (
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-[300px] animate-fade-in">
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-[300px] animate-fade-in">
             {/* Control Panel */}
             <div className="p-3 bg-slate-50/50 border-b border-slate-200 space-y-2 shrink-0">
               <div className="flex flex-wrap gap-3 items-center justify-between">
@@ -507,14 +479,6 @@ export default function PapanKerjaSpkPanel() {
               </table>
             </div>
           </div>
-        ) : (
-          <ManagerTable
-            jobs={jobs}
-            orderMap={orderMap}
-            staffList={staffList}
-            onEdit={setEditJob}
-          />
-        )}
       </div>
 
       {/* Modals */}
