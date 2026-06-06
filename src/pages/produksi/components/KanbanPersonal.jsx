@@ -71,32 +71,39 @@ export default function KanbanPersonal({ jobs, onSelectJob, onStart, onComplete 
                       className="bg-white border border-slate-200 hover:border-indigo-400 rounded-lg p-2.5 shadow-xs hover:shadow-sm transition-all cursor-pointer group"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        {/* Kiri: Tahap, ID, dan Nama Produk */}
-                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        {/* Kiri: Tahap & ID */}
+                        <div className="flex items-center gap-1.5 min-w-0">
                           <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 uppercase tracking-wider shrink-0">
                             {job.tahap_nama}
                           </span>
                           <span className="text-[10px] font-bold text-slate-400 shrink-0">#{job.id}</span>
-                          <span className="text-slate-200 shrink-0">|</span>
-                          <h4 className="text-[11px] font-extrabold text-slate-800 truncate group-hover:text-indigo-600 transition-colors" title={item.jenis_produk || 'Produk'}>
-                            {item.jenis_produk || 'Produk'}
-                          </h4>
                         </div>
                         
                         {/* Kanan: Qty & Biaya Desain */}
-                        <div className="flex items-center gap-1 shrink-0 text-[10px] text-slate-500 font-bold">
+                        <div className="flex items-center gap-1.5 shrink-0 text-[10px] text-slate-500 font-bold">
                           <span>
                             Qty: <strong className="text-slate-700">{item.qty || 1}</strong>
                           </span>
                           {job.biaya_desain > 0 && (
                             <>
-                              <span className="text-slate-300">·</span>
+                              <span className="text-slate-350 text-slate-300">·</span>
                               <span className="text-emerald-600 font-extrabold">
                                 Rp{job.biaya_desain.toLocaleString()}
                               </span>
                             </>
                           )}
                         </div>
+                      </div>
+
+                      {/* Baris Tengah: Nama Pelanggan & Nama Produk */}
+                      <div className="mt-1.5 flex items-baseline gap-1.5 min-w-0">
+                        <span className="text-[11px] font-black text-slate-800 truncate" title={job.pelanggan_nama || 'Umum'}>
+                          {job.pelanggan_nama || 'Umum'}
+                        </span>
+                        <span className="text-[10px] text-slate-300 shrink-0">—</span>
+                        <span className="text-[10px] font-semibold text-slate-500 truncate group-hover:text-indigo-600 transition-colors" title={item.jenis_produk || 'Produk'}>
+                          {item.jenis_produk || 'Produk'}
+                        </span>
                       </div>
 
                       {/* Quick Action Shortcuts inside Kanban Card */}
