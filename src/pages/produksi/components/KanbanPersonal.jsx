@@ -84,7 +84,7 @@ export default function KanbanPersonal({ jobs, onSelectJob, onStart, onComplete 
                         </div>
                         
                         {/* Kanan: Qty & Biaya Desain */}
-                        <div className="flex items-center gap-1 shrink-0 text-[10px] text-slate-505 text-slate-500 font-bold">
+                        <div className="flex items-center gap-1 shrink-0 text-[10px] text-slate-500 font-bold">
                           <span>
                             Qty: <strong className="text-slate-700">{item.qty || 1}</strong>
                           </span>
