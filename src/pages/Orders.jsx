@@ -294,6 +294,25 @@ export default function Orders() {
         status_global: newStatus,
       });
 
+      // 1b. Update detail item (jenis_produk, qty, panjang, lebar, bahan, harga_jual, biaya_bahan, biaya_desain, insentif)
+      const formData = new FormData(form);
+      if (editModalData.items && editModalData.items.length > 0) {
+        for (const item of editModalData.items) {
+          const itemPayload = {
+            jenis_produk: formData.get(`item_jenis_produk_${item.id}`) || item.jenis_produk,
+            qty: parseInt(formData.get(`item_qty_${item.id}`) || item.qty),
+            panjang: parseFloat(formData.get(`item_panjang_${item.id}`) || item.panjang || 0),
+            lebar: parseFloat(formData.get(`item_lebar_${item.id}`) || item.lebar || 0),
+            bahan: formData.get(`item_bahan_${item.id}`) || item.bahan || '',
+            harga_jual: parseInt(formData.get(`item_harga_jual_${item.id}`) || item.harga_jual || 0),
+            biaya_bahan: parseInt(formData.get(`item_biaya_bahan_${item.id}`) || item.biaya_bahan || 0),
+            biaya_desain: parseInt(formData.get(`item_biaya_desain_${item.id}`) || item.biaya_desain || 0),
+            insentif: parseInt(formData.get(`item_insentif_${item.id}`) || item.insentif || 0),
+          };
+          await apiClient.patch(`/order-items/${item.id}/`, itemPayload);
+        }
+      }
+
       // 2. Tambah Pembayaran jika diisi
       if (jumlahBayar > 0) {
         await apiClient.post(`/orders/${editModalData.id}/bayar/`, {
@@ -920,6 +939,123 @@ export default function Orders() {
                         HPP belum terhitung — operator belum mencatat pemakaian bahan baku di Lembar Kerja SPK.
                       </p>
                     )}
+                  </div>
+                )}
+
+                {/* Detail Produk & Biaya Card */}
+                {editModalData.items && editModalData.items.length > 0 && (
+                  <div className="bg-slate-50/50 border border-slate-200 rounded-xl p-5 space-y-4 shadow-3xs">
+                    <div className="text-[11px] font-extrabold text-slate-800 border-b border-slate-200/60 pb-2 mb-2 uppercase tracking-wide">
+                      Detail Produk, Bahan, Harga & Insentif
+                    </div>
+                    {editModalData.items.map((item, idx) => (
+                      <div key={item.id} className="p-4 bg-white border border-slate-200 rounded-lg space-y-3 shadow-3xs">
+                        <div className="text-[10px] font-black text-[#714B67] uppercase tracking-wider">
+                          Item #{idx + 1} - ID: {item.id}
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                            <label className="text-[10px] font-bold text-slate-650">Nama Produk</label>
+                            <input
+                              type="text"
+                              name={`item_jenis_produk_${item.id}`}
+                              defaultValue={item.jenis_produk}
+                              className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
+                            />
+                          </div>
+                          
+                          <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                            <label className="text-[10px] font-bold text-slate-650">Bahan / Material</label>
+                            <input
+                              type="text"
+                              name={`item_bahan_${item.id}`}
+                              defaultValue={item.bahan || ''}
+                              placeholder="Cth: Flexi Korea"
+                              className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-650">Qty</label>
+                            <input
+                              type="number"
+                              name={`item_qty_${item.id}`}
+                              defaultValue={item.qty}
+                              className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
+                            />
+                          </div>
+                          
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-650">Panjang (m)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              name={`item_panjang_${item.id}`}
+                              defaultValue={item.panjang || 0}
+                              className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-650">Lebar (m)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              name={`item_lebar_${item.id}`}
+                              defaultValue={item.lebar || 0}
+                              className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-650">Harga Jual (Rp)</label>
+                            <input
+                              type="number"
+                              name={`item_harga_jual_${item.id}`}
+                              defaultValue={item.harga_jual || 0}
+                              className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-650">Biaya Bahan / HPP (Rp)</label>
+                            <input
+                              type="number"
+                              name={`item_biaya_bahan_${item.id}`}
+                              defaultValue={item.biaya_bahan || 0}
+                              className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 pt-1 border-t border-slate-100">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-indigo-600">Biaya Desain Staff (Rp)</label>
+                            <input
+                              type="number"
+                              name={`item_biaya_desain_${item.id}`}
+                              defaultValue={item.biaya_desain || 0}
+                              className="w-full text-[11px] border border-indigo-150 bg-indigo-50/20 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-purple-600">Estimasi Insentif (Rp)</label>
+                            <input
+                              type="number"
+                              name={`item_insentif_${item.id}`}
+                              defaultValue={item.insentif || 0}
+                              className="w-full text-[11px] border border-purple-150 bg-purple-50/20 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-purple-500 outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
 
