@@ -24,6 +24,13 @@ export default function KanbanPersonal({ jobs, onSelectJob, onStart, onComplete 
       badgeColor: 'bg-emerald-100 text-emerald-800',
       items: jobs.filter((j) => j.status_pekerjaan === 'selesai'),
     },
+    failed: {
+      title: 'Gagal / Batal / Kendala',
+      color: 'border-rose-400 bg-rose-50/50',
+      iconColor: 'text-rose-500',
+      badgeColor: 'bg-rose-100 text-rose-800',
+      items: jobs.filter((j) => ['gagal', 'batal', 'kendala'].includes(j.status_pekerjaan)),
+    },
   };
 
   return (
@@ -35,7 +42,7 @@ export default function KanbanPersonal({ jobs, onSelectJob, onStart, onComplete 
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {Object.entries(columns).map(([colKey, col]) => (
           <div
             key={colKey}
@@ -45,7 +52,12 @@ export default function KanbanPersonal({ jobs, onSelectJob, onStart, onComplete 
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div
-                  className={`w-2 h-2 rounded-full ${colKey === 'todo' ? 'bg-amber-500' : colKey === 'progress' ? 'bg-indigo-500' : 'bg-emerald-500'}`}
+                  className={`w-2 h-2 rounded-full ${
+                    colKey === 'todo' ? 'bg-amber-500' :
+                    colKey === 'progress' ? 'bg-indigo-500' :
+                    colKey === 'done' ? 'bg-emerald-500' :
+                    'bg-rose-500'
+                  }`}
                 />
                 <h3 className="text-xs font-bold text-slate-700">{col.title}</h3>
               </div>
@@ -143,6 +155,16 @@ export default function KanbanPersonal({ jobs, onSelectJob, onStart, onComplete 
                             <CheckCircle2 size={10} />
                             Selesai
                           </button>
+                        )}
+
+                        {colKey === 'failed' && (
+                          <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded shadow-2xs ${
+                            job.status_pekerjaan === 'gagal' ? 'bg-rose-100 text-rose-700' :
+                            job.status_pekerjaan === 'batal' ? 'bg-slate-100 text-slate-700' :
+                            'bg-amber-100 text-amber-700'
+                          }`}>
+                            {job.status_pekerjaan === 'gagal' ? 'Gagal' : job.status_pekerjaan === 'batal' ? 'Batal' : 'Kendala'}
+                          </span>
                         )}
                       </div>
                     </div>
