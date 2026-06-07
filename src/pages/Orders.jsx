@@ -13,13 +13,18 @@ import {
   Search,
   Edit2,
   X,
-  UserCheck,
   Trash2,
   Printer,
   Truck,
   DollarSign,
   Palette,
   AlertTriangle,
+  Calculator,
+  User,
+  Calendar,
+  CreditCard,
+  Save,
+  UserCheck,
 } from 'lucide-react';
 import OrderInputForm from '../components/orders/OrderInputForm';
 import KomplainModal from '../components/orders/KomplainModal';
@@ -66,6 +71,26 @@ export default function Orders() {
   const [selectedStatus, setSelectedStatus] = useState('');
   const [exporting, setExporting] = useState(false);
 
+  // States for Smart Calculator in Edit Modal
+  const [editItems, setEditItems] = useState([]);
+  const [dbPrices, setDbPrices] = useState([]);
+  const [editPricelistActiveIndex, setEditPricelistActiveIndex] = useState(null);
+  const [priceSearch, setPriceSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+
+  const priceCategories = {
+    print_outdoor_per_m2: 'Print Outdoor / m²',
+    stand_banner: 'Stand Banner',
+    print_a3_plus: 'Print A3+',
+    sticker_a3_plus: 'Sticker A3+',
+    laminasi_a3_plus: 'Laminasi A3+',
+    paket_cetak_brosur: 'Paket Cetak Brosur',
+    merchandise_dan_seminar_kit: 'Merchandise & Seminar Kit',
+    buku_yasin_dan_finishing: 'Buku Yasin & Finishing',
+    kartu_nama_ivory_260: 'Kartu Nama Ivory 260',
+    kartu_nama_aster_200: 'Kartu Nama Aster 200',
+  };
+
   // CRM Scheduled Activities states
   const [chatterTab, setChatterTab] = useState('logs'); // 'logs' | 'crm'
   const [orderActivities, setOrderActivities] = useState([]);
@@ -88,15 +113,103 @@ export default function Orders() {
     }
   };
 
+  const fetchPrices = async () => {
+    try {
+      const res = await apiClient.get('/product-prices/');
+      setDbPrices(res.data);
+    } catch (err) {
+      console.error('Gagal memuat daftar harga:', err);
+    }
+  };
+
+  const filteredProducts = useMemo(() => {
+    return dbPrices.filter((prod) => {
+      const matchesCategory = selectedCategory === 'all' || prod.kategori === selectedCategory;
+      const searchData = `${(prod.nama_produk || '').toLowerCase()} ${(prod.material || '').toLowerCase()}`;
+      const matchesSearch = searchData.includes(priceSearch.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+  }, [dbPrices, selectedCategory, priceSearch]);
+
+  const handleSelectEditProduct = (product, selectedPrice) => {
+    if (editPricelistActiveIndex === null) return;
+
+    const catMap = {
+      print_outdoor_per_m2: 'Cetak Outdoor',
+      stand_banner: 'Stand Banner',
+      print_a3_plus: 'Print A3+',
+      sticker_a3_plus: 'Sticker A3+',
+      laminasi_a3_plus: 'Laminasi A3+',
+      paket_cetak_brosur: 'Paket Brosur',
+      merchandise_dan_seminar_kit: 'Merchandise',
+      buku_yasin_dan_finishing: 'Yasin & Finishing',
+      kartu_nama_ivory_260: 'Kartu Nama',
+      kartu_nama_aster_200: 'Kartu Nama',
+    };
+
+    const jenisProduk = catMap[product.kategori] || product.kategori;
+    const isMeteran = product.kategori === 'print_outdoor_per_m2';
+
+    const newItems = [...editItems];
+    newItems[editPricelistActiveIndex].is_meteran = isMeteran;
+    newItems[editPricelistActiveIndex].jenis_produk = jenisProduk;
+    newItems[editPricelistActiveIndex].bahan =
+      product.nama_produk + (product.material ? ` (${product.material})` : '');
+    newItems[editPricelistActiveIndex].harga_per_m2 = selectedPrice;
+    newItems[editPricelistActiveIndex].panjang = isMeteran ? 1 : 0;
+    newItems[editPricelistActiveIndex].lebar = isMeteran ? 1 : 0;
+
+    const qty = parseInt(newItems[editPricelistActiveIndex].qty) || 1;
+    if (isMeteran) {
+      newItems[editPricelistActiveIndex].harga_jual = Math.round(1 * 1 * selectedPrice * qty);
+    } else {
+      newItems[editPricelistActiveIndex].harga_jual = Math.round(selectedPrice * qty);
+    }
+
+    setEditItems(newItems);
+    setEditPricelistActiveIndex(null);
+    setPriceSearch('');
+    setSelectedCategory('all');
+  };
+
+  const handleEditItemChange = (index, field, value) => {
+    const newItems = [...editItems];
+    newItems[index] = { ...newItems[index], [field]: value };
+
+    const item = newItems[index];
+    const isMeteran = item.is_meteran !== false;
+    const qty = parseInt(item.qty) || 1;
+    const hargaUnit = parseFloat(item.harga_per_m2) || 0;
+
+    if (field === 'panjang' || field === 'lebar' || field === 'harga_per_m2' || field === 'qty' || field === 'is_meteran') {
+      if (isMeteran) {
+        const p = parseFloat(item.panjang) || 0;
+        const l = parseFloat(item.lebar) || 0;
+        item.harga_jual = Math.round(p * l * hargaUnit * qty);
+      } else {
+        item.harga_jual = Math.round(hargaUnit * qty);
+      }
+    }
+
+    setEditItems(newItems);
+  };
+
   const openEditModal = (order) => {
     setEditModalData(order);
+    const itemsWithMeteran = (order.items || []).map(item => ({
+      ...item,
+      is_meteran: item.panjang > 0 || item.lebar > 0
+    }));
+    setEditItems(itemsWithMeteran);
     setSelectedStatus(order.status_global);
     setChatterTab('logs');
     fetchOrderActivities(order.id);
+    fetchPrices();
   };
 
   const closeEditModal = () => {
     setEditModalData(null);
+    setEditItems([]);
     setSelectedStatus('');
   };
 
@@ -284,7 +397,6 @@ export default function Orders() {
     const newStatus = form.status.value;
     const staffId = form.assign_staff?.value;
     const biayaDesain = form.biaya_desain?.value ? parseInt(form.biaya_desain.value) : undefined;
-    const insentif = form.insentif?.value ? parseInt(form.insentif.value) : undefined;
     const jumlahBayar = parseInt(form.jumlah_bayar?.value || '0');
     const metodePembayaran = form.metode_pembayaran?.value || 'tunai';
 
@@ -294,20 +406,19 @@ export default function Orders() {
         status_global: newStatus,
       });
 
-      // 1b. Update detail item (jenis_produk, qty, panjang, lebar, bahan, harga_jual, biaya_bahan, biaya_desain, insentif)
-      const formData = new FormData(form);
-      if (editModalData.items && editModalData.items.length > 0) {
-        for (const item of editModalData.items) {
+      // 1b. Update detail item (jenis_produk, qty, panjang, lebar, bahan, harga_per_m2, harga_jual, biaya_bahan, biaya_desain)
+      if (editItems && editItems.length > 0) {
+        for (const item of editItems) {
           const itemPayload = {
-            jenis_produk: formData.get(`item_jenis_produk_${item.id}`) || item.jenis_produk,
-            qty: parseInt(formData.get(`item_qty_${item.id}`) || item.qty),
-            panjang: parseFloat(formData.get(`item_panjang_${item.id}`) || item.panjang || 0),
-            lebar: parseFloat(formData.get(`item_lebar_${item.id}`) || item.lebar || 0),
-            bahan: formData.get(`item_bahan_${item.id}`) || item.bahan || '',
-            harga_jual: parseInt(formData.get(`item_harga_jual_${item.id}`) || item.harga_jual || 0),
-            biaya_bahan: parseInt(formData.get(`item_biaya_bahan_${item.id}`) || item.biaya_bahan || 0),
-            biaya_desain: parseInt(formData.get(`item_biaya_desain_${item.id}`) || item.biaya_desain || 0),
-            insentif: parseInt(formData.get(`item_insentif_${item.id}`) || item.insentif || 0),
+            jenis_produk: item.jenis_produk,
+            qty: parseInt(item.qty || 1),
+            panjang: parseFloat(item.panjang || 0),
+            lebar: parseFloat(item.lebar || 0),
+            bahan: item.bahan || '',
+            harga_per_m2: parseInt(item.harga_per_m2 || 0),
+            harga_jual: parseInt(item.harga_jual || 0),
+            biaya_bahan: parseInt(item.biaya_bahan || 0),
+            biaya_desain: parseInt(item.biaya_desain || 0),
           };
           await apiClient.patch(`/order-items/${item.id}/`, itemPayload);
         }
@@ -324,18 +435,9 @@ export default function Orders() {
       // 3. Assign / Publish Job (Staff PIC atau Global Pool)
       let updatedOrderData = null;
       if (['desain', 'proses'].includes(newStatus)) {
-        const payload = {
-          status_global: newStatus,
-        };
-        if (staffId && staffId !== '') {
-          payload.staff_id = parseInt(staffId);
-        }
-        if (biayaDesain !== undefined) {
-          payload.biaya_desain = biayaDesain;
-        }
-        if (insentif !== undefined) {
-          payload.insentif = insentif;
-        }
+        const payload = { status_global: newStatus };
+        if (staffId && staffId !== '') payload.staff_id = parseInt(staffId);
+        if (biayaDesain !== undefined) payload.biaya_desain = biayaDesain;
         await apiClient.post(`/orders/${editModalData.id}/assign/`, payload);
       }
 
@@ -942,16 +1044,38 @@ export default function Orders() {
                   </div>
                 )}
 
-                {/* Detail Produk & Biaya Card */}
-                {editModalData.items && editModalData.items.length > 0 && (
+                {/* Detail Produk & Kalkulator Pintar */}
+                {editItems && editItems.length > 0 && (
                   <div className="bg-slate-50/50 border border-slate-200 rounded-xl p-5 space-y-4 shadow-3xs">
-                    <div className="text-[11px] font-extrabold text-slate-800 border-b border-slate-200/60 pb-2 mb-2 uppercase tracking-wide">
-                      Detail Produk, Bahan, Harga & Insentif
+                    <div className="text-[11px] font-extrabold text-slate-800 border-b border-slate-200/60 pb-2 mb-2 uppercase tracking-wide flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <Calculator className="w-3.5 h-3.5 text-[#714B67]" />
+                        Kalkulator Pintar — Detail Produk & Harga
+                      </span>
                     </div>
-                    {editModalData.items.map((item, idx) => (
+                    {editItems.map((item, idx) => (
                       <div key={item.id} className="p-4 bg-white border border-slate-200 rounded-lg space-y-3 shadow-3xs">
-                        <div className="text-[10px] font-black text-[#714B67] uppercase tracking-wider">
-                          Item #{idx + 1} - ID: {item.id}
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                          <span className="text-[10px] font-black text-[#714B67] uppercase tracking-wider">
+                            Item #{idx + 1} - ID: {item.id}
+                          </span>
+                          {/* is_meteran toggle button */}
+                          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                            <button
+                              type="button"
+                              onClick={() => handleEditItemChange(idx, 'is_meteran', true)}
+                              className={`px-2 py-0.5 text-[9px] font-bold rounded ${item.is_meteran !== false ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                              P x L (Meteran)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleEditItemChange(idx, 'is_meteran', false)}
+                              className={`px-2 py-0.5 text-[9px] font-bold rounded ${item.is_meteran === false ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                              Pcs (Satuan)
+                            </button>
+                          </div>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-3">
@@ -959,8 +1083,8 @@ export default function Orders() {
                             <label className="text-[10px] font-bold text-slate-650">Nama Produk</label>
                             <input
                               type="text"
-                              name={`item_jenis_produk_${item.id}`}
-                              defaultValue={item.jenis_produk}
+                              value={item.jenis_produk || ''}
+                              onChange={(e) => handleEditItemChange(idx, 'jenis_produk', e.target.value)}
                               className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
                             />
                           </div>
@@ -969,95 +1093,122 @@ export default function Orders() {
                             <label className="text-[10px] font-bold text-slate-650">Bahan / Material</label>
                             <input
                               type="text"
-                              name={`item_bahan_${item.id}`}
-                              defaultValue={item.bahan || ''}
+                              value={item.bahan || ''}
+                              onChange={(e) => handleEditItemChange(idx, 'bahan', e.target.value)}
                               placeholder="Cth: Flexi Korea"
                               className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
                             />
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="space-y-1.5">
+                        <div className="grid grid-cols-4 gap-3">
+                          {item.is_meteran !== false ? (
+                            <>
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold text-slate-650">Panjang (m)</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={item.panjang || ''}
+                                  onChange={(e) => handleEditItemChange(idx, 'panjang', parseFloat(e.target.value) || 0)}
+                                  className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
+                                />
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold text-slate-650">Lebar (m)</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={item.lebar || ''}
+                                  onChange={(e) => handleEditItemChange(idx, 'lebar', parseFloat(e.target.value) || 0)}
+                                  className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
+                                />
+                              </div>
+                            </>
+                          ) : null}
+
+                          <div className={`space-y-1.5 ${item.is_meteran !== false ? 'col-span-1' : 'col-span-2'}`}>
+                            <label className="text-[10px] font-bold text-slate-650">
+                              {item.is_meteran !== false ? 'Harga / m² (Rp)' : 'Harga / Pcs (Rp)'}
+                            </label>
+                            <input
+                              type="number"
+                              value={item.harga_per_m2 || ''}
+                              onChange={(e) => handleEditItemChange(idx, 'harga_per_m2', parseInt(e.target.value) || 0)}
+                              className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
+                            />
+                          </div>
+
+                          <div className={`space-y-1.5 ${item.is_meteran !== false ? 'col-span-1' : 'col-span-2'}`}>
                             <label className="text-[10px] font-bold text-slate-650">Qty</label>
                             <input
                               type="number"
-                              name={`item_qty_${item.id}`}
-                              defaultValue={item.qty}
-                              className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
-                            />
-                          </div>
-                          
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold text-slate-650">Panjang (m)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              name={`item_panjang_${item.id}`}
-                              defaultValue={item.panjang || 0}
-                              className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
-                            />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold text-slate-650">Lebar (m)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              name={`item_lebar_${item.id}`}
-                              defaultValue={item.lebar || 0}
+                              value={item.qty || ''}
+                              onChange={(e) => handleEditItemChange(idx, 'qty', parseInt(e.target.value) || 0)}
                               className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
                             />
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold text-slate-650">Harga Jual (Rp)</label>
-                            <input
-                              type="number"
-                              name={`item_harga_jual_${item.id}`}
-                              defaultValue={item.harga_jual || 0}
-                              className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
-                            />
-                          </div>
+                        {/* Pricelist Picker Button */}
+                        <div className="pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setEditPricelistActiveIndex(idx)}
+                            className="w-full bg-[#714B67]/8 hover:bg-[#714B67]/15 text-[#714B67] border border-[#714B67]/25 text-[10px] font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <Search size={12} />
+                            🔍 Pilih dari Daftar Harga Resmi
+                          </button>
+                        </div>
 
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold text-slate-650">Biaya Bahan / HPP (Rp)</label>
+                        {/* Live Calculation Summary */}
+                        <div className="mt-2 rounded-lg bg-gradient-to-r from-slate-900 to-slate-800 p-3 text-white">
+                          <div className="text-[9px] font-bold text-slate-400 uppercase mb-1.5">Hasil Kalkulasi Otomatis</div>
+                          <div className="text-[9.5px] text-slate-300 mb-2">
+                            {item.is_meteran !== false
+                              ? <>📐 {item.panjang || 0}m × {item.lebar || 0}m = <span className="text-white font-bold">{((parseFloat(item.panjang) || 0) * (parseFloat(item.lebar) || 0)).toFixed(2)} m²</span> &nbsp;×&nbsp; {formatRupiah(item.harga_per_m2 || 0)}/m² &nbsp;×&nbsp; {item.qty || 1} pcs</>
+                              : <>{formatRupiah(item.harga_per_m2 || 0)}/pcs &nbsp;×&nbsp; {item.qty || 1} pcs</>
+                            }
+                          </div>
+                          <div className="flex items-center justify-between border-t border-slate-700 pt-2">
+                            <span className="text-[9px] font-bold text-slate-400">TOTAL HARGA JUAL</span>
                             <input
                               type="number"
-                              name={`item_biaya_bahan_${item.id}`}
-                              defaultValue={item.biaya_bahan || 0}
-                              className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
+                              value={item.harga_jual || 0}
+                              onChange={(e) => handleEditItemChange(idx, 'harga_jual', parseInt(e.target.value) || 0)}
+                              className="text-right text-[13px] font-black text-emerald-400 bg-transparent border-b border-slate-600 focus:border-emerald-400 outline-none w-36 pb-0.5"
                             />
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3 pt-1 border-t border-slate-100">
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold text-indigo-600">Biaya Desain Staff (Rp)</label>
-                            <input
-                              type="number"
-                              name={`item_biaya_desain_${item.id}`}
-                              defaultValue={item.biaya_desain || 0}
-                              className="w-full text-[11px] border border-indigo-150 bg-indigo-50/20 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none"
-                            />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold text-purple-600">Estimasi Insentif (Rp)</label>
-                            <input
-                              type="number"
-                              name={`item_insentif_${item.id}`}
-                              defaultValue={item.insentif || 0}
-                              className="w-full text-[11px] border border-purple-150 bg-purple-50/20 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-purple-500 outline-none"
-                            />
-                          </div>
+                        {/* Biaya Bahan / HPP */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-650">Biaya Bahan / HPP (Rp)</label>
+                          <input
+                            type="number"
+                            value={item.biaya_bahan || 0}
+                            onChange={(e) => handleEditItemChange(idx, 'biaya_bahan', parseInt(e.target.value) || 0)}
+                            className="w-full text-[11px] border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-slate-900 outline-none"
+                          />
                         </div>
                       </div>
                     ))}
+
+                    {/* Grand Total Summary */}
+                    {editItems.length > 1 && (
+                      <div className="mt-2 pt-3 border-t border-slate-200 flex items-center justify-between">
+                        <span className="text-[10px] font-extrabold text-slate-600 uppercase">Grand Total Semua Item</span>
+                        <span className="text-[14px] font-black text-[#714B67]">
+                          {formatRupiah(editItems.reduce((sum, it) => sum + (parseInt(it.harga_jual) || 0), 0))}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
+
+
 
                 {/* Form Fields Card */}
                 <div className="bg-slate-50/50 border border-slate-200 rounded-xl p-5 space-y-4 shadow-3xs">
@@ -1108,29 +1259,16 @@ export default function Orders() {
                         </p>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-bold text-slate-600">
-                            Biaya Desain (Custom)
-                          </label>
-                          <input
-                            type="number"
-                            name="biaya_desain"
-                            placeholder="Cth: 25000"
-                            className="w-full text-[12px] border border-slate-200 bg-white rounded-lg px-3 py-2 focus:ring-1 focus:ring-slate-900 outline-none shadow-3xs"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-bold text-slate-600">
-                            Estimasi Insentif
-                          </label>
-                          <input
-                            type="number"
-                            name="insentif"
-                            placeholder="Cth: 15000"
-                            className="w-full text-[12px] border border-slate-200 bg-white rounded-lg px-3 py-2 focus:ring-1 focus:ring-slate-900 outline-none shadow-3xs"
-                          />
-                        </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-600">
+                          Biaya Desain (Custom)
+                        </label>
+                        <input
+                          type="number"
+                          name="biaya_desain"
+                          placeholder="Cth: 25000"
+                          className="w-full text-[12px] border border-slate-200 bg-white rounded-lg px-3 py-2 focus:ring-1 focus:ring-slate-900 outline-none shadow-3xs"
+                        />
                       </div>
                     </div>
                   )}
@@ -1492,26 +1630,20 @@ export default function Orders() {
             </div>
 
             <div className="p-6 receipt-print-area text-slate-900 text-sm font-mono max-h-[70vh] overflow-y-auto bg-white">
-              <div className="text-center border-b border-dashed border-slate-300 pb-4 mb-4">
-                <h2 className="font-extrabold text-[16px] uppercase tracking-widest text-slate-900">
-                  {businessSettings?.nama_bisnis || 'Bintang Advertising'}
-                </h2>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  {businessSettings?.alamat || 'Jl. Produksi No. 123, Kota'}
-                </p>
-                <p className="text-[11px] text-slate-500">
-                  Telp: {businessSettings?.no_telepon || '0812-3456-7890'}
+              {/* RESI HEADER */}
+              <div className="text-center border-b border-dashed border-slate-300 pb-3 mb-4">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">BUKTI PESANAN</p>
+                <h2 className="font-black text-[18px] uppercase tracking-wider text-slate-900">RESI</h2>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  {new Date(printOrder.waktu).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </p>
               </div>
 
+              {/* INFO PELANGGAN */}
               <div className="space-y-1 mb-4 text-[11px]">
                 <div className="flex justify-between">
                   <span className="text-slate-500">No. Order:</span>
                   <span className="font-bold">{printOrder.id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Tanggal:</span>
-                  <span>{new Date(printOrder.waktu).toLocaleDateString('id-ID')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Pelanggan:</span>
@@ -1574,7 +1706,13 @@ export default function Orders() {
                 Tutup
               </button>
               <button
-                onClick={() => window.print()}
+                onClick={() => {
+                  const originalTitle = document.title;
+                  const cleanName = (printOrder.nama || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
+                  document.title = `RESI_${cleanName}_${printOrder.id}`;
+                  window.print();
+                  document.title = originalTitle;
+                }}
                 className="px-4 py-2 bg-indigo-600 text-white font-bold text-xs rounded-md hover:bg-indigo-700 flex items-center gap-2 shadow-sm cursor-pointer"
               >
                 <Printer size={14} /> Cetak Sekarang
@@ -1601,48 +1739,20 @@ export default function Orders() {
             </div>
 
             <div className="p-8 print-area bg-white text-slate-800 text-[12px]">
+              {/* INVOICE HEADER — 1 baris, tidak duplikasi */}
               <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-6">
                 <div>
-                  <h1 className="text-2xl font-black tracking-widest uppercase text-slate-900">
-                    INVOICE
-                  </h1>
-                  <p className="text-slate-500 font-mono mt-1">#{printInvoiceOrder.id}</p>
+                  <h1 className="text-2xl font-black tracking-widest uppercase text-slate-900">INVOICE</h1>
+                  <p className="text-slate-500 font-mono text-[11px] mt-1">#{printInvoiceOrder.id}</p>
+                  <p className="text-slate-400 text-[10px] mt-0.5">
+                    {new Date(printInvoiceOrder.waktu).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
                 </div>
                 <div className="text-right">
-                  <h2 className="font-bold text-[14px]">
-                    {businessSettings?.nama_bisnis || 'Bintang Advertising'}
-                  </h2>
-                  <p className="text-slate-500 mt-0.5">
-                    {businessSettings?.alamat || 'Jl. Produksi No. 123, Kota'}
-                  </p>
-                  <p className="text-slate-500">
-                    WA: {businessSettings?.no_telepon || '0812-3456-7890'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex justify-between mb-8">
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    DITAGIHKAN KEPADA:
-                  </p>
-                  <p className="font-bold text-[14px]">{printInvoiceOrder.nama}</p>
-                  <p className="text-slate-600">{printInvoiceOrder.nomor_wa}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    TANGGAL INVOICE:
-                  </p>
-                  <p className="font-bold">
-                    {new Date(printInvoiceOrder.waktu).toLocaleDateString('id-ID', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
-                  </p>
-                  <p className="text-slate-500 text-[11px] mt-1 capitalize">
-                    Pembayaran: {printInvoiceOrder.metode_pembayaran || 'Tunai'}
-                  </p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">DITAGIHKAN KEPADA</p>
+                  <p className="font-black text-[15px] text-slate-900">{printInvoiceOrder.nama}</p>
+                  <p className="text-slate-500 text-[11px] mt-0.5">{printInvoiceOrder.nomor_wa}</p>
+                  <p className="text-slate-400 text-[10px] mt-0.5 capitalize">Metode: {printInvoiceOrder.metode_pembayaran || 'Tunai'}</p>
                 </div>
               </div>
 
@@ -1763,7 +1873,13 @@ export default function Orders() {
                 Tutup
               </button>
               <button
-                onClick={() => window.print()}
+                onClick={() => {
+                  const originalTitle = document.title;
+                  const cleanName = (printInvoiceOrder.nama || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
+                  document.title = `INVOICE_${cleanName}_${printInvoiceOrder.id}`;
+                  window.print();
+                  document.title = originalTitle;
+                }}
                 className="px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-md hover:bg-blue-700 flex items-center gap-2 cursor-pointer"
               >
                 <Printer size={14} /> Cetak (Ctrl+P)
@@ -1790,41 +1906,19 @@ export default function Orders() {
             </div>
 
             <div className="p-8 print-area bg-white text-slate-800 text-[12px]">
+              {/* SURAT JALAN HEADER — tidak duplikasi */}
               <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-6">
                 <div>
-                  <h1 className="text-xl font-black tracking-widest uppercase text-slate-900">
-                    SURAT JALAN
-                  </h1>
-                  <p className="text-slate-500 font-mono mt-1">
-                    Ref Order: #{printSuratJalanOrder.id}
+                  <h1 className="text-xl font-black tracking-widest uppercase text-slate-900">SURAT JALAN</h1>
+                  <p className="text-slate-500 font-mono text-[11px] mt-1">#{printSuratJalanOrder.id}</p>
+                  <p className="text-slate-400 text-[10px] mt-0.5">
+                    {new Date(printSuratJalanOrder.waktu).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                   </p>
-                </div>
-                <div className="text-right text-[11px]">
-                  <h2 className="font-bold text-[13px]">
-                    {businessSettings?.nama_bisnis || 'Bintang Advertising'}
-                  </h2>
-                  <p className="text-slate-500 mt-0.5">
-                    {businessSettings?.alamat || 'Jl. Produksi No. 123, Kota'}
-                  </p>
-                  <p className="text-slate-500">
-                    WA: {businessSettings?.no_telepon || '0812-3456-7890'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex justify-between mb-8">
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    PENERIMA:
-                  </p>
-                  <p className="font-bold text-[14px]">{printSuratJalanOrder.nama}</p>
-                  <p className="text-slate-600">{printSuratJalanOrder.nomor_wa}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    TANGGAL KIRIM:
-                  </p>
-                  <p className="font-bold border-b border-slate-300 pb-1 w-32 ml-auto">&nbsp;</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">PENERIMA</p>
+                  <p className="font-black text-[15px] text-slate-900">{printSuratJalanOrder.nama}</p>
+                  <p className="text-slate-500 text-[11px] mt-0.5">{printSuratJalanOrder.nomor_wa}</p>
                 </div>
               </div>
 
@@ -1892,7 +1986,13 @@ export default function Orders() {
                 Tutup
               </button>
               <button
-                onClick={() => window.print()}
+                onClick={() => {
+                  const originalTitle = document.title;
+                  const cleanName = (printSuratJalanOrder.nama || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
+                  document.title = `SURAT_JALAN_${cleanName}_${printSuratJalanOrder.id}`;
+                  window.print();
+                  document.title = originalTitle;
+                }}
                 className="px-4 py-2 bg-emerald-600 text-white font-bold text-xs rounded-md hover:bg-emerald-700 flex items-center gap-2 cursor-pointer"
               >
                 <Printer size={14} /> Cetak Surat Jalan
@@ -1919,40 +2019,30 @@ export default function Orders() {
             </div>
 
             <div className="p-6 print-area bg-white text-slate-800 text-[11px] leading-tight">
-              {/* Header SPK */}
-              <div className="flex justify-between items-center border-b pb-2 mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-slate-900 rounded flex items-center justify-center text-white font-black text-sm">
-                    {businessSettings?.nama_bisnis?.slice(0, 2).toUpperCase() || 'BA'}
+              {/* Header SPK — tidak duplikasi, nama pelanggan ada di Data Customer */}
+              <div className="flex justify-between items-center border-b-2 border-slate-800 pb-2 mb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 bg-slate-900 rounded flex items-center justify-center text-white font-black text-sm flex-shrink-0">
+                    SPK
                   </div>
                   <div>
-                    <h2 className="font-extrabold text-xs tracking-wide uppercase text-slate-900 leading-none">
-                      {businessSettings?.nama_bisnis || 'Bintang Advertising'}
+                    <h2 className="font-black text-[13px] tracking-widest uppercase text-slate-900 leading-none">
+                      SURAT PERINTAH KERJA
                     </h2>
-                    <p className="text-[9px] text-slate-500 font-medium">
-                      WA: {businessSettings?.no_telepon || '0812-3456-7890'}
-                    </p>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Production Order</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-4 text-[10px]">
                   <div className="text-right">
-                    <span className="text-slate-400 font-bold block text-[8px] uppercase">
-                      No Order
-                    </span>
-                    <span className="font-mono font-black text-red-650 text-xs">
-                      #{printSpkOrder.id}
-                    </span>
+                    <span className="text-slate-400 font-bold block text-[8px] uppercase">No Order</span>
+                    <span className="font-mono font-black text-red-600 text-xs">#{printSpkOrder.id}</span>
                   </div>
                   <div className="text-right border-l pl-3">
-                    <span className="text-slate-400 font-bold block text-[8px] uppercase">
-                      Tgl Order
-                    </span>
+                    <span className="text-slate-400 font-bold block text-[8px] uppercase">Tgl Order</span>
                     <span className="font-bold text-slate-800">
                       {new Date(printSpkOrder.waktu).toLocaleDateString('id-ID', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
+                        day: '2-digit', month: 'short', year: 'numeric',
                       })}
                     </span>
                   </div>
@@ -2116,11 +2206,186 @@ export default function Orders() {
                 Tutup
               </button>
               <button
-                onClick={() => window.print()}
+                onClick={() => {
+                  const originalTitle = document.title;
+                  const cleanName = (printSpkOrder.nama || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
+                  document.title = `SPK_${cleanName}_${printSpkOrder.id}`;
+                  window.print();
+                  document.title = originalTitle;
+                }}
                 className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-md flex items-center gap-2 cursor-pointer"
               >
                 <Printer size={14} /> Cetak SPK Produksi
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DAFTAR HARGA UNTUK EDIT ORDER */}
+      {editPricelistActiveIndex !== null && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden border border-slate-200">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-indigo-600 text-white rounded">
+                  <Calculator size={16} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800 text-sm">Asisten Daftar Harga (Edit Item)</h3>
+                  <p className="text-[10px] text-slate-500 font-medium">
+                    Pilih produk untuk mengisi data item #{editPricelistActiveIndex + 1}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditPricelistActiveIndex(null)}
+                className="text-slate-400 hover:text-slate-600 hover:bg-slate-200 p-1.5 rounded transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Pencarian */}
+            <div className="p-4 border-b border-slate-100 flex gap-3 bg-white">
+              <input
+                type="text"
+                value={priceSearch}
+                onChange={(e) => setPriceSearch(e.target.value)}
+                placeholder="Cari nama bahan, produk, banner, sticker..."
+                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+
+            {/* Main Area */}
+            <div className="flex-1 flex overflow-hidden min-h-[400px]">
+              {/* Sidebar Kategori */}
+              <div className="w-56 bg-slate-50 border-r border-slate-100 p-2 overflow-y-auto space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('all')}
+                  className={`w-full text-left px-3 py-2 rounded-md text-[11px] font-bold transition-colors ${selectedCategory === 'all' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-200/60'}`}
+                >
+                  Semua Kategori
+                </button>
+                {Object.entries(priceCategories).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setSelectedCategory(key)}
+                    className={`w-full text-left px-3 py-2 rounded-md text-[11px] font-bold transition-colors ${selectedCategory === key ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-200/60'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Daftar Produk */}
+              <div className="flex-1 p-4 overflow-y-auto bg-slate-50/30">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {filteredProducts.length > 0 ? (
+                    filteredProducts.map((prod, idx) => {
+                      const currentQty =
+                        parseInt(editItems[editPricelistActiveIndex]?.qty || '1') || 1;
+
+                      return (
+                        <div
+                          key={idx}
+                          className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex flex-col justify-between hover:border-indigo-300 transition-all"
+                        >
+                          <div>
+                            <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              {priceCategories[prod.kategori] || prod.kategori}
+                            </span>
+                            <h4 className="font-bold text-slate-800 text-xs mt-2 capitalize">
+                              {prod.nama_produk}
+                              {prod.material ? ` (${prod.material})` : ''}
+                            </h4>
+                          </div>
+
+                          <div className="mt-4 border-t border-slate-100 pt-3">
+                            {prod.price_type === 'flat' ? (
+                              <div className="flex justify-between items-center">
+                                <span className="text-[13px] font-black text-slate-900">
+                                  {formatRupiah(prod.harga)}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSelectEditProduct(prod, prod.harga)}
+                                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg transition-colors shadow-sm cursor-pointer"
+                                >
+                                  Pilih Item
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                <p className="text-[10px] text-slate-400 font-bold mb-1 uppercase">
+                                  Harga Bertingkat (Qty saat ini: {currentQty}):
+                                </p>
+                                <div className="space-y-1.5">
+                                  {Object.entries(prod.tiers || {}).map(([tierKey, tierVal]) => {
+                                    const tierPrice = parseInt(tierVal) || 0;
+
+                                    let isMatched;
+                                    const cleanKey = tierKey.toLowerCase();
+                                    if (cleanKey.includes('-')) {
+                                      const parts = cleanKey.split('-');
+                                      const min = parseInt(parts[0]) || 0;
+                                      const max = parseInt(parts[1]) || 999999;
+                                      isMatched = currentQty >= min && currentQty <= max;
+                                    } else if (cleanKey.includes('>')) {
+                                      const min = parseInt(cleanKey.replace(/[^\d]/g, '')) || 0;
+                                      isMatched = currentQty > min;
+                                    } else if (cleanKey.includes('<')) {
+                                      const max =
+                                        parseInt(cleanKey.replace(/[^\d]/g, '')) || 999999;
+                                      isMatched = currentQty < max;
+                                    } else {
+                                      const val = parseInt(cleanKey.replace(/[^\d]/g, '')) || 1;
+                                      isMatched = currentQty === val;
+                                    }
+
+                                    return (
+                                      <div
+                                        key={tierKey}
+                                        className={`flex justify-between items-center p-1.5 rounded-lg border text-[10px] ${isMatched ? 'bg-emerald-50 border-emerald-300' : 'bg-slate-50 border-slate-100'}`}
+                                      >
+                                        <span
+                                          className={`font-semibold ${isMatched ? 'text-emerald-800' : 'text-slate-600'}`}
+                                        >
+                                          {tierKey}
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-bold text-slate-800">
+                                            {formatRupiah(tierPrice)}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleSelectEditProduct(prod, tierPrice)}
+                                            className={`px-2 py-1 rounded text-[9px] font-bold cursor-pointer ${isMatched ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'}`}
+                                          >
+                                            Pilih
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="col-span-2 text-center py-8 text-slate-400 font-bold text-xs">
+                      Tidak ada produk yang cocok dengan pencarian / kategori.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -31,6 +31,17 @@ export default function JobCard({ job, orderInfo, onOpenWorkspace }) {
           <span className="truncate">{job.tahap_nama}</span>
         </p>
       )}
+      {orderInfo?.desainSusulan && (
+        <div className="mt-2 flex items-center gap-1.5 bg-cyan-50 border border-cyan-150 rounded px-1.5 py-0.5 w-fit">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-450 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-cyan-500"></span>
+          </span>
+          <span className="text-[8.5px] font-extrabold text-cyan-700 uppercase tracking-wider">
+            Desain Susulan
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { playSoundForType } from '../utils/notificationSounds';
+import apiClient from '../api/apiClient';
 
 const DynamicIslandContext = createContext(null);
 
@@ -128,6 +129,78 @@ export function DynamicIslandProvider({ children }) {
       return () => clearTimeout(timer);
     }
   }, [activeNotification]);
+
+  // Global background polling for incoming WhatsApp chats
+  const knownChatsRef = useRef({});
+  const isFirstFetchRef = useRef(true);
+
+  useEffect(() => {
+    let active = true;
+    const pollChats = async () => {
+      if (!localStorage.getItem('access_token')) return;
+      try {
+        const response = await apiClient.get('/whatsapp/chats/');
+        const data = Array.isArray(response.data)
+          ? response.data
+          : response.data?.chats || response.data?.records || [];
+
+        if (!active) return;
+
+        const newKnown = { ...knownChatsRef.current };
+        let hasNewMessage = false;
+        let lastNewChat = null;
+
+        data.forEach((chat) => {
+          if (!chat) return;
+          const jid = chat.remoteJid || chat.id || '';
+          const unread = chat.unreadCount || 0;
+          const timestamp = chat.messageTimestamp || 0;
+          const name = chat.name || chat.pushName || jid.split('@')[0];
+          
+          // Get message body text
+          let msgText = '';
+          if (chat.message) {
+            const m = chat.message;
+            msgText = m.conversation || m.extendedTextMessage?.text || m.imageMessage?.caption || m.videoMessage?.caption || '';
+          }
+
+          const prev = knownChatsRef.current[jid];
+
+          if (!isFirstFetchRef.current) {
+            // Jika unread > 0 dan (belum pernah tercatat atau unread bertambah atau timestamp lebih baru)
+            if (unread > 0 && (!prev || unread > prev.unread || timestamp > prev.timestamp)) {
+              hasNewMessage = true;
+              lastNewChat = { name, text: msgText || 'Mengirimkan media' };
+            }
+          }
+
+          newKnown[jid] = { unread, timestamp };
+        });
+
+        knownChatsRef.current = newKnown;
+        isFirstFetchRef.current = false;
+
+        if (hasNewMessage && lastNewChat) {
+          triggerNotification({
+            type: 'whatsapp',
+            title: `Pesan WA: ${lastNewChat.name}`,
+            message: lastNewChat.text,
+          });
+        }
+      } catch (err) {
+        console.warn('Silent global WhatsApp poll error:', err);
+      }
+    };
+
+    // Poll every 8 seconds
+    const interval = setInterval(pollChats, 8000);
+    pollChats(); // Initial run
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <DynamicIslandContext.Provider

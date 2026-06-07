@@ -27,6 +27,7 @@ import Komplain from './pages/Komplain';
 import { useAuth } from './context/AuthContext';
 import ProductionApp from './pages/produksi/ProductionApp';
 import WhatsAppChat from './pages/WhatsAppChat';
+import UploadDesain from './pages/UploadDesain';
 
 let globalAlertTrigger = null;
 
@@ -173,6 +174,8 @@ function App() {
           <Routes>
             {/* Halaman publik */}
             <Route path="/login" element={<Login />} />
+            <Route path="/public/upload-desain" element={<UploadDesain />} />
+            <Route path="/public/upload-desain/:orderId" element={<UploadDesain />} />
 
             {/* Halaman yang butuh login */}
             <Route element={<ProtectedRoute />}>

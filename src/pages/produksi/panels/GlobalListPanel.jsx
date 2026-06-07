@@ -459,6 +459,11 @@ export default function GlobalListPanel() {
                               <span className="font-extrabold text-slate-800">
                                 {item.jenis_produk || '-'}
                               </span>
+                              {item.desain_susulan && (
+                                <span className="inline-flex items-center gap-1 ml-2 px-1.5 py-0.5 rounded bg-cyan-50 border border-cyan-100 text-[8px] font-black text-cyan-700 uppercase tracking-wider animate-pulse">
+                                  Desain Susulan
+                                </span>
+                              )}
                               {item.bahan && (
                                 <span className="text-slate-400 ml-1.5">/ {item.bahan}</span>
                               )}
@@ -617,13 +622,16 @@ export default function GlobalListPanel() {
 
             <div className="p-6 receipt-print-area text-slate-900 text-sm font-mono max-h-[70vh] overflow-y-auto bg-white">
               <div className="text-center border-b border-dashed border-slate-300 pb-4 mb-4">
-                <h2 className="font-extrabold text-[16px] uppercase tracking-widest text-slate-900">
-                  {businessSettings?.nama_bisnis || 'Bintang Advertising'}
+                <h2 className="font-extrabold text-[14px] uppercase tracking-wider text-slate-900 leading-tight">
+                  RESI - {printOrder.nama?.toUpperCase()} - #{printOrder.id}
                 </h2>
-                <p className="text-[11px] text-slate-505 text-slate-500 mt-1">
+                <h3 className="font-bold text-[10px] text-slate-500 mt-1">
+                  {businessSettings?.nama_bisnis || 'Bintang Advertising'}
+                </h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">
                   {businessSettings?.alamat || 'Jl. Produksi No. 123, Kota'}
                 </p>
-                <p className="text-[11px] text-slate-505 text-slate-500">
+                <p className="text-[10px] text-slate-400">
                   Telp: {businessSettings?.no_telepon || '0812-3456-7890'}
                 </p>
               </div>
@@ -698,8 +706,14 @@ export default function GlobalListPanel() {
                 Tutup
               </button>
               <button
-                onClick={() => window.print()}
-                className="px-4 py-2 bg-indigo-650 bg-indigo-600 text-white font-bold text-xs rounded-md hover:bg-indigo-700 flex items-center gap-2 shadow-sm cursor-pointer"
+                onClick={() => {
+                  const originalTitle = document.title;
+                  const cleanName = (printOrder.nama || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
+                  document.title = `RESI_${cleanName}_${printOrder.id}`;
+                  window.print();
+                  document.title = originalTitle;
+                }}
+                className="px-4 py-2 bg-indigo-600 text-white font-bold text-xs rounded-md hover:bg-indigo-700 flex items-center gap-2 shadow-sm cursor-pointer"
               >
                 <Printer size={14} /> Cetak Sekarang
               </button>
@@ -734,8 +748,11 @@ export default function GlobalListPanel() {
                 </div>
                 <div className="text-right">
                   <h2 className="font-bold text-[14px]">
-                    {businessSettings?.nama_bisnis || 'Bintang Advertising'}
+                    INVOICE - {printInvoiceOrder.nama?.toUpperCase()} - #{printInvoiceOrder.id}
                   </h2>
+                  <p className="text-slate-500 font-bold text-[10px] mt-0.5">
+                    {businessSettings?.nama_bisnis || 'Bintang Advertising'}
+                  </p>
                   <p className="text-slate-550 text-slate-500 mt-0.5">
                     {businessSettings?.alamat || 'Jl. Produksi No. 123, Kota'}
                   </p>
@@ -887,7 +904,13 @@ export default function GlobalListPanel() {
                 Tutup
               </button>
               <button
-                onClick={() => window.print()}
+                onClick={() => {
+                  const originalTitle = document.title;
+                  const cleanName = (printInvoiceOrder.nama || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
+                  document.title = `INVOICE_${cleanName}_${printInvoiceOrder.id}`;
+                  window.print();
+                  document.title = originalTitle;
+                }}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-md flex items-center gap-2 cursor-pointer"
               >
                 <Printer size={14} /> Cetak (Ctrl+P)
@@ -925,8 +948,11 @@ export default function GlobalListPanel() {
                 </div>
                 <div className="text-right text-[11px]">
                   <h2 className="font-bold text-[13px]">
-                    {businessSettings?.nama_bisnis || 'Bintang Advertising'}
+                    SURAT JALAN - {printSuratJalanOrder.nama?.toUpperCase()} - #{printSuratJalanOrder.id}
                   </h2>
+                  <p className="text-slate-500 font-bold text-[10px] mt-0.5">
+                    {businessSettings?.nama_bisnis || 'Bintang Advertising'}
+                  </p>
                   <p className="text-slate-500 mt-0.5">
                     {businessSettings?.alamat || 'Jl. Produksi No. 123, Kota'}
                   </p>
@@ -1016,7 +1042,13 @@ export default function GlobalListPanel() {
                 Tutup
               </button>
               <button
-                onClick={() => window.print()}
+                onClick={() => {
+                  const originalTitle = document.title;
+                  const cleanName = (printSuratJalanOrder.nama || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
+                  document.title = `SURAT_JALAN_${cleanName}_${printSuratJalanOrder.id}`;
+                  window.print();
+                  document.title = originalTitle;
+                }}
                 className="px-4 py-2 bg-emerald-650 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-md flex items-center gap-2 cursor-pointer"
               >
                 <Printer size={14} /> Cetak Surat Jalan
@@ -1051,10 +1083,10 @@ export default function GlobalListPanel() {
                   </div>
                   <div>
                     <h2 className="font-extrabold text-xs tracking-wide uppercase text-slate-900 leading-none">
-                      {businessSettings?.nama_bisnis || 'Bintang Advertising'}
+                      SPK - {printSpkOrder.nama?.toUpperCase()} - #{printSpkOrder.id}
                     </h2>
-                    <p className="text-[9px] text-slate-500 font-medium">
-                      WA: {businessSettings?.no_telepon || '0812-3456-7890'}
+                    <p className="text-[9px] text-slate-500 font-bold mt-0.5">
+                      {businessSettings?.nama_bisnis || 'Bintang Advertising'}
                     </p>
                   </div>
                 </div>
@@ -1240,7 +1272,13 @@ export default function GlobalListPanel() {
                 Tutup
               </button>
               <button
-                onClick={() => window.print()}
+                onClick={() => {
+                  const originalTitle = document.title;
+                  const cleanName = (printSpkOrder.nama || 'Pelanggan').replace(/[^a-zA-Z0-9]/g, '_');
+                  document.title = `SPK_${cleanName}_${printSpkOrder.id}`;
+                  window.print();
+                  document.title = originalTitle;
+                }}
                 className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-md flex items-center gap-2 cursor-pointer"
               >
                 <Printer size={14} /> Cetak SPK Produksi

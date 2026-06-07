@@ -1,11 +1,16 @@
 {
-  "short_name": "Bintang CRM",
-  "name": "Bintang Advertising CRM",
+  "short_name": "Bintang Adv",
+  "name": "Bintang Advertising System",
   "icons": [
     {
-      "src": "/favicon.svg",
-      "type": "image/svg+xml",
-      "sizes": "any"
+      "src": "/logo192.png?v=2",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/logo512.png?v=2",
+      "type": "image/png",
+      "sizes": "512x512"
     }
   ],
   "start_url": "/",
