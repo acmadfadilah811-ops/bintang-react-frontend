@@ -1001,7 +1001,11 @@ export default function Customers() {
                               )}
                             </div>
 
-                            {isUnpaid ? (
+                            {order.total_harga <= 0 ? (
+                              <span className="font-bold text-amber-600 uppercase text-[9px] bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                Harga belum di-input
+                              </span>
+                            ) : isUnpaid ? (
                               <div className="flex items-center gap-2">
                                 <span className="font-bold text-red-650">
                                   Sisa: {formatCurrency(order.sisa_tagihan)}

@@ -321,7 +321,20 @@ export default function Orders() {
     };
   }, [statsData]);
 
-  const filteredOrders = orders;
+  const filteredOrders = useMemo(() => {
+    if (activeTab === 'all') return orders;
+    if (activeTab === 'piutang') {
+      return orders.filter((o) => (o.sisa_tagihan || 0) > 0 && o.status_global !== 'batal');
+    }
+    const tabToStatus = {
+      pending: 'review',
+      printing: 'proses',
+      completed: 'selesai',
+      cancelled: 'batal',
+    };
+    const targetStatus = tabToStatus[activeTab] || activeTab;
+    return orders.filter((o) => o.status_global === targetStatus);
+  }, [orders, activeTab]);
 
   const renderBadge = (statusText = '') => {
     const type = getStatusType(statusText);
