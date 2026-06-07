@@ -57,6 +57,12 @@ export default function Payroll() {
     items: [{ inventory_item_id: '', qty_required_per_unit: 1.0 }],
   });
 
+  const [toast, setToast] = useState(null);
+  const showToast = (type, msg) => {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 3500);
+  };
+
   // --- Fetch Data Functions ---
   const fetchSlips = async () => {
     try {
@@ -65,6 +71,7 @@ export default function Payroll() {
       setSlips(res.data);
     } catch (err) {
       console.error('Gagal memuat slip gaji:', err);
+      showToast('error', 'Gagal memuat data slip gaji.');
     } finally {
       setLoadingSlips(false);
     }
@@ -77,6 +84,7 @@ export default function Payroll() {
       setBoms(res.data);
     } catch (err) {
       console.error('Gagal memuat data BoM:', err);
+      showToast('error', 'Gagal memuat data Bill of Materials.');
     } finally {
       setLoadingBoms(false);
     }
@@ -88,6 +96,7 @@ export default function Payroll() {
       setProductPrices(res.data);
     } catch (err) {
       console.error('Gagal memuat harga produk:', err);
+      showToast('error', 'Gagal memuat harga produk.');
     }
   };
 
@@ -97,6 +106,7 @@ export default function Payroll() {
       setInventoryItems(res.data);
     } catch (err) {
       console.error('Gagal memuat inventori:', err);
+      showToast('error', 'Gagal memuat data inventori.');
     }
   };
 
@@ -121,11 +131,11 @@ export default function Payroll() {
     try {
       setGeneratingPayroll(true);
       await apiClient.post('/hr/slip-gaji/generate/', { bulan, tahun });
-      alert('Kalkulasi Slip Gaji berhasil diproses!');
+      showToast('success', 'Kalkulasi Slip Gaji berhasil diproses!');
       fetchSlips();
     } catch (err) {
       console.error('Gagal kalkulasi gaji:', err);
-      alert(err.response?.data?.detail || 'Gagal memproses kalkulasi gaji.');
+      showToast('error', err.response?.data?.detail || 'Gagal memproses kalkulasi gaji.');
     } finally {
       setGeneratingPayroll(false);
     }
@@ -140,11 +150,11 @@ export default function Payroll() {
     try {
       setPayingSlipId(id);
       await apiClient.post(`/hr/slip-gaji/${id}/pay/`);
-      alert('Slip gaji berhasil dibayar dan dibukukan!');
+      showToast('success', 'Slip gaji berhasil dibayar dan dibukukan!');
       fetchSlips();
     } catch (err) {
       console.error('Gagal membayar gaji:', err);
-      alert(err.response?.data?.detail || 'Gagal memproses pembayaran.');
+      showToast('error', err.response?.data?.detail || 'Gagal memproses pembayaran.');
     } finally {
       setPayingSlipId(null);
     }
@@ -178,11 +188,11 @@ export default function Payroll() {
   const handleSaveBom = async (e) => {
     e.preventDefault();
     if (!bomForm.product_id || !bomForm.nama) {
-      alert('Nama dan Produk BoM wajib diisi!');
+      showToast('error', 'Nama dan Produk BoM wajib diisi!');
       return;
     }
     if (bomForm.items.some((i) => !i.inventory_item_id || parseFloat(i.qty_required_per_unit) <= 0)) {
-      alert('Pilih bahan baku yang valid dan isi kuantitas di atas 0!');
+      showToast('error', 'Pilih bahan baku yang valid dan isi kuantitas di atas 0!');
       return;
     }
 
@@ -206,7 +216,7 @@ export default function Payroll() {
       );
       await Promise.all(itemPromises);
 
-      alert('Bill of Materials berhasil dibuat!');
+      showToast('success', 'Bill of Materials berhasil dibuat!');
       setIsAddBomOpen(false);
       setBomForm({
         product_id: '',
@@ -217,7 +227,7 @@ export default function Payroll() {
       fetchBoms();
     } catch (err) {
       console.error('Gagal menyimpan BoM:', err);
-      alert('Gagal membuat Bill of Materials. Produk ini mungkin sudah memiliki BoM.');
+      showToast('error', 'Gagal membuat Bill of Materials. Produk ini mungkin sudah memiliki BoM.');
     } finally {
       setSavingBom(false);
     }
@@ -231,11 +241,11 @@ export default function Payroll() {
 
     try {
       await apiClient.delete(`/bom/${id}/`);
-      alert('BoM berhasil dihapus!');
+      showToast('success', 'BoM berhasil dihapus!');
       fetchBoms();
     } catch (err) {
       console.error('Gagal hapus BoM:', err);
-      alert('Gagal menghapus Bill of Materials.');
+      showToast('error', 'Gagal menghapus Bill of Materials.');
     }
   };
 
@@ -828,6 +838,20 @@ export default function Payroll() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Toast Notifikasi ── */}
+      {toast && (
+        <div
+          className={`fixed top-4 right-4 z-[9999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm font-medium transition-all animate-[slideDown_0.3s_ease] ${
+            toast.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+              : 'bg-red-50 border-red-200 text-red-700'
+          }`}
+        >
+          {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+          {toast.msg}
         </div>
       )}
     </div>

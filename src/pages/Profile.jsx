@@ -38,7 +38,7 @@ const ROLE_LABEL = {
 const formatDate = (dateStr, includeTime = false) => {
   if (!dateStr) return '–';
   const date = new Date(dateStr);
-  if (isNaN(date)) return dateStr;
+  if (isNaN(date.getTime())) return dateStr;
 
   const options = includeTime
     ? { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }

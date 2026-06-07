@@ -1055,36 +1055,39 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {complaints.length > 0 ? (
-                    (Array.isArray(complaints) ? complaints : complaints?.results || []).slice(0, 10).map((c) => (
-                      <tr key={c.id} className="hover:bg-slate-550/10 transition-colors">
-                        <td className="py-3 px-4 font-mono font-bold text-indigo-600">#{c.order_id || c.order}</td>
-                        <td className="py-3 px-4 font-bold text-slate-800 capitalize">{c.staff_nama || c.pelanggan_nama || 'Pelanggan'}</td>
-                        <td className="py-3 px-4 font-semibold text-rose-600">{c.jenis_display || c.jenis}</td>
-                        <td className="py-3 px-4 max-w-xs truncate" title={c.deskripsi}>{c.deskripsi}</td>
-                        <td className="py-3 px-4">
-                          <span className={`text-[8.5px] font-black px-2 py-0.5 rounded border uppercase
-                            ${
-                              c.status === 'selesai'
-                                ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                : 'bg-amber-50 text-amber-600 border-amber-100'
-                            }`}
-                          >
-                            {c.status_display || c.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 font-medium text-slate-500 italic max-w-xs truncate" title={c.catatan_resolusi || '-'}>
-                          {c.catatan_resolusi || '-'}
+                  {(() => {
+                    const list = Array.isArray(complaints) ? complaints : (complaints?.results || []);
+                    return list.length > 0 ? (
+                      list.slice(0, 10).map((c) => (
+                        <tr key={c.id} className="hover:bg-slate-550/10 transition-colors">
+                          <td className="py-3 px-4 font-mono font-bold text-indigo-600">#{c.order_id || c.order}</td>
+                          <td className="py-3 px-4 font-bold text-slate-800 capitalize">{c.staff_nama || c.pelanggan_nama || 'Pelanggan'}</td>
+                          <td className="py-3 px-4 font-semibold text-rose-600">{c.jenis_display || c.jenis}</td>
+                          <td className="py-3 px-4 max-w-xs truncate" title={c.deskripsi}>{c.deskripsi}</td>
+                          <td className="py-3 px-4">
+                            <span className={`text-[8.5px] font-black px-2 py-0.5 rounded border uppercase
+                              ${
+                                c.status === 'selesai'
+                                  ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                  : 'bg-amber-50 text-amber-600 border-amber-100'
+                              }`}
+                            >
+                              {c.status_display || c.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 font-medium text-slate-500 italic max-w-xs truncate" title={c.catatan_resolusi || '-'}>
+                            {c.catatan_resolusi || '-'}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="text-center py-8 text-slate-400 italic">
+                          Tidak ada komplain pelanggan tercatat.
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="text-center py-8 text-slate-400 italic">
-                        Tidak ada komplain pelanggan tercatat.
-                      </td>
-                    </tr>
-                  )}
+                    );
+                  })()}
                 </tbody>
               </table>
             </div>

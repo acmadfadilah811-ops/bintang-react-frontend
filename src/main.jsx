@@ -73,13 +73,14 @@ if (sentryDsn) {
     console.warn('Failed to parse VITE_API_URL for Sentry tracing:', e);
   }
 
-  const tracePropagationTargets = ['localhost'];
+  const tracePropagationTargets = ['localhost', /^\//];
   if (apiHost) {
     // Escape dots in the hostname to construct a secure RegExp
     const escapedHost = apiHost.replace(/\./g, '\\.');
-    tracePropagationTargets.push(new RegExp(`^https?:\\/\\/${escapedHost}\\/api`));
+    tracePropagationTargets.push(new RegExp(`^https?:\\/\\/${escapedHost}`));
   } else {
-    tracePropagationTargets.push(/^https:\/\/bintang-adv\.duckdns\.org\/api/);
+    // Dynamically match current domain to be staging and environment-agnostic
+    tracePropagationTargets.push(new RegExp(`^https?:\\/\\/${window.location.host.replace(/\./g, '\\.')}`));
   }
 
   Sentry.init({

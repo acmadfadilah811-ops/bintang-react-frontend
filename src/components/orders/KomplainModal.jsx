@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, AlertTriangle, MessageCircle, Save } from 'lucide-react';
+import { X, AlertTriangle, MessageCircle, Save, CheckCircle2 } from 'lucide-react';
 import apiClient from '../../api/apiClient';
 
 export default function KomplainModal({ isOpen, onClose, order, onSuccess, defaultFotoBukti = '' }) {
@@ -9,6 +9,8 @@ export default function KomplainModal({ isOpen, onClose, order, onSuccess, defau
     foto_bukti: defaultFotoBukti,
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -17,6 +19,8 @@ export default function KomplainModal({ isOpen, onClose, order, onSuccess, defau
         deskripsi: '',
         foto_bukti: defaultFotoBukti || '',
       });
+      setError('');
+      setSuccess('');
     }
   }, [isOpen, defaultFotoBukti]);
 
@@ -24,8 +28,11 @@ export default function KomplainModal({ isOpen, onClose, order, onSuccess, defau
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setSuccess('');
+    
     if (!formData.jenis_komplain || !formData.deskripsi) {
-      alert('Jenis komplain dan deskripsi wajib diisi.');
+      setError('Jenis komplain dan deskripsi wajib diisi.');
       return;
     }
     
@@ -37,11 +44,13 @@ export default function KomplainModal({ isOpen, onClose, order, onSuccess, defau
         deskripsi: formData.deskripsi,
         foto_bukti: formData.foto_bukti
       });
-      alert('Komplain berhasil dicatat!');
-      onSuccess();
+      setSuccess('Komplain berhasil dicatat!');
+      setTimeout(() => {
+        onSuccess();
+      }, 1500);
     } catch (err) {
       console.error(err);
-      alert('Gagal membuat komplain. Silakan coba lagi.');
+      setError(err.response?.data?.detail || 'Gagal membuat komplain. Silakan coba lagi.');
     } finally {
       setLoading(false);
     }
@@ -63,6 +72,19 @@ export default function KomplainModal({ isOpen, onClose, order, onSuccess, defau
         
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {error && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold flex items-center gap-2 animate-[slideDown_0.2s_ease-out]">
+              <AlertTriangle size={14} className="shrink-0 text-rose-500" />
+              <span>{error}</span>
+            </div>
+          )}
+          {success && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-semibold flex items-center gap-2 animate-[slideDown_0.2s_ease-out]">
+              <CheckCircle2 size={14} className="shrink-0 text-emerald-500 animate-pulse" />
+              <span>{success}</span>
+            </div>
+          )}
+
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col gap-2.5">
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-1 bg-white rounded-lg shadow-sm border border-slate-200 text-xs font-black text-slate-800 font-mono">
