@@ -699,11 +699,13 @@ export default function Orders() {
                           {formatRupiah(order.total_harga)}
                         </div>
                         <div
-                          className={`text-[9px] font-semibold ${order.sisa_tagihan <= 0 ? 'text-emerald-500' : 'text-red-500'}`}
+                          className={`text-[9px] font-semibold ${order.total_harga <= 0 ? 'text-amber-650' : order.sisa_tagihan <= 0 ? 'text-emerald-500' : 'text-red-500'}`}
                         >
-                          {order.sisa_tagihan <= 0
-                            ? 'LUNAS'
-                            : `Sisa: ${formatRupiah(order.sisa_tagihan)}`}
+                          {order.total_harga <= 0
+                            ? 'Harga belum di-input'
+                            : order.sisa_tagihan <= 0
+                              ? 'LUNAS'
+                              : `Sisa: ${formatRupiah(order.sisa_tagihan)}`}
                         </div>
                       </td>
                       <td className="px-3 py-2 text-center">{renderBadge(order.status_global)}</td>
@@ -973,10 +975,10 @@ export default function Orders() {
                     </button>
                     
                     <div className={`flex flex-col items-center justify-center p-3 border rounded-xl shadow-2xs ${
-                      editModalData.sisa_tagihan <= 0 ? 'bg-emerald-50/50 border-emerald-250 text-emerald-800' : 'bg-red-50/50 border-red-250 text-red-800'
+                      editModalData.total_harga <= 0 ? 'bg-amber-50/50 border-amber-250 text-amber-800' : editModalData.sisa_tagihan <= 0 ? 'bg-emerald-50/50 border-emerald-250 text-emerald-800' : 'bg-red-50/50 border-red-250 text-red-800'
                     }`}>
-                      <span className="text-[11px] font-extrabold">
-                        {editModalData.sisa_tagihan <= 0 ? 'LUNAS' : formatRupiah(editModalData.sisa_tagihan)}
+                      <span className="text-[11px] font-extrabold text-center">
+                        {editModalData.total_harga <= 0 ? 'Harga belum di-input' : editModalData.sisa_tagihan <= 0 ? 'LUNAS' : formatRupiah(editModalData.sisa_tagihan)}
                       </span>
                       <span className="text-[9px] font-bold mt-1 opacity-75">Status Tagihan</span>
                     </div>
@@ -1685,9 +1687,11 @@ export default function Orders() {
                 <div className="flex justify-between pt-1 border-t border-dashed border-slate-300 text-indigo-700">
                   <span>SISA TAGIHAN:</span>
                   <span>
-                    {printOrder.sisa_tagihan <= 0
-                      ? 'LUNAS'
-                      : formatRupiah(printOrder.sisa_tagihan || 0)}
+                    {printOrder.total_harga <= 0
+                      ? 'Harga belum di-input'
+                      : printOrder.sisa_tagihan <= 0
+                        ? 'LUNAS'
+                        : formatRupiah(printOrder.sisa_tagihan || 0)}
                   </span>
                 </div>
               </div>
@@ -1829,12 +1833,14 @@ export default function Orders() {
                     <span>SISA TAGIHAN</span>
                     <span
                       className={
-                        printInvoiceOrder.sisa_tagihan <= 0 ? 'text-emerald-600' : 'text-red-600'
+                        printInvoiceOrder.total_harga <= 0 ? 'text-amber-600' : printInvoiceOrder.sisa_tagihan <= 0 ? 'text-emerald-600' : 'text-red-600'
                       }
                     >
-                      {printInvoiceOrder.sisa_tagihan <= 0
-                        ? 'LUNAS'
-                        : formatRupiah(printInvoiceOrder.sisa_tagihan)}
+                      {printInvoiceOrder.total_harga <= 0
+                        ? 'Harga belum di-input'
+                        : printInvoiceOrder.sisa_tagihan <= 0
+                          ? 'LUNAS'
+                          : formatRupiah(printInvoiceOrder.sisa_tagihan)}
                     </span>
                   </div>
                 </div>
@@ -2157,11 +2163,13 @@ export default function Orders() {
                   <div className="grid grid-cols-2 p-1.5 bg-red-50/10">
                     <span className="text-red-900 text-[8px] uppercase">Sisa</span>
                     <span
-                      className={`text-right font-black ${printSpkOrder.sisa_tagihan <= 0 ? 'text-emerald-600' : 'text-red-650'}`}
+                      className={`text-right font-black ${printSpkOrder.total_harga <= 0 ? 'text-amber-600' : printSpkOrder.sisa_tagihan <= 0 ? 'text-emerald-600' : 'text-red-650'}`}
                     >
-                      {printSpkOrder.sisa_tagihan <= 0
-                        ? 'LUNAS'
-                        : formatRupiah(printSpkOrder.sisa_tagihan)}
+                      {printSpkOrder.total_harga <= 0
+                        ? 'Harga belum di-input'
+                        : printSpkOrder.sisa_tagihan <= 0
+                          ? 'LUNAS'
+                          : formatRupiah(printSpkOrder.sisa_tagihan)}
                     </span>
                   </div>
                 </div>
