@@ -25,6 +25,7 @@ class LocalErrorBoundary extends Component {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Client-Log-Auth': 'BintangClientLogSecretKey123',
         },
         body: JSON.stringify({
           error: error?.message || String(error),
