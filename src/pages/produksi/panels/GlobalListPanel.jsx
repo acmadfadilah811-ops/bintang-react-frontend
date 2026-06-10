@@ -25,6 +25,22 @@ const STATUS_COLORS = {
   batal: 'bg-red-100 text-red-700 border-red-200',
 };
 
+const getKonsepDesain = (detail) => {
+  if (!detail) return null;
+  try {
+    const arr = typeof detail === 'string' ? JSON.parse(detail) : detail;
+    if (Array.isArray(arr)) {
+      const found = arr.find(d => d && (d.key === 'Konsep Desain' || d.key === 'konsep_desain'));
+      if (found && found.value) {
+        return found.value;
+      }
+    }
+  } catch (e) {
+    console.error("Error parsing detail:", e);
+  }
+  return null;
+};
+
 const STATUS_LABEL = {
   review: 'Menunggu Review',
   desain: 'Proses Desain',
@@ -471,6 +487,38 @@ export default function GlobalListPanel() {
                                 <span className="text-slate-400 ml-1.5">
                                   {item.panjang}×{item.lebar}m
                                 </span>
+                              )}
+                              {item.keterangan_detail && (
+                                <div className="mt-1 text-[10px] text-indigo-700 bg-indigo-50/50 border border-indigo-100/50 rounded px-2 py-1 font-semibold whitespace-pre-line leading-relaxed max-w-lg text-left">
+                                  <span className="block text-[8px] font-black text-indigo-500 uppercase tracking-wider mb-0.5">
+                                    {item.keterangan_detail.startsWith('Konsep Desain:') ? 'Konsep Desain' : 'Catatan CS'}
+                                  </span>
+                                  {(() => {
+                                    const konsep = getKonsepDesain(item.detail);
+                                    if (konsep) {
+                                      return (
+                                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1 text-[9.5px]">
+                                          <div>
+                                            <span className="text-indigo-400 font-bold">Tulisan:</span> {konsep.tulisan || '-'}
+                                          </div>
+                                          <div>
+                                            <span className="text-indigo-400 font-bold">Warna:</span> {konsep.warna_dominan || '-'}
+                                          </div>
+                                          <div>
+                                            <span className="text-indigo-400 font-bold">Logo/Foto:</span> {konsep.logo_foto || '-'}
+                                          </div>
+                                          <div>
+                                            <span className="text-indigo-400 font-bold">Bentuk:</span> {konsep.bentuk || '-'}
+                                          </div>
+                                          <div className="col-span-2">
+                                            <span className="text-indigo-400 font-bold">Request:</span> {konsep.request_tambahan || '-'}
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return item.keterangan_detail.startsWith('Konsep Desain:') ? item.keterangan_detail.replace('Konsep Desain:\n', '') : item.keterangan_detail;
+                                  })()}
+                                </div>
                               )}
                             </div>
                             <div className="flex items-center gap-3 text-right">

@@ -48,17 +48,37 @@ export default function KanbanGlobalPanel() {
   useEffect(() => {
     if (workspaceJob) {
       const updatedJob = jobs.find((j) => j.id === workspaceJob.job.id);
-      if (updatedJob && JSON.stringify(updatedJob) !== JSON.stringify(workspaceJob.job)) {
-        setWorkspaceJob((prev) => ({ ...prev, job: updatedJob }));
+      const orderItemId = typeof workspaceJob.job.order_item === 'object' ? workspaceJob.job.order_item?.id : workspaceJob.job.order_item;
+      const updatedOrderInfo = orderMap[orderItemId];
+      
+      const jobChanged = updatedJob && JSON.stringify(updatedJob) !== JSON.stringify(workspaceJob.job);
+      const orderChanged = updatedOrderInfo && JSON.stringify(updatedOrderInfo) !== JSON.stringify(workspaceJob.orderItemData);
+      
+      if (jobChanged || orderChanged) {
+        setWorkspaceJob((prev) => ({
+          ...prev,
+          job: updatedJob || prev.job,
+          orderItemData: updatedOrderInfo || prev.orderItemData
+        }));
       }
     }
     if (workspaceReviewJob) {
       const updatedJob = jobs.find((j) => j.id === workspaceReviewJob.job.id);
-      if (updatedJob && JSON.stringify(updatedJob) !== JSON.stringify(workspaceReviewJob.job)) {
-        setWorkspaceReviewJob((prev) => ({ ...prev, job: updatedJob }));
+      const orderItemId = typeof workspaceReviewJob.job.order_item === 'object' ? workspaceReviewJob.job.order_item?.id : workspaceReviewJob.job.order_item;
+      const updatedOrderInfo = orderMap[orderItemId];
+      
+      const jobChanged = updatedJob && JSON.stringify(updatedJob) !== JSON.stringify(workspaceReviewJob.job);
+      const orderChanged = updatedOrderInfo && JSON.stringify(updatedOrderInfo) !== JSON.stringify(workspaceReviewJob.orderItemData);
+      
+      if (jobChanged || orderChanged) {
+        setWorkspaceReviewJob((prev) => ({
+          ...prev,
+          job: updatedJob || prev.job,
+          orderItemData: updatedOrderInfo || prev.orderItemData
+        }));
       }
     }
-  }, [jobs, workspaceJob, workspaceReviewJob]);
+  }, [jobs, orderMap, workspaceJob, workspaceReviewJob]);
 
   // Buka workspace sesuai kolom status
   const openWorkspace = (job) => {

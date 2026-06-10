@@ -232,6 +232,19 @@ export default function ProductionApp() {
     return () => clearInterval(intervalId);
   }, [modeInitialized, isAdminMode, fetchAdminData, fetchJobs]);
 
+  // Sync selectedWorkspaceJob with background updates
+  useEffect(() => {
+    if (selectedWorkspaceJob) {
+      const listToSearch = isAdminMode ? globalJobs : jobs;
+      const freshJob = listToSearch.find((j) => j.id === selectedWorkspaceJob.id);
+      if (freshJob) {
+        if (JSON.stringify(freshJob) !== JSON.stringify(selectedWorkspaceJob)) {
+          setSelectedWorkspaceJob(freshJob);
+        }
+      }
+    }
+  }, [jobs, globalJobs, selectedWorkspaceJob, isAdminMode]);
+
   // Lazy load tab data dynamically on activeTab change
   useEffect(() => {
     if (!modeInitialized) return;

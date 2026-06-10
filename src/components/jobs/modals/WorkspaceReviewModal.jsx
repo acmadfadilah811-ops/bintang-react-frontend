@@ -12,6 +12,22 @@ import {
 import { parsePreviousNotes } from '../jobConstants';
 import KomplainModal from '../../orders/KomplainModal';
 
+const getKonsepDesain = (detail) => {
+  if (!detail) return null;
+  try {
+    const arr = typeof detail === 'string' ? JSON.parse(detail) : detail;
+    if (Array.isArray(arr)) {
+      const found = arr.find(d => d && (d.key === 'Konsep Desain' || d.key === 'konsep_desain'));
+      if (found && found.value) {
+        return found.value;
+      }
+    }
+  } catch (e) {
+    console.error("Error parsing detail:", e);
+  }
+  return null;
+};
+
 export default function WorkspaceReviewModal({ workspaceJob, onRevisi, onClose }) {
   const [isKomplainOpen, setIsKomplainOpen] = useState(false);
   if (!workspaceJob) return null;
@@ -99,16 +115,51 @@ export default function WorkspaceReviewModal({ workspaceJob, onRevisi, onClose }
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 text-[11px]">
-            {/* Keterangan CS */}
+            {/* Keterangan CS / Konsep Desain */}
             <div>
               <span className="block font-bold text-slate-500 uppercase text-[9px] tracking-wider mb-0.5">
-                Keterangan Khusus dari CS (Finishing)
+                {orderItemData?.keteranganDetail?.startsWith('Konsep Desain:') ? 'Konsep Desain' : 'Keterangan Khusus dari CS (Finishing)'}
               </span>
-              <div className="bg-slate-50 border border-slate-200 rounded p-2 min-h-[30px] text-slate-700 whitespace-pre-line leading-relaxed">
-                {orderItemData?.keteranganDetail || (
-                  <span className="text-slate-400 italic">Tidak ada keterangan khusus</span>
-                )}
-              </div>
+              {(() => {
+                const konsep = getKonsepDesain(orderItemData?.keterangan);
+                if (konsep) {
+                  return (
+                    <div className="bg-indigo-50/40 border border-indigo-100/60 rounded-lg p-2.5 space-y-1.5 text-xs text-indigo-950 font-medium">
+                      <div className="grid grid-cols-3 gap-2 border-b border-indigo-100/30 pb-1.5">
+                        <div>
+                          <span className="block text-[8px] uppercase text-indigo-500 font-black">Tulisan yang Dimuat</span>
+                          <span className="font-extrabold">{konsep.tulisan || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[8px] uppercase text-indigo-500 font-black">Warna Dominan</span>
+                          <span className="font-extrabold">{konsep.warna_dominan || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[8px] uppercase text-indigo-500 font-black">Logo / Foto</span>
+                          <span className="font-extrabold">{konsep.logo_foto || '-'}</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="block text-[8px] uppercase text-indigo-500 font-black">Bentuk / Layout</span>
+                          <span className="font-bold">{konsep.bentuk || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[8px] uppercase text-indigo-500 font-black">Request Tambahan</span>
+                          <span className="font-bold">{konsep.request_tambahan || '-'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="bg-slate-50 border border-slate-200 rounded p-2 min-h-[30px] text-slate-700 whitespace-pre-line leading-relaxed">
+                    {orderItemData?.keteranganDetail || (
+                      <span className="text-slate-400 italic">Tidak ada keterangan khusus</span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Catatan Pelanggan */}

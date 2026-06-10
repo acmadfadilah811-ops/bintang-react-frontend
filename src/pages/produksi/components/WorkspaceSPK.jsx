@@ -3,6 +3,22 @@ import { Play, CheckCircle, Save, Trash, ChevronLeft, Download, Printer, Refresh
 import apiClient from '../../../api/apiClient';
 import KomplainModal from '../../../components/orders/KomplainModal';
 
+const getKonsepDesain = (detail) => {
+  if (!detail) return null;
+  try {
+    const arr = typeof detail === 'string' ? JSON.parse(detail) : detail;
+    if (Array.isArray(arr)) {
+      const found = arr.find(d => d && (d.key === 'Konsep Desain' || d.key === 'konsep_desain'));
+      if (found && found.value) {
+        return found.value;
+      }
+    }
+  } catch (e) {
+    console.error("Error parsing detail:", e);
+  }
+  return null;
+};
+
 const COLS = ['A','B','C','D','E','F','G','H'];
 const FREE_ROWS = 20;
 const mkEmpty = () => Array.from({ length: FREE_ROWS }, () => Array(COLS.length).fill(''));
@@ -405,20 +421,78 @@ export default function WorkspaceSPK({ job, onClose, onStart, onComplete, saving
                   />
                 </td>
               </tr>
-              <tr className="h-14 hover:bg-slate-50/30">
-                <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
-                  5
-                </td>
-                <td className="bg-[#f9f9f9] px-2 font-extrabold text-slate-500 border border-[#ccc] uppercase">
-                  CATATAN CS (FINISHING)
-                </td>
-                <td
-                  colSpan={3}
-                  className="px-3 py-2 text-amber-800 bg-amber-50/40 border border-[#ccc] align-top leading-relaxed font-semibold"
-                >
-                  {item.keterangan_detail || 'Tidak ada catatan pengerjaan spesifik.'}
-                </td>
-              </tr>
+              {(() => {
+                const konsep = getKonsepDesain(item.detail);
+                if (konsep) {
+                  return (
+                    <>
+                      <tr className="bg-indigo-50/10">
+                        <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
+                          5a
+                        </td>
+                        <td className="bg-[#e8eaf6] px-2 font-extrabold text-indigo-900 border border-[#ccc] uppercase">
+                          KONSEP DESAIN (TULISAN)
+                        </td>
+                        <td colSpan={3} className="px-2 font-bold text-slate-800 border border-[#ccc] py-1 bg-white whitespace-pre-wrap">
+                          {konsep.tulisan || '-'}
+                        </td>
+                      </tr>
+                      <tr className="bg-indigo-50/10">
+                        <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
+                          5b
+                        </td>
+                        <td className="bg-[#e8eaf6] px-2 font-extrabold text-indigo-900 border border-[#ccc] uppercase">
+                          WARNA DOMINAN
+                        </td>
+                        <td className="px-2 font-bold text-slate-800 border border-[#ccc] bg-white">
+                          {konsep.warna_dominan || '-'}
+                        </td>
+                        <td className="bg-[#e8eaf6] px-2 font-extrabold text-indigo-900 border border-[#ccc] uppercase">
+                          LOGO / FOTO
+                        </td>
+                        <td className="px-2 font-bold text-slate-800 border border-[#ccc] bg-white">
+                          {konsep.logo_foto || '-'}
+                        </td>
+                      </tr>
+                      <tr className="bg-indigo-50/10">
+                        <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
+                          5c
+                        </td>
+                        <td className="bg-[#e8eaf6] px-2 font-extrabold text-indigo-900 border border-[#ccc] uppercase">
+                          BENTUK / LAYOUT
+                        </td>
+                        <td className="px-2 font-bold text-slate-800 border border-[#ccc] bg-white">
+                          {konsep.bentuk || '-'}
+                        </td>
+                        <td className="bg-[#e8eaf6] px-2 font-extrabold text-indigo-900 border border-[#ccc] uppercase">
+                          REQ TAMBAHAN
+                        </td>
+                        <td className="px-2 font-bold text-slate-800 border border-[#ccc] bg-white">
+                          {konsep.request_tambahan || '-'}
+                        </td>
+                      </tr>
+                    </>
+                  );
+                }
+                
+                const label = item.keterangan_detail?.startsWith('Konsep Desain:') ? 'KONSEP DESAIN' : 'CATATAN CS (FINISHING)';
+                return (
+                  <tr className="h-14 hover:bg-slate-50/30">
+                    <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
+                      5
+                    </td>
+                    <td className="bg-[#f9f9f9] px-2 font-extrabold text-slate-500 border border-[#ccc] uppercase">
+                      {label}
+                    </td>
+                    <td
+                      colSpan={3}
+                      className="px-3 py-2 text-amber-800 bg-amber-50/40 border border-[#ccc] align-top leading-relaxed font-semibold whitespace-pre-wrap"
+                    >
+                      {item.keterangan_detail || 'Tidak ada catatan pengerjaan spesifik.'}
+                    </td>
+                  </tr>
+                );
+              })()}
               <tr className="h-8 hover:bg-slate-50/30">
                 <td className="bg-[#f3f3f3] text-center font-bold text-[9px] text-slate-400 border border-[#ccc] select-none w-8">
                   6
