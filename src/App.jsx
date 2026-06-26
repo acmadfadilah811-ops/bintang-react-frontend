@@ -6,29 +6,30 @@ import { AuthProvider } from './context/AuthContext';
 import { DynamicIslandProvider } from './context/DynamicIslandContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import AdminDashboard from './pages/AdminDashboard';
-import StaffDashboard from './pages/StaffDashboard';
-import Orders from './pages/Orders';
-import Inventory from './pages/Inventory';
-import Customers from './pages/Customers';
-import Settings from './pages/Settings';
-import Profile from './pages/Profile';
-import Employees from './pages/Employees';
-import Payroll from './pages/Payroll';
-import Attendance from './pages/Attendance';
-import BukuBesar from './pages/BukuBesar';
-import Announcements from './pages/Announcements';
-import Pricelist from './pages/Pricelist';
-import Divisi from './pages/Divisi';
-import Reports from './pages/Reports';
-import Komplain from './pages/Komplain';
+import Login from './features/auth/pages/Login';
+import Dashboard from './features/dashboard/pages/Dashboard';
+import AdminDashboard from './features/dashboard/pages/AdminDashboard';
+import StaffDashboard from './features/dashboard/pages/StaffDashboard';
+import Orders from './features/orders/pages/Orders';
+import Inventory from './features/inventory/pages/Inventory';
+import Customers from './features/customerSupplier/pages/CustomersPageLegacy';
+import Settings from './features/settings/pages/Settings';
+import Profile from './features/settings/pages/Profile';
+import Employees from './features/hr/pages/Employees';
+import Payroll from './features/hr/pages/Payroll';
+import Attendance from './features/hr/pages/Attendance';
+import BukuBesar from './features/finance/pages/BukuBesar';
+import Announcements from './features/announcements/pages/Announcements';
+import Pricelist from './features/catalog/pages/Pricelist';
+import Divisi from './features/hr/pages/Divisi';
+import Reports from './features/reports/pages/Reports';
+import Komplain from './features/komplain/pages/Komplain';
 import { useAuth } from './context/AuthContext';
-import ProductionApp from './pages/produksi/ProductionApp';
-import WhatsAppChat from './pages/WhatsAppChat';
-import UploadDesain from './pages/UploadDesain';
-import ProductInventoryApp from './pages/productInventory/ProductInventoryApp';
+import ProductionApp from './features/production/pages/ProductionApp';
+import WhatsAppChat from './features/whatsapp/pages/WhatsAppChat';
+import UploadDesain from './features/orders/pages/UploadDesain';
+import ProductInventoryApp from './features/inventory/pages/ProductInventoryApp';
+import CustomerSupplierApp from './features/customerSupplier/pages/CustomerSupplierApp';
 
 let globalAlertTrigger = null;
 
@@ -126,6 +127,7 @@ function App() {
                 <Route path="/produksi/*" element={<ProductionApp />} />
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/product-inventory/*" element={<ProductInventoryApp />} />
+                <Route path="/customer-supplier/*" element={<CustomerSupplierApp />} />
                 <Route path="/attendance" element={<Attendance />} />
                 <Route path="/whatsapp-chat" element={<WhatsAppChat />} />
                 <Route path="/komplain" element={<Komplain />} />

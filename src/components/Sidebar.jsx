@@ -45,8 +45,11 @@ const groupedMenuOwnerManager = [
       { path: '/product-inventory/barcode', label: 'Cetak Barcode Produk', icon: Barcode },
       { path: '/product-inventory/price-label', label: 'Cetak Label Harga', icon: Tag },
       { path: '/product-inventory/deposit', label: 'Deposit', icon: Receipt },
+      { path: '/product-inventory/pos-stock-mode', label: 'Mode Stok POS', icon: Settings },
+      { path: '/product-inventory/merge-stocks', label: 'Gabung Stok', icon: Layers },
     ],
   },
+  { path: '/customer-supplier', label: 'Pelanggan & Supplier', icon: Users, isGroup: false },
   {
     id: 'operasional',
     label: 'Operasional',
@@ -147,6 +150,7 @@ export default function Sidebar() {
     if (path === '/announcements') return 'announcements';
     if (path === '/reports') return 'reports';
     if (path.startsWith('/product-inventory')) return 'product-inventory';
+    if (path.startsWith('/customer-supplier')) return 'customer-supplier';
     if (path === '/inventory') return 'inventory';
     if (path === '/buku-besar') return 'buku-besar';
     if (path === '/pricelist') return 'pricelist';
@@ -238,7 +242,7 @@ export default function Sidebar() {
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto overflow-x-hidden sidebar-scrollbar bg-white">
         {filteredMenu.map((item) => {
           if (!item.isGroup) {
-            const isActive = location.pathname === item.path;
+            const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
             const Icon = item.icon;
             return (
               <button

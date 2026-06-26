@@ -79,7 +79,7 @@ export default function Layout() {
     return (
       <div className="h-screen w-full flex flex-col overflow-hidden bg-[#F4F7FE] relative">
         {/* Header / Topbar */}
-        {!location.pathname.startsWith('/product-inventory') && (
+        {!location.pathname.startsWith('/product-inventory') && !location.pathname.startsWith('/customer-supplier') && (
           <div className="shrink-0 h-[72px] relative z-40 bg-white border-b border-slate-200">
             <Topbar />
           </div>
@@ -119,9 +119,9 @@ export default function Layout() {
     <div className="bg-[#F4F7FE] flex h-screen overflow-hidden font-sans">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden relative">
-        {!location.pathname.startsWith('/product-inventory') && <Topbar />}
-        <main className={`flex-1 overflow-y-auto scroll-smooth transition-all duration-300 ${location.pathname.startsWith('/product-inventory') ? 'p-0' : 'p-6 md:p-8'}`}>
-          <div className={location.pathname.startsWith('/product-inventory') ? 'w-full' : 'max-w-[1600px] mx-auto'}>
+        {!location.pathname.startsWith('/product-inventory') && !location.pathname.startsWith('/customer-supplier') && <Topbar />}
+        <main className={`flex-1 overflow-y-auto scroll-smooth transition-all duration-300 ${(location.pathname.startsWith('/product-inventory') || location.pathname.startsWith('/customer-supplier')) ? 'p-0' : 'p-6 md:p-8'}`}>
+          <div className={(location.pathname.startsWith('/product-inventory') || location.pathname.startsWith('/customer-supplier')) ? 'w-full' : 'max-w-[1600px] mx-auto'}>
             <Outlet />
           </div>
         </main>
