@@ -1,20 +1,85 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Search } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import { StatusBadge } from '../components/PageShell';
-import { categories } from '../productInventoryData';
+import apiClient from '../../../../api/apiClient';
 
 export function CategoriesPage() {
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+
   const [namaGrup, setNamaGrup] = useState('');
   const [klasifikasi, setKlasifikasi] = useState('');
   const [nonAktifkan, setNonAktifkan] = useState(false);
   const [tidakMunculPos, setTidakMunculPos] = useState(false);
   const [tidakMunculNavWeb, setTidakMunculNavWeb] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null);
 
-  const filteredCategories = categories.filter(cat => 
-    cat.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const handlePhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setSelectedPhoto(file);
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const fetchCategories = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.get('/product-categories/');
+      setCategories(Array.isArray(res.data) ? res.data : res.data?.results || []);
+    } catch (err) {
+      console.error('[CategoriesPage] fetch error:', err);
+      setError('Gagal memuat daftar kategori.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const handleSave = async () => {
+    if (!namaGrup.trim() || !klasifikasi || saving) return;
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append('nama', namaGrup);
+      fd.append('klasifikasi', klasifikasi);
+      fd.append('is_active', String(!nonAktifkan));
+      fd.append('tampil_pos', String(!tidakMunculPos));
+      fd.append('tampil_nav_web', String(!tidakMunculNavWeb));
+      if (selectedPhoto) fd.append('foto', selectedPhoto);
+
+      await apiClient.post('/product-categories/', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setNamaGrup('');
+      setKlasifikasi('');
+      setNonAktifkan(false);
+      setTidakMunculPos(false);
+      setTidakMunculNavWeb(false);
+      setSelectedPhoto(null);
+      setPhotoPreviewUrl(null);
+      await fetchCategories();
+    } catch (err) {
+      console.error('[CategoriesPage] save error:', err);
+      setError('Gagal menyimpan kategori.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const filteredCategories = categories.filter(cat =>
+    cat.nama.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const canSave = namaGrup.trim() && klasifikasi && !saving;
 
   return (
     <div className="pi-category-layout">
@@ -22,22 +87,23 @@ export function CategoriesPage() {
       <div className="pi-category-card">
         <div className="pi-category-card-header">
           <h3>Tambah Group/Kategori</h3>
-          <button 
-            type="button" 
-            className="pi-btn" 
-            disabled 
-            style={{ 
-              background: '#e2e8f0', 
-              color: '#94a3b8', 
-              border: '0', 
-              cursor: 'not-allowed', 
-              padding: '6px 16px', 
-              borderRadius: '4px', 
-              fontSize: '12px', 
-              fontWeight: 'bold' 
+          <button
+            type="button"
+            className="pi-btn"
+            disabled={!canSave}
+            onClick={handleSave}
+            style={{
+              background: canSave ? '#16a34a' : '#e2e8f0',
+              color: canSave ? '#fff' : '#94a3b8',
+              border: '0',
+              cursor: canSave ? 'pointer' : 'not-allowed',
+              padding: '6px 16px',
+              borderRadius: '4px',
+              fontSize: '12px',
+              fontWeight: 'bold'
             }}
           >
-            Simpan
+            {saving ? 'Menyimpan...' : 'Simpan'}
           </button>
         </div>
         <div className="pi-category-card-body">
@@ -63,7 +129,7 @@ export function CategoriesPage() {
             <div className="pi-create-row" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
               <div className="pi-row-label-desc">
                 <span className="pi-row-label">Klasifikasi <span style={{ color: '#ef4444' }}>*</span></span>
-                <span className="pi-row-desc">Memilih produk klasifikasi yang benar akan memudahkan pelanggan mencari produk anda di Marketplace olsera.com</span>
+                <span className="pi-row-desc">Memilih klasifikasi produk yang benar akan memudahkan pelanggan mencari produk Anda</span>
               </div>
               <div className="pi-row-input">
                 <select 
@@ -86,9 +152,14 @@ export function CategoriesPage() {
                 <span className="pi-row-label">Product Group Photo <span style={{ color: '#ef4444' }}>*</span></span>
               </div>
               <div className="pi-row-input">
-                <div className="pi-category-photo-upload">
-                  <Plus size={24} />
-                </div>
+                <label className="pi-category-photo-upload" style={{ cursor: 'pointer', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {photoPreviewUrl ? (
+                    <img src={photoPreviewUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <Plus size={24} />
+                  )}
+                  <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
+                </label>
               </div>
             </div>
 
@@ -164,14 +235,16 @@ export function CategoriesPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+          {error && <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 8 }}>{error}</p>}
           <DataTable
             rows={filteredCategories}
+            emptyText={loading ? 'Memuat...' : 'Tidak ada data'}
             columns={[
-              { key: 'name', label: 'Nama Grup' },
-              { key: 'classification', label: 'Klasifikasi' },
-              { key: 'pos', label: 'Tampil di POS', render: (row) => <StatusBadge active={row.pos} label={row.pos ? 'Ya' : 'Tidak'} /> },
-              { key: 'web', label: 'Tampil di Web', render: (row) => <StatusBadge active={row.web} label={row.web ? 'Ya' : 'Tidak'} /> },
-              { key: 'active', label: 'Status', render: (row) => <StatusBadge active={row.active} /> },
+              { key: 'nama', label: 'Nama Grup' },
+              { key: 'klasifikasi', label: 'Klasifikasi', render: (row) => row.klasifikasi || '-' },
+              { key: 'tampil_pos', label: 'Tampil di POS', render: (row) => <StatusBadge active={row.tampil_pos} label={row.tampil_pos ? 'Ya' : 'Tidak'} /> },
+              { key: 'tampil_nav_web', label: 'Tampil di Web', render: (row) => <StatusBadge active={row.tampil_nav_web} label={row.tampil_nav_web ? 'Ya' : 'Tidak'} /> },
+              { key: 'is_active', label: 'Status', render: (row) => <StatusBadge active={row.is_active} /> },
             ]}
           />
         </div>

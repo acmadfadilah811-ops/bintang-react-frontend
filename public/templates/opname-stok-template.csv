@@ -1,0 +1,3 @@
+time,product,variant,sku,qty,rack
+09:00,Contoh Produk A,,SKU-001,10,rack1
+09:05,Contoh Produk B,"warna,ukuran",SKU-002,5,rack2

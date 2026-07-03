@@ -1,15 +1,52 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, ChevronDown, Calendar, Printer, X, Plus, CloudUpload, Download, Check, ChevronsUpDown, ArrowLeft } from 'lucide-react';
-import { useAuth } from '../../../../context/AuthContext';
+import { Search, ChevronDown, Calendar, Printer, X, Plus, CloudUpload, Download, Check, ChevronsUpDown, ArrowLeft, Trash2 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { PolarBearSvg } from './_shared';
-import { stockIncoming } from '../productInventoryData';
+import apiClient from '../../../../api/apiClient';
+import { useAuth } from '../../../../context/AuthContext';
+
+const getLogoUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  const apiBase = (import.meta.env.VITE_API_URL || 'https://bintang-adv.duckdns.org/api').replace('/api', '');
+  return `${apiBase}${url.startsWith('/') ? url : `/${url}`}`;
+};
+
+const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const STATUS_LABEL = { draft: 'Draft', selesai: 'Selesai', batal: 'Batal' };
+
+const formatDisplayDate = (isoStr) => {
+  if (!isoStr) return '-';
+  const d = new Date(`${isoStr}T00:00:00`);
+  if (isNaN(d.getTime())) return '-';
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${day}-${MONTHS_ID[d.getMonth()]}-${d.getFullYear()}`;
+};
+
+const mapDocToRow = (doc) => ({
+  id: doc.id,
+  no: doc.nomor,
+  from: doc.nama_penerima || '-',
+  supplier: doc.supplier || '-',
+  date: formatDisplayDate(doc.tanggal),
+  note: doc.catatan || '-',
+  status: STATUS_LABEL[doc.status] || doc.status,
+  receivedBy: doc.dibuat_oleh_nama || '-',
+  // Nilai mentah (bukan untuk tampilan) — dipakai saat export XLSX agar cocok kolom asli Olsera
+  supplierRaw: doc.supplier || '',
+  tanggalRaw: doc.tanggal || '',
+  noteRaw: doc.catatan || '',
+  receiverNameRaw: doc.nama_penerima || '',
+  receivedByRaw: doc.dibuat_oleh_nama || '',
+});
+
+const formatCurrencyRp = (value) =>
+  new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value || 0);
 
 export function StockInPage({ onToggleCreate, viewState: propViewState }) {
-  const { user } = useAuth();
-  const activeUserEmail = user?.email || 'bayumaruf1410@gmail.com';
-
+  const { businessSettings } = useAuth();
   const [viewState, setViewState] = useState('list'); // 'list', 'create', 'detail'
-  
+
   useEffect(() => {
     if (propViewState) {
       setViewState(propViewState);
@@ -18,33 +55,74 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
 
   const [showTambahDropdown, setShowTambahDropdown] = useState(false);
   const [showPembelianModal, setShowPembelianModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
 
-  // Stock List State loaded from LocalStorage
-  const [stockList, setStockList] = useState(() => {
-    const saved = localStorage.getItem('stock_ins');
-    return saved ? JSON.parse(saved) : stockIncoming;
-  });
-  const [nextDocNumber, setNextDocNumber] = useState(() => {
-    const saved = localStorage.getItem('stock_ins_next_num');
-    return saved ? parseInt(saved, 10) : 3;
-  });
+  // Stock List State (dari API)
+  const [stockList, setStockList] = useState([]);
+  const [listLoading, setListLoading] = useState(true);
+
+  const fetchDocuments = async () => {
+    setListLoading(true);
+    try {
+      const res = await apiClient.get('/stock-in-documents/');
+      const data = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      setStockList(data.map(mapDocToRow));
+    } catch (err) {
+      console.error('[StockInPage] fetch documents error:', err);
+    } finally {
+      setListLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
 
   // Form State
   const [tanggal, setTanggal] = useState('2026-06-25');
   const [catatan, setCatatan] = useState('');
-  const [diterimaDari, setDiterimaDari] = useState('');
+  const [namaPenerima, setNamaPenerima] = useState('');
   const [supplier, setSupplier] = useState('');
 
   const [searchPembelian, setSearchPembelian] = useState('');
   const [searchProduct, setSearchProduct] = useState('');
+  const [productOptions, setProductOptions] = useState([]);
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const [searchListQuery, setSearchListQuery] = useState('');
+  const [itemSaving, setItemSaving] = useState(false);
 
   // Qty Counter State for Detail Product Add
   const [qtyValue, setQtyValue] = useState(1);
   const [productHargaBeli, setProductHargaBeli] = useState('0');
 
-  // Active Detail Document (for Staging / Detail screen)
+  // Active Detail Document (for Staging / Detail screen) — dokumen mentah dari API
   const [activeDetailDoc, setActiveDetailDoc] = useState(null);
+
+  useEffect(() => {
+    if (!searchProduct.trim()) {
+      setProductOptions([]);
+      return;
+    }
+    const handle = setTimeout(async () => {
+      try {
+        const res = await apiClient.get('/products/', { params: { search: searchProduct } });
+        const data = Array.isArray(res.data) ? res.data : res.data?.results || [];
+        setProductOptions(data);
+      } catch (err) {
+        console.error('[StockInPage] search product error:', err);
+      }
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [searchProduct]);
+
+  const fetchDocumentDetail = async (id) => {
+    const res = await apiClient.get(`/stock-in-documents/${id}/`);
+    setActiveDetailDoc(res.data);
+    return res.data;
+  };
 
   // Sort & Pagination State
   const [sortKey, setSortKey] = useState('no');
@@ -55,13 +133,13 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
   // Inline editing states for Detail Metadata Cards
   const [isEditingTanggal, setIsEditingTanggal] = useState(false);
   const [isEditingCatatan, setIsEditingCatatan] = useState(false);
-  const [isEditingDiterimaDari, setIsEditingDiterimaDari] = useState(false);
+  const [isEditingNamaPenerima, setIsEditingNamaPenerima] = useState(false);
   const [isEditingSupplier, setIsEditingSupplier] = useState(false);
 
   // Inline edit input value states
   const [editTanggalValue, setEditTanggalValue] = useState('');
   const [editCatatanValue, setEditCatatanValue] = useState('');
-  const [editDiterimaDariValue, setEditDiterimaDariValue] = useState('');
+  const [editNamaPenerimaValue, setEditNamaPenerimaValue] = useState('');
   const [editSupplierValue, setEditSupplierValue] = useState('');
 
   const [validationError, setValidationError] = useState('');
@@ -117,11 +195,6 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
     document.addEventListener('mouseup', onMouseUp);
   };
 
-  useEffect(() => {
-    localStorage.setItem('stock_ins', JSON.stringify(stockList));
-    localStorage.setItem('stock_ins_next_num', nextDocNumber.toString());
-  }, [stockList, nextDocNumber]);
-
   // Reset page when filter changes
   useEffect(() => {
     setCurrentPage(1);
@@ -132,71 +205,85 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
     if (onToggleCreate) {
       onToggleCreate(state);
     }
+    if (state === 'list') {
+      fetchDocuments();
+    }
   };
 
-  // Form creation staging handler
-  const handleStageStock = () => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-    const d = new Date(tanggal);
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = months[d.getMonth()];
-    const year = d.getFullYear();
-    const formattedDate = `${day}-${month}-${year}`;
+  // Buat dokumen draft baru di backend, lalu lanjut ke layar staging produk
+  const handleStageStock = async () => {
+    try {
+      const res = await apiClient.post('/stock-in-documents/', {
+        tanggal,
+        catatan,
+        nama_penerima: namaPenerima,
+        supplier,
+      });
+      setActiveDetailDoc(res.data);
+      handleStateChange('detail');
 
-    const numStr = String(nextDocNumber).padStart(8, '0');
-    const newDocNo = `IN260623${numStr}`;
-
-    const newStagedRecord = {
-      no: newDocNo,
-      from: diterimaDari || '-',
-      supplier: supplier || '-',
-      date: formattedDate,
-      note: catatan || '-',
-      status: 'Draft',
-      receivedBy: activeUserEmail
-    };
-
-    setActiveDetailDoc(newStagedRecord);
-    handleStateChange('detail');
-
-    // Reset inputs
-    setTanggal('2026-06-25');
-    setCatatan('');
-    setDiterimaDari('');
-    setSupplier('');
+      setTanggal('2026-06-25');
+      setCatatan('');
+      setNamaPenerima('');
+      setSupplier('');
+    } catch (err) {
+      console.error('[StockInPage] create document error:', err);
+      setValidationError('Gagal membuat dokumen stok masuk.');
+    }
   };
 
-  // Commit document with chosen status and save to local list
-  const handleCommitStockIn = (status) => {
-    if (status === 'Selesai') {
-      const isDateEmpty = !activeDetailDoc.date || activeDetailDoc.date.trim() === '' || activeDetailDoc.date === '-';
-      const isNoteEmpty = !activeDetailDoc.note || activeDetailDoc.note.trim() === '' || activeDetailDoc.note === '-';
-      const isFromEmpty = !activeDetailDoc.from || activeDetailDoc.from.trim() === '' || activeDetailDoc.from === '-';
-      const isSupplierEmpty = !activeDetailDoc.supplier || activeDetailDoc.supplier.trim() === '' || activeDetailDoc.supplier === '-';
+  // Import CSV: buat dokumen draft baru lalu proses file CSV sekaligus
+  const handleImportCsv = async () => {
+    if (!importFile || importing) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const docRes = await apiClient.post('/stock-in-documents/', {
+        tanggal: new Date().toISOString().split('T')[0],
+        catatan: 'Import CSV',
+      });
+      const docId = docRes.data.id;
 
-      if (isDateEmpty || isNoteEmpty || isFromEmpty || isSupplierEmpty) {
-        let missing = [];
-        if (isDateEmpty) missing.push('Tanggal');
-        if (isNoteEmpty) missing.push('Catatan');
-        if (isFromEmpty) missing.push('Diterima Dari');
-        if (isSupplierEmpty) missing.push('Supplier');
+      const fd = new FormData();
+      fd.append('file', importFile);
+      const importRes = await apiClient.post(`/stock-in-documents/${docId}/import-csv/`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
 
-        setValidationError(`Harap isi semua kolom data yang wajib: ${missing.join(', ')} sebelum melakukan posting.`);
-        return;
+      setImportResult({ errors: importRes.data.errors || [], createdCount: importRes.data.created?.length || 0 });
+      setActiveDetailDoc(importRes.data.document);
+      setImportFile(null);
+      if ((importRes.data.created?.length || 0) > 0) {
+        setShowImportModal(false);
+        handleStateChange('detail');
       }
+    } catch (err) {
+      console.error('[StockInPage] import csv error:', err);
+      setImportResult({ errors: [err.response?.data?.error || 'Gagal mengimpor file CSV.'], createdCount: 0 });
+    } finally {
+      setImporting(false);
     }
+  };
 
-    const finalRecord = { ...activeDetailDoc, status: status };
-
-    const exists = stockList.some(item => item.no === finalRecord.no);
-    if (exists) {
-      setStockList(stockList.map(item => item.no === finalRecord.no ? finalRecord : item));
-    } else {
-      setStockList([finalRecord, ...stockList]);
-      setNextDocNumber(prev => prev + 1);
+  // Draft = kembali ke daftar (dokumen sudah otomatis tersimpan sbg draft di backend)
+  // Batal = panggil action cancel
+  // Selesai = panggil action post-document (validasi header & item dilakukan backend)
+  const handleCommitStockIn = async (targetStatus) => {
+    if (targetStatus === 'Draft') {
+      handleStateChange('list');
+      return;
     }
-
-    handleStateChange('list');
+    try {
+      if (targetStatus === 'Batal') {
+        await apiClient.post(`/stock-in-documents/${activeDetailDoc.id}/cancel/`);
+      } else if (targetStatus === 'Selesai') {
+        await apiClient.post(`/stock-in-documents/${activeDetailDoc.id}/post-document/`);
+      }
+      handleStateChange('list');
+    } catch (err) {
+      const message = err.response?.data?.error || 'Gagal memproses dokumen stok masuk.';
+      setValidationError(message);
+    }
   };
 
   const handleSort = (key) => {
@@ -206,6 +293,25 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
       setSortKey(key);
       setSortDirection('asc');
     }
+  };
+
+  const handleExport = (rows) => {
+    // Kolom & urutan persis file export asli Olsera (stockincoming-*.xlsx):
+    // no, supplier, transfer from, date, notes, status, received by, receiver name
+    const data = rows.map((row) => ({
+      no: row.no,
+      supplier: row.supplierRaw,
+      'transfer from': '',
+      date: row.tanggalRaw,
+      notes: row.noteRaw,
+      status: row.status,
+      'received by': row.receivedByRaw,
+      'receiver name': row.receiverNameRaw,
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+    XLSX.writeFile(wb, `stockincoming-${startDate}__${endDate}.xlsx`);
   };
 
   // Sorting and Filtering logic
@@ -343,32 +449,131 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
     }
   };
 
-  // inline updates
-  const saveInlineTanggal = () => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-    const d = new Date(editTanggalValue);
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = months[d.getMonth()];
-    const year = d.getFullYear();
-    const formatted = `${day}-${month}-${year}`;
+  // inline updates — PATCH langsung ke dokumen (hanya berlaku saat status draft)
+  const patchDocument = async (payload) => {
+    try {
+      const res = await apiClient.patch(`/stock-in-documents/${activeDetailDoc.id}/`, payload);
+      setActiveDetailDoc(res.data);
+    } catch (err) {
+      console.error('[StockInPage] patch document error:', err);
+      setValidationError(err.response?.data?.error || 'Gagal menyimpan perubahan.');
+    }
+  };
 
-    setActiveDetailDoc(prev => ({ ...prev, date: formatted }));
+  const saveInlineTanggal = async () => {
+    await patchDocument({ tanggal: editTanggalValue });
     setIsEditingTanggal(false);
   };
 
-  const saveInlineCatatan = () => {
-    setActiveDetailDoc(prev => ({ ...prev, note: editCatatanValue || '-' }));
+  const saveInlineCatatan = async () => {
+    await patchDocument({ catatan: editCatatanValue });
     setIsEditingCatatan(false);
   };
 
-  const saveInlineDiterimaDari = () => {
-    setActiveDetailDoc(prev => ({ ...prev, from: editDiterimaDariValue || '-' }));
-    setIsEditingDiterimaDari(false);
+  const saveInlineNamaPenerima = async () => {
+    await patchDocument({ nama_penerima: editNamaPenerimaValue });
+    setIsEditingNamaPenerima(false);
   };
 
-  const saveInlineSupplier = () => {
-    setActiveDetailDoc(prev => ({ ...prev, supplier: editSupplierValue || '-' }));
+  const saveInlineSupplier = async () => {
+    await patchDocument({ supplier: editSupplierValue });
     setIsEditingSupplier(false);
+  };
+
+  const handleAddItem = async () => {
+    if (!selectedProduct || itemSaving) return;
+    setItemSaving(true);
+    try {
+      await apiClient.post(`/stock-in-documents/${activeDetailDoc.id}/add-item/`, {
+        product: selectedProduct.id,
+        qty: qtyValue,
+        harga_beli: parseFloat(productHargaBeli) || 0,
+      });
+      await fetchDocumentDetail(activeDetailDoc.id);
+      setSelectedProduct(null);
+      setSearchProduct('');
+      setProductOptions([]);
+      setQtyValue(1);
+      setProductHargaBeli('0');
+    } catch (err) {
+      console.error('[StockInPage] add item error:', err);
+      setValidationError(err.response?.data?.error || 'Gagal menambah produk.');
+    } finally {
+      setItemSaving(false);
+    }
+  };
+
+  const handleRemoveItem = async (itemId) => {
+    try {
+      const res = await apiClient.post(`/stock-in-documents/${activeDetailDoc.id}/remove-item/`, { item_id: itemId });
+      setActiveDetailDoc(res.data);
+    } catch (err) {
+      console.error('[StockInPage] remove item error:', err);
+      setValidationError(err.response?.data?.error || 'Gagal menghapus produk.');
+    }
+  };
+
+  const handleCetak = () => {
+    if (!activeDetailDoc) return;
+    const doc = activeDetailDoc;
+    const esc = (v) => String(v ?? '-').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const fmtRp = (v) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(v) || 0).replace('Rp', 'IDR');
+    const namaBisnis = businessSettings?.nama_bisnis || '';
+    const logoUrl = getLogoUrl(businessSettings?.logo_url);
+    let totalQty = 0;
+    let totalJumlah = 0;
+    const rows = (doc.items || []).map((item, i) => {
+      const qty = Number(item.qty) || 0;
+      const jumlah = (Number(item.harga_beli) || 0) * qty;
+      totalQty += qty;
+      totalJumlah += jumlah;
+      return `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${esc(item.product_nama)}${item.product_sku ? ` (${esc(item.product_sku)})` : ''}${item.rak ? ` — Rak ${esc(item.rak)}` : ''}</td>
+        <td style="text-align:right">${qty} ${esc(item.product_satuan || '')}</td>
+        <td style="text-align:right">${fmtRp(item.harga_beli)}</td>
+        <td style="text-align:right">${fmtRp(jumlah)}</td>
+      </tr>`;
+    }).join('');
+    const infoExtra = [
+      doc.nama_penerima ? `Nama Penerima: ${esc(doc.nama_penerima)}` : '',
+      doc.supplier ? `Supplier: ${esc(doc.supplier)}` : '',
+      doc.catatan ? `Catatan: ${esc(doc.catatan)}` : '',
+    ].filter(Boolean).join(' &nbsp;·&nbsp; ');
+    const html = `<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>${esc(doc.nomor)}</title>
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 13px; color: #111; margin: 24px; }
+        .logo-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px; margin-bottom: 16px; min-height: 60px; display: flex; align-items: center; }
+        .logo-box img { max-height: 56px; max-width: 160px; object-fit: contain; }
+        .doc-title { font-size: 15px; margin: 0 0 4px; }
+        .doc-title .biz { font-size: 12px; color: #555; margin-left: 6px; }
+        .tanggal { margin: 6px 0 4px; }
+        .info-extra { color: #666; font-size: 11px; margin-bottom: 10px; }
+        table.items { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        table.items th, table.items td { border: 1px solid #999; padding: 6px 8px; text-align: left; }
+        table.items th { background: #f8fafc; }
+        .foot { margin-top: 24px; color: #999; font-size: 10px; }
+      </style></head><body>
+      <div class="logo-box">${logoUrl ? `<img src="${esc(logoUrl)}" alt="logo">` : ''}</div>
+      <p class="doc-title">No. Stok Masuk #${esc(doc.nomor)}<span class="biz">${esc(namaBisnis)}</span></p>
+      <p class="tanggal"><strong>Tanggal</strong> : ${esc(doc.tanggal)}</p>
+      ${infoExtra ? `<p class="info-extra">${infoExtra}</p>` : ''}
+      <table class="items">
+        <thead><tr><th>#</th><th>Produk</th><th style="text-align:right">Qty</th><th style="text-align:right">Harga Beli</th><th style="text-align:right">Jumlah</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="5">Tidak ada produk</td></tr>'}</tbody>
+        <tfoot><tr><td colspan="2" style="text-align:right"><strong>Total</strong></td><td style="text-align:right">${totalQty}</td><td></td><td style="text-align:right">${fmtRp(totalJumlah)}</td></tr></tfoot>
+      </table>
+      <p class="foot">Dicetak ${new Date().toLocaleString('id-ID')}</p>
+      <script>window.onload = function () { window.print(); };</script>
+      </body></html>`;
+    const win = window.open('', '_blank', 'width=800,height=600');
+    if (!win) {
+      setValidationError('Popup diblokir browser. Izinkan popup untuk mencetak.');
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
   };
 
   return (
@@ -519,39 +724,47 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
               </div>
 
               {/* Export Button - Premium Blue */}
-              <button style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '6px', 
-                background: 'linear-gradient(135deg, #0ea5e9, #0284c7)', 
-                color: '#ffffff', 
-                border: 0, 
-                padding: '8px 16px', 
-                borderRadius: '6px', 
-                fontSize: '13px', 
-                fontWeight: 'bold', 
-                cursor: 'pointer',
-                boxShadow: '0 4px 6px -1px rgba(14, 165, 233, 0.2)'
-              }}>
+              <button
+                type="button"
+                onClick={() => handleExport(sortedList)}
+                disabled={sortedList.length === 0}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: sortedList.length === 0 ? '#94a3b8' : 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+                  color: '#ffffff',
+                  border: 0,
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: sortedList.length === 0 ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 6px -1px rgba(14, 165, 233, 0.2)'
+                }}
+              >
                 <Download size={14} />
                 <span>Export</span>
               </button>
 
               {/* Import Button - Premium Teal */}
-              <button style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '6px', 
-                background: 'linear-gradient(135deg, #0f766e, #0d9488)', 
-                color: '#ffffff', 
-                border: 0, 
-                padding: '8px 16px', 
-                borderRadius: '6px', 
-                fontSize: '13px', 
-                fontWeight: 'bold', 
-                cursor: 'pointer',
-                boxShadow: '0 4px 6px -1px rgba(15, 118, 110, 0.2)'
-              }}>
+              <button
+                onClick={() => { setImportResult(null); setImportFile(null); setShowImportModal(true); }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'linear-gradient(135deg, #0f766e, #0d9488)',
+                  color: '#ffffff',
+                  border: 0,
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 6px -1px rgba(15, 118, 110, 0.2)'
+                }}
+              >
                 <CloudUpload size={14} />
                 <span>Import</span>
               </button>
@@ -734,7 +947,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span>Diterima dari</span>
+                          <span>Nama Penerima</span>
                           <ChevronsUpDown size={14} style={{ color: sortKey === 'from' ? '#0ea5e9' : '#94a3b8' }} />
                         </div>
                         <div 
@@ -912,7 +1125,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                         <td colSpan={7} style={{ padding: '40px 20px', textAlign: 'center', borderBottom: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <PolarBearSvg />
-                            <span style={{ fontSize: '14px', color: '#64748b', marginTop: '16px', fontWeight: 'bold' }}>No Data</span>
+                            <span style={{ fontSize: '14px', color: '#64748b', marginTop: '16px', fontWeight: 'bold' }}>{listLoading ? 'Memuat...' : 'No Data'}</span>
                           </div>
                         </td>
                       </tr>
@@ -923,9 +1136,9 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                           style={{ cursor: 'default' }}
                           className="pi-table-row-hover"
                         >
-                          <td 
-                            onClick={() => {
-                              setActiveDetailDoc(row);
+                          <td
+                            onClick={async () => {
+                              await fetchDocumentDetail(row.id);
                               handleStateChange('detail');
                             }}
                             style={{ 
@@ -1173,6 +1386,78 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
         </div>
       )}
 
+      {/* MODAL: Import Stok Masuk via CSV */}
+      {showImportModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: '#ffffff', borderRadius: '8px', width: '90%', maxWidth: '520px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>Import Stok Masuk (CSV)</h3>
+              <button
+                onClick={() => setShowImportModal(false)}
+                style={{ background: '#f1f5f9', border: 0, padding: '6px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#475569' }}
+              >
+                Tutup
+              </button>
+            </div>
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
+                Kolom CSV: <strong>product, variant, sku, supplier, qty, new_buy_price, rack</strong>. Hanya 1 supplier per file import.
+                Produk dicocokkan berdasarkan SKU, lalu nama produk bila SKU kosong.
+              </p>
+              <a
+                href="/templates/stok-masuk-template.csv"
+                download
+                style={{ fontSize: '12px', color: '#0d9488', fontWeight: 'bold', textDecoration: 'underline', width: 'fit-content' }}
+              >
+                Download Template CSV
+              </a>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(e) => setImportFile(e.target.files[0] || null)}
+                style={{ fontSize: '13px' }}
+              />
+              {importResult && (
+                <div style={{ fontSize: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '10px 12px' }}>
+                  <div style={{ color: '#16a34a', fontWeight: 'bold', marginBottom: importResult.errors.length ? 6 : 0 }}>
+                    {importResult.createdCount} baris berhasil ditambahkan.
+                  </div>
+                  {importResult.errors.length > 0 && (
+                    <ul style={{ margin: 0, paddingLeft: 18, color: '#dc2626' }}>
+                      {importResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '16px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+              <button
+                onClick={() => setShowImportModal(false)}
+                style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '8px 20px', fontSize: '13px', fontWeight: 'bold', color: '#475569', cursor: 'pointer' }}
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleImportCsv}
+                disabled={!importFile || importing}
+                style={{
+                  background: (!importFile || importing) ? '#99f6e4' : '#0d9488',
+                  border: 0,
+                  borderRadius: '4px',
+                  padding: '8px 24px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  color: '#ffffff',
+                  cursor: (!importFile || importing) ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {importing ? 'Memproses...' : 'Post Sekarang'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* STATE: create (Tambah Stok Masuk Form) */}
       {viewState === 'create' && (
         <div style={{ padding: '24px', background: '#f8fafc', minHeight: '100%' }}>
@@ -1209,7 +1494,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
 
                 {/* Catatan */}
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>Catatan</label>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>Catatan <span style={{ color: '#94a3b8', fontWeight: '400' }}>(opsional)</span></label>
                   <input 
                     type="text" 
                     placeholder="Masukkan catatan"
@@ -1229,14 +1514,14 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                   />
                 </div>
 
-                {/* Diterima Dari */}
+                {/* Nama Penerima */}
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>Diterima Dari</label>
-                  <input 
-                    type="text" 
-                    placeholder="Masukkan asal pengirim"
-                    value={diterimaDari}
-                    onChange={(e) => setDiterimaDari(e.target.value)}
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>Nama Penerima <span style={{ color: '#94a3b8', fontWeight: '400' }}>(opsional)</span></label>
+                  <input
+                    type="text"
+                    placeholder="Nama staf yang menerima barang"
+                    value={namaPenerima}
+                    onChange={(e) => setNamaPenerima(e.target.value)}
                     style={{ 
                       width: '100%', 
                       border: '1px solid #cbd5e1', 
@@ -1253,7 +1538,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
 
                 {/* Supplier */}
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>Supplier</label>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>Supplier <span style={{ color: '#94a3b8', fontWeight: '400' }}>(opsional)</span></label>
                   <input 
                     type="text" 
                     placeholder="Pilih supplier (Autocomplete)"
@@ -1348,24 +1633,24 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
               minWidth: '95px'
             }}>
               <span style={{ fontSize: '20px', lineHeight: 1 }}>📄</span>
-              <span style={{ fontSize: '13px', fontWeight: 'bold' }}>{activeDetailDoc.status}</span>
+              <span style={{ fontSize: '13px', fontWeight: 'bold' }}>{STATUS_LABEL[activeDetailDoc.status] || activeDetailDoc.status}</span>
             </div>
 
             {/* Center Title and Back Button */}
             <div style={{ flex: 1, padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <button 
+              <button
                 onClick={() => handleStateChange('list')}
                 title="Kembali ke Daftar"
-                style={{ 
-                  border: 0, 
-                  background: '#f1f5f9', 
-                  color: '#64748b', 
-                  width: '32px', 
-                  height: '32px', 
-                  borderRadius: '50%', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
+                style={{
+                  border: 0,
+                  background: '#f1f5f9',
+                  color: '#64748b',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   cursor: 'pointer',
                   transition: 'all 0.15s'
                 }}
@@ -1376,25 +1661,26 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
               </button>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>No. Stok Masuk</span>
-                <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', marginTop: '1px' }}>{activeDetailDoc.no}</span>
+                <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', marginTop: '1px' }}>{activeDetailDoc.nomor}</span>
               </div>
             </div>
 
             {/* Right Action Buttons */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 24px' }}>
-              <button 
+              <button
                 type="button"
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '6px', 
-                  background: '#ffffff', 
-                  border: '1px solid #cbd5e1', 
-                  padding: '8px 14px', 
-                  borderRadius: '6px', 
-                  fontSize: '13px', 
-                  fontWeight: '600', 
-                  color: '#475569', 
+                onClick={handleCetak}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  padding: '8px 14px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: '#475569',
                   cursor: 'pointer',
                   height: '36px',
                   transition: 'background 0.2s'
@@ -1404,79 +1690,82 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
               >
                 <Printer size={14} />
                 <span>Cetak</span>
-                <ChevronDown size={12} />
               </button>
 
-              <button 
-                type="button"
-                onClick={() => handleCommitStockIn('Draft')}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '6px', 
-                  background: 'linear-gradient(135deg, #f97316, #ea580c)', 
-                  border: 0, 
-                  padding: '8px 16px', 
-                  borderRadius: '6px', 
-                  fontSize: '13px', 
-                  fontWeight: 'bold', 
-                  color: '#ffffff', 
-                  cursor: 'pointer',
-                  height: '36px',
-                  boxShadow: '0 4px 6px -1px rgba(234, 88, 12, 0.2)'
-                }}
-              >
-                <Check size={14} />
-                <span>Draft</span>
-              </button>
+              {activeDetailDoc.status === 'draft' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleCommitStockIn('Draft')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: 'linear-gradient(135deg, #f97316, #ea580c)',
+                      border: 0,
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      color: '#ffffff',
+                      cursor: 'pointer',
+                      height: '36px',
+                      boxShadow: '0 4px 6px -1px rgba(234, 88, 12, 0.2)'
+                    }}
+                  >
+                    <Check size={14} />
+                    <span>Draft</span>
+                  </button>
 
-              <button 
-                type="button"
-                onClick={() => handleCommitStockIn('Batal')}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '6px', 
-                  background: '#ffffff', 
-                  border: '1px solid #fecdd3', 
-                  padding: '8px 16px', 
-                  borderRadius: '6px', 
-                  fontSize: '13px', 
-                  fontWeight: 'bold', 
-                  color: '#e11d48', 
-                  cursor: 'pointer',
-                  height: '36px',
-                  transition: 'background 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#fff1f2'}
-                onMouseOut={(e) => e.currentTarget.style.background = '#ffffff'}
-              >
-                <X size={14} />
-                <span>Batalkan</span>
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCommitStockIn('Batal')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: '#ffffff',
+                      border: '1px solid #fecdd3',
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      color: '#e11d48',
+                      cursor: 'pointer',
+                      height: '36px',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = '#fff1f2'}
+                    onMouseOut={(e) => e.currentTarget.style.background = '#ffffff'}
+                  >
+                    <X size={14} />
+                    <span>Batalkan</span>
+                  </button>
 
-              <button 
-                type="button"
-                onClick={() => handleCommitStockIn('Selesai')}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '6px', 
-                  background: 'linear-gradient(135deg, #0ea5e9, #0284c7)', 
-                  border: 0, 
-                  padding: '8px 20px', 
-                  borderRadius: '6px', 
-                  fontSize: '13px', 
-                  fontWeight: 'bold', 
-                  color: '#ffffff', 
-                  cursor: 'pointer',
-                  height: '36px',
-                  boxShadow: '0 4px 6px -1px rgba(14, 165, 233, 0.3)'
-                }}
-              >
-                <Check size={14} />
-                <span>Posting Sekarang</span>
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCommitStockIn('Selesai')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+                      border: 0,
+                      padding: '8px 20px',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      color: '#ffffff',
+                      cursor: 'pointer',
+                      height: '36px',
+                      boxShadow: '0 4px 6px -1px rgba(14, 165, 233, 0.3)'
+                    }}
+                  >
+                    <Check size={14} />
+                    <span>Posting Sekarang</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -1486,19 +1775,10 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
             <div className="pi-category-card" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
               <div style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9' }}>
                 <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>Tanggal</span>
-                {!isEditingTanggal ? (
-                  <button 
+                {activeDetailDoc.status === 'draft' && (!isEditingTanggal ? (
+                  <button
                     onClick={() => {
-                      const parts = activeDetailDoc.date.split('-');
-                      if (parts.length === 3) {
-                        const monthsMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', Mei: '05', Jun: '06', Jul: '07', Agu: '08', Sep: '09', Okt: '10', Nov: '11', Des: '12' };
-                        const year = parts[2];
-                        const month = monthsMap[parts[1]] || '01';
-                        const day = parts[0];
-                        setEditTanggalValue(`${year}-${month}-${day}`);
-                      } else {
-                        setEditTanggalValue('2026-06-25');
-                      }
+                      setEditTanggalValue(activeDetailDoc.tanggal || '');
                       setIsEditingTanggal(true);
                     }}
                     style={{ border: 0, background: 'transparent', color: '#0ea5e9', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
@@ -1510,13 +1790,13 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                     <button onClick={saveInlineTanggal} style={{ border: 0, background: 'transparent', color: '#16a34a', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>Simpan</button>
                     <button onClick={() => setIsEditingTanggal(false)} style={{ border: 0, background: 'transparent', color: '#ef4444', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>Batal</button>
                   </div>
-                )}
+                ))}
               </div>
               <div style={{ padding: '20px' }}>
                 {!isEditingTanggal ? (
-                  <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1e293b' }}>{activeDetailDoc.date}</div>
+                  <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1e293b' }}>{formatDisplayDate(activeDetailDoc.tanggal)}</div>
                 ) : (
-                  <input 
+                  <input
                     type="date"
                     value={editTanggalValue}
                     onChange={(e) => setEditTanggalValue(e.target.value)}
@@ -1524,27 +1804,27 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                   />
                 )}
                 <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span>Tanggal buat: {activeDetailDoc.date}</span>
-                  <span>Dibuat oleh: {activeDetailDoc.receivedBy}</span>
+                  <span>Tanggal buat: {formatDisplayDate(activeDetailDoc.tanggal)}</span>
+                  <span>Dibuat oleh: {activeDetailDoc.dibuat_oleh_nama || '-'}</span>
                 </div>
               </div>
             </div>
 
-            {/* Card 2: Diterima Dari & Supplier */}
+            {/* Card 2: Info Penerimaan & Supplier */}
             <div className="pi-category-card" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
               <div style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>Diterima Dari & Supplier</span>
+                <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>Info Penerimaan & Supplier</span>
               </div>
               <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {/* Diterima Dari row */}
+                {/* Nama Penerima row */}
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '600' }}>DITERIMA DARI</span>
-                    {!isEditingDiterimaDari ? (
-                      <button 
+                    <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '600' }}>NAMA PENERIMA</span>
+                    {activeDetailDoc.status === 'draft' && (!isEditingNamaPenerima ? (
+                      <button
                         onClick={() => {
-                          setEditDiterimaDariValue(activeDetailDoc.from === '-' ? '' : activeDetailDoc.from);
-                          setIsEditingDiterimaDari(true);
+                          setEditNamaPenerimaValue(activeDetailDoc.nama_penerima || '');
+                          setIsEditingNamaPenerima(true);
                         }}
                         style={{ border: 0, background: 'transparent', color: '#0ea5e9', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
                       >
@@ -1552,20 +1832,20 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                       </button>
                     ) : (
                       <div style={{ display: 'flex', gap: '6px' }}>
-                        <button onClick={saveInlineDiterimaDari} style={{ border: 0, background: 'transparent', color: '#16a34a', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Simpan</button>
-                        <button onClick={() => setIsEditingDiterimaDari(false)} style={{ border: 0, background: 'transparent', color: '#ef4444', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Batal</button>
+                        <button onClick={saveInlineNamaPenerima} style={{ border: 0, background: 'transparent', color: '#16a34a', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Simpan</button>
+                        <button onClick={() => setIsEditingNamaPenerima(false)} style={{ border: 0, background: 'transparent', color: '#ef4444', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Batal</button>
                       </div>
-                    )}
+                    ))}
                   </div>
-                  {!isEditingDiterimaDari ? (
-                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: activeDetailDoc.from === '-' ? '#94a3b8' : '#1e293b' }}>
-                      {activeDetailDoc.from}
+                  {!isEditingNamaPenerima ? (
+                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: activeDetailDoc.nama_penerima ? '#1e293b' : '#94a3b8' }}>
+                      {activeDetailDoc.nama_penerima || '-'}
                     </div>
                   ) : (
-                    <input 
+                    <input
                       type="text"
-                      value={editDiterimaDariValue}
-                      onChange={(e) => setEditDiterimaDariValue(e.target.value)}
+                      value={editNamaPenerimaValue}
+                      onChange={(e) => setEditNamaPenerimaValue(e.target.value)}
                       style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '6px 8px', fontSize: '12px', outline: 'none' }}
                     />
                   )}
@@ -1575,10 +1855,10 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                     <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '600' }}>SUPPLIER</span>
-                    {!isEditingSupplier ? (
-                      <button 
+                    {activeDetailDoc.status === 'draft' && (!isEditingSupplier ? (
+                      <button
                         onClick={() => {
-                          setEditSupplierValue(activeDetailDoc.supplier === '-' ? '' : activeDetailDoc.supplier);
+                          setEditSupplierValue(activeDetailDoc.supplier || '');
                           setIsEditingSupplier(true);
                         }}
                         style={{ border: 0, background: 'transparent', color: '#0ea5e9', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
@@ -1590,14 +1870,14 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                         <button onClick={saveInlineSupplier} style={{ border: 0, background: 'transparent', color: '#16a34a', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Simpan</button>
                         <button onClick={() => setIsEditingSupplier(false)} style={{ border: 0, background: 'transparent', color: '#ef4444', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Batal</button>
                       </div>
-                    )}
+                    ))}
                   </div>
                   {!isEditingSupplier ? (
-                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: activeDetailDoc.supplier === '-' ? '#94a3b8' : '#1e293b' }}>
-                      {activeDetailDoc.supplier}
+                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: activeDetailDoc.supplier ? '#1e293b' : '#94a3b8' }}>
+                      {activeDetailDoc.supplier || '-'}
                     </div>
                   ) : (
-                    <input 
+                    <input
                       type="text"
                       value={editSupplierValue}
                       onChange={(e) => setEditSupplierValue(e.target.value)}
@@ -1612,10 +1892,10 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
             <div className="pi-category-card" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
               <div style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9' }}>
                 <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>Catatan</span>
-                {!isEditingCatatan ? (
-                  <button 
+                {activeDetailDoc.status === 'draft' && (!isEditingCatatan ? (
+                  <button
                     onClick={() => {
-                      setEditCatatanValue(activeDetailDoc.note === '-' ? '' : activeDetailDoc.note);
+                      setEditCatatanValue(activeDetailDoc.catatan || '');
                       setIsEditingCatatan(true);
                     }}
                     style={{ border: 0, background: 'transparent', color: '#0ea5e9', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
@@ -1627,15 +1907,15 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                     <button onClick={saveInlineCatatan} style={{ border: 0, background: 'transparent', color: '#16a34a', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>Simpan</button>
                     <button onClick={() => setIsEditingCatatan(false)} style={{ border: 0, background: 'transparent', color: '#ef4444', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>Batal</button>
                   </div>
-                )}
+                ))}
               </div>
               <div style={{ padding: '20px' }}>
                 {!isEditingCatatan ? (
-                  <div style={{ fontSize: '14px', fontWeight: 'bold', color: activeDetailDoc.note === '-' ? '#94a3b8' : '#1e293b' }}>
-                    {activeDetailDoc.note}
+                  <div style={{ fontSize: '14px', fontWeight: 'bold', color: activeDetailDoc.catatan ? '#1e293b' : '#94a3b8' }}>
+                    {activeDetailDoc.catatan || '-'}
                   </div>
                 ) : (
-                  <input 
+                  <input
                     type="text"
                     value={editCatatanValue}
                     onChange={(e) => setEditCatatanValue(e.target.value)}
@@ -1658,24 +1938,49 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                   <label style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', marginBottom: '6px', display: 'block' }}>Produk</label>
                   <div style={{ position: 'relative' }}>
                     <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                    <input 
-                      type="text" 
-                      placeholder="Cari Produk" 
+                    <input
+                      type="text"
+                      placeholder="Cari Produk"
                       value={searchProduct}
-                      onChange={(e) => setSearchProduct(e.target.value)}
-                      style={{ 
-                        width: '100%', 
-                        border: '1px solid #cbd5e1', 
-                        borderRadius: '4px', 
-                        padding: '8px 10px 8px 30px', 
-                        fontSize: '13px', 
-                        outline: 'none', 
+                      onChange={(e) => {
+                        setSearchProduct(e.target.value);
+                        setSelectedProduct(null);
+                      }}
+                      disabled={activeDetailDoc.status !== 'draft'}
+                      style={{
+                        width: '100%',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        padding: '8px 10px 8px 30px',
+                        fontSize: '13px',
+                        outline: 'none',
                         boxSizing: 'border-box',
                         background: '#ffffff',
                         backgroundColor: '#ffffff',
                         height: '36px'
                       }}
                     />
+                    {productOptions.length > 0 && !selectedProduct && (
+                      <div style={{ position: 'absolute', top: '38px', left: 0, right: 0, background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', zIndex: 50, maxHeight: '200px', overflowY: 'auto' }}>
+                        {productOptions.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedProduct(p);
+                              setSearchProduct(p.nama);
+                              setProductOptions([]);
+                              if (p.harga_beli) setProductHargaBeli(String(Math.round(Number(p.harga_beli))));
+                            }}
+                            style={{ display: 'block', width: '100%', textAlign: 'left', border: 0, background: 'transparent', padding: '8px 12px', fontSize: '13px', color: '#334155', cursor: 'pointer' }}
+                            onMouseOver={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                            onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                          >
+                            {p.nama} {p.sku ? `(${p.sku})` : ''}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1686,11 +1991,12 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                     <div style={{ background: '#f8fafc', borderRight: '1px solid #cbd5e1', padding: '0 12px', display: 'flex', alignItems: 'center', fontSize: '13px', color: '#64748b', fontWeight: '600' }}>
                       Rp.
                     </div>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={productHargaBeli}
                       onChange={(e) => setProductHargaBeli(e.target.value)}
-                      style={{ 
+                      disabled={activeDetailDoc.status !== 'draft'}
+                      style={{
                         border: 0, 
                         outline: 0, 
                         padding: '0 12px', 
@@ -1718,33 +2024,36 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                     background: '#ffffff',
                     backgroundColor: '#ffffff'
                   }}>
-                    <button 
+                    <button
                       type="button"
                       onClick={() => setQtyValue(prev => Math.max(1, prev - 1))}
+                      disabled={activeDetailDoc.status !== 'draft'}
                       style={{ border: 0, background: '#f8fafc', width: '32px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', color: '#64748b' }}
                     >
                       -
                     </button>
-                    <input 
-                      type="text" 
-                      value={qtyValue} 
+                    <input
+                      type="text"
+                      value={qtyValue}
                       onChange={(e) => setQtyValue(parseInt(e.target.value, 10) || 1)}
-                      style={{ 
-                        border: 0, 
-                        borderLeft: '1px solid #cbd5e1', 
-                        borderRight: '1px solid #cbd5e1', 
-                        textAlign: 'center', 
-                        flex: 1, 
-                        fontSize: '13px', 
-                        color: '#334155', 
+                      disabled={activeDetailDoc.status !== 'draft'}
+                      style={{
+                        border: 0,
+                        borderLeft: '1px solid #cbd5e1',
+                        borderRight: '1px solid #cbd5e1',
+                        textAlign: 'center',
+                        flex: 1,
+                        fontSize: '13px',
+                        color: '#334155',
                         outline: 'none',
                         background: '#ffffff',
                         backgroundColor: '#ffffff'
-                      }} 
+                      }}
                     />
-                    <button 
+                    <button
                       type="button"
                       onClick={() => setQtyValue(prev => prev + 1)}
+                      disabled={activeDetailDoc.status !== 'draft'}
                       style={{ border: 0, background: '#f8fafc', width: '32px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', color: '#64748b' }}
                     >
                       +
@@ -1753,16 +2062,73 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                 </div>
 
                 {/* Plus Blue Button */}
-                <button style={{ background: '#0ea5e9', color: '#ffffff', border: 0, borderRadius: '4px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(14, 165, 233, 0.2)' }}>
+                <button
+                  type="button"
+                  onClick={handleAddItem}
+                  disabled={activeDetailDoc.status !== 'draft' || !selectedProduct || itemSaving}
+                  style={{
+                    background: (!selectedProduct || itemSaving) ? '#93c5fd' : '#0ea5e9',
+                    color: '#ffffff',
+                    border: 0,
+                    borderRadius: '4px',
+                    width: '36px',
+                    height: '36px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: (!selectedProduct || itemSaving) ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 6px -1px rgba(14, 165, 233, 0.2)'
+                  }}
+                >
                   <Plus size={16} />
                 </button>
               </div>
 
-              {/* Bear Illustration area */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', borderTop: '1px solid #f1f5f9' }}>
-                <PolarBearSvg />
-                <span style={{ fontSize: '14px', color: '#64748b', marginTop: '16px', fontWeight: 'bold' }}>Belum ada produk</span>
-              </div>
+              {/* Daftar produk yang sudah ditambahkan / Bear Illustration jika kosong */}
+              {activeDetailDoc.items && activeDetailDoc.items.length > 0 ? (
+                <div style={{ borderTop: '1px solid #f1f5f9' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc' }}>
+                        <th style={{ padding: '10px 20px', fontWeight: 'bold', color: '#475569' }}>Produk</th>
+                        <th style={{ padding: '10px 20px', fontWeight: 'bold', color: '#475569' }}>Rak</th>
+                        <th style={{ padding: '10px 20px', fontWeight: 'bold', color: '#475569' }}>Harga Beli</th>
+                        <th style={{ padding: '10px 20px', fontWeight: 'bold', color: '#475569' }}>Qty</th>
+                        <th style={{ padding: '10px 20px', fontWeight: 'bold', color: '#475569' }}>Subtotal</th>
+                        {activeDetailDoc.status === 'draft' && <th style={{ padding: '10px 20px' }}></th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeDetailDoc.items.map((item) => (
+                        <tr key={item.id} style={{ borderTop: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '10px 20px', color: '#1e293b' }}>{item.product_nama}{item.product_sku ? ` (${item.product_sku})` : ''}</td>
+                          <td style={{ padding: '10px 20px', color: '#334155' }}>{item.rak || '-'}</td>
+                          <td style={{ padding: '10px 20px', color: '#334155' }}>{formatCurrencyRp(item.harga_beli)}</td>
+                          <td style={{ padding: '10px 20px', color: '#334155' }}>{item.qty} {item.product_satuan}</td>
+                          <td style={{ padding: '10px 20px', color: '#334155', fontWeight: '600' }}>{formatCurrencyRp(Number(item.harga_beli) * Number(item.qty))}</td>
+                          {activeDetailDoc.status === 'draft' && (
+                            <td style={{ padding: '10px 20px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItem(item.id)}
+                                style={{ border: 0, background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                title="Hapus"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', borderTop: '1px solid #f1f5f9' }}>
+                  <PolarBearSvg />
+                  <span style={{ fontSize: '14px', color: '#64748b', marginTop: '16px', fontWeight: 'bold' }}>Belum ada produk</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

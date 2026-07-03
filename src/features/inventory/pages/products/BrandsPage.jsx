@@ -1,15 +1,60 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import DataTable from '../components/DataTable';
-import { brands } from '../productInventoryData';
+import apiClient from '../../../../api/apiClient';
 
 export function BrandsPage() {
+  const [brands, setBrands] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [namaBrand, setNamaBrand] = useState('');
   const [komisi, setKomisi] = useState('');
 
+  const fetchBrands = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.get('/brands/');
+      setBrands(Array.isArray(res.data) ? res.data : res.data?.results || []);
+    } catch (err) {
+      console.error('[BrandsPage] fetch error:', err);
+      setError('Gagal memuat daftar brand.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBrands();
+  }, []);
+
+  const canSave = namaBrand.trim() && !saving;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    try {
+      await apiClient.post('/brands/', {
+        nama: namaBrand,
+        komisi_persen: parseFloat(komisi) || 0,
+        is_active: true,
+      });
+      setNamaBrand('');
+      setKomisi('');
+      await fetchBrands();
+    } catch (err) {
+      console.error('[BrandsPage] save error:', err);
+      setError('Gagal menyimpan brand.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const filteredBrands = brands.filter(brand =>
-    brand.name.toLowerCase().includes(searchQuery.toLowerCase())
+    brand.nama.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -19,12 +64,13 @@ export function BrandsPage() {
         <div className="pi-category-card">
           <div className="pi-category-card-header" style={{ padding: '16px 20px' }}>
             <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', color: '#1e293b' }}>Tambah Brand</h3>
-            <button 
+            <button
               type="button"
-              disabled
-              style={{ background: '#e2e8f0', color: '#94a3b8', border: 0, borderRadius: '4px', padding: '6px 16px', fontSize: '12px', fontWeight: 'bold', cursor: 'not-allowed' }}
+              disabled={!canSave}
+              onClick={handleSave}
+              style={{ background: canSave ? '#16a34a' : '#e2e8f0', color: canSave ? '#fff' : '#94a3b8', border: 0, borderRadius: '4px', padding: '6px 16px', fontSize: '12px', fontWeight: 'bold', cursor: canSave ? 'pointer' : 'not-allowed' }}
             >
-              ✓ Simpan
+              {saving ? 'Menyimpan...' : '✓ Simpan'}
             </button>
           </div>
           <div className="pi-category-card-body" style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -91,12 +137,14 @@ export function BrandsPage() {
               />
             </div>
 
-            <DataTable 
-              rows={filteredBrands} 
+            {error && <p style={{ color: '#dc2626', fontSize: 12, margin: '0 0 8px' }}>{error}</p>}
+            <DataTable
+              rows={filteredBrands}
+              emptyText={loading ? 'Memuat...' : 'Tidak ada data'}
               columns={[
-                { key: 'name', label: 'Nama Brand' }, 
-                { key: 'commission', label: 'Komisi', render: (row) => `${row.commission}%` }
-              ]} 
+                { key: 'nama', label: 'Nama Brand' },
+                { key: 'komisi_persen', label: 'Komisi', render: (row) => `${row.komisi_persen}%` }
+              ]}
             />
           </div>
         </div>

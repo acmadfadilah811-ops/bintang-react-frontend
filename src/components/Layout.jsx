@@ -75,11 +75,21 @@ export default function Layout() {
 
   const mobileMenu = user?.role?.toLowerCase() === 'staff' ? mobileMenuStaff : mobileMenuOwner;
 
+  // Fitur dengan tampilan full-screen + topbar sendiri (tanpa Topbar global).
+  const fullScreenFeature =
+    location.pathname.startsWith('/product-inventory') ||
+    location.pathname.startsWith('/customer-supplier') ||
+    location.pathname.startsWith('/transaksi') ||
+    location.pathname.startsWith('/laporan') ||
+    location.pathname.startsWith('/marketing') ||
+    location.pathname.startsWith('/settings') ||
+    location.pathname.startsWith('/kasir');
+
   if (isMobileScreen) {
     return (
       <div className="h-screen w-full flex flex-col overflow-hidden bg-[#F4F7FE] relative">
         {/* Header / Topbar */}
-        {!location.pathname.startsWith('/product-inventory') && !location.pathname.startsWith('/customer-supplier') && (
+        {!fullScreenFeature && (
           <div className="shrink-0 h-[72px] relative z-40 bg-white border-b border-slate-200">
             <Topbar />
           </div>
@@ -115,13 +125,16 @@ export default function Layout() {
     );
   }
 
+  // Kasir/POS butuh tinggi tetap penuh (frame tidak ikut scroll) agar background tidak "bocor".
+  const isKasir = location.pathname.startsWith('/kasir');
+
   return (
     <div className="bg-[#F4F7FE] flex h-screen overflow-hidden font-sans">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden relative">
-        {!location.pathname.startsWith('/product-inventory') && !location.pathname.startsWith('/customer-supplier') && <Topbar />}
-        <main className={`flex-1 overflow-y-auto scroll-smooth transition-all duration-300 ${(location.pathname.startsWith('/product-inventory') || location.pathname.startsWith('/customer-supplier')) ? 'p-0' : 'p-6 md:p-8'}`}>
-          <div className={(location.pathname.startsWith('/product-inventory') || location.pathname.startsWith('/customer-supplier')) ? 'w-full' : 'max-w-[1600px] mx-auto'}>
+        {!fullScreenFeature && <Topbar />}
+        <main className={`flex-1 scroll-smooth transition-all duration-300 ${fullScreenFeature ? 'p-0' : 'p-6 md:p-8'} ${isKasir ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+          <div className={fullScreenFeature ? (isKasir ? 'w-full h-full' : 'w-full') : 'max-w-[1600px] mx-auto'}>
             <Outlet />
           </div>
         </main>

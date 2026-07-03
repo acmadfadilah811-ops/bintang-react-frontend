@@ -1,12 +1,24 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Search, Copy, Download, ChevronRight, Calendar } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import { StatusBadge } from '../components/PageShell';
-import { formatCurrency, packages } from '../productInventoryData';
+import { formatCurrency } from '../productInventoryData';
 import { useAuth } from '../../../../context/AuthContext';
+import apiClient from '../../../../api/apiClient';
+
+const parseRupiah = (raw) => {
+  const cleaned = String(raw ?? '').replace(/\./g, '').replace(',', '.').replace(/[^0-9.]/g, '');
+  const value = parseFloat(cleaned);
+  return Number.isNaN(value) ? 0 : value;
+};
 
 export function PackagesPage({ onToggleCreate }) {
   const { businessSettings } = useAuth();
+  const [packages, setPackages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+
   const [isCreating, setIsCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [rowsPerPage, setRowsPerPage] = useState('10');
@@ -27,6 +39,46 @@ export function PackagesPage({ onToggleCreate }) {
   const [tanggalMulaiJual, setTanggalMulaiJual] = useState('');
   const [searchProduct, setSearchProduct] = useState('');
 
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+
+  const fetchPackages = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.get('/product-packages/');
+      setPackages(Array.isArray(res.data) ? res.data : res.data?.results || []);
+    } catch (err) {
+      console.error('[PackagesPage] fetch error:', err);
+      setError('Gagal memuat daftar paket produk.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPackages();
+  }, []);
+
+  const resetForm = () => {
+    setNamaPaket('');
+    setSku('');
+    setDeskripsi('');
+    setHargaBeli('0,00');
+    setHargaPasar('0,00');
+    setHargaJualOnline('0,00');
+    setHargaJualToko('0,00');
+    setKomisi('0,00');
+    setMinimalPesanan(0);
+    setMaksimalPesanan(0);
+    setHargaDinamis(false);
+    setSiapPublikasi(false);
+    setTanggalMulaiJual('');
+    setSearchProduct('');
+  };
+
   const handleSetIsCreating = (val) => {
     setIsCreating(val);
     if (onToggleCreate) {
@@ -34,8 +86,60 @@ export function PackagesPage({ onToggleCreate }) {
     }
   };
 
+  const canSave = namaPaket.trim() && parseRupiah(hargaJualOnline) > 0 && !saving;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    try {
+      await apiClient.post('/product-packages/', {
+        nama: namaPaket,
+        deskripsi: deskripsi || null,
+        harga_beli: parseRupiah(hargaBeli),
+        harga_pasar: parseRupiah(hargaPasar),
+        harga_jual_offline: parseRupiah(hargaJualToko),
+        harga_jual_online: parseRupiah(hargaJualOnline),
+        komisi: parseRupiah(komisi),
+        minimal_pesanan: minimalPesanan,
+        maksimal_pesanan: maksimalPesanan,
+        harga_dinamis: hargaDinamis,
+        publikasi: siapPublikasi,
+        periode_mulai: tanggalMulaiJual || null,
+      });
+      resetForm();
+      handleSetIsCreating(false);
+      await fetchPackages();
+    } catch (err) {
+      console.error('[PackagesPage] save error:', err);
+      setError('Gagal menyimpan paket produk.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleImportCsv = async () => {
+    if (!importFile || importing) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', importFile);
+      const res = await apiClient.post('/product-packages/import-csv/', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setImportResult({ errors: res.data.errors || [], createdCount: res.data.created?.length || 0 });
+      setImportFile(null);
+      await fetchPackages();
+    } catch (err) {
+      console.error('[PackagesPage] import csv error:', err);
+      setImportResult({ errors: [err.response?.data?.error || 'Gagal mengimpor file CSV.'], createdCount: 0 });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const filteredPackages = packages.filter(pkg =>
-    pkg.name.toLowerCase().includes(searchQuery.toLowerCase())
+    pkg.nama.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (isCreating) {
@@ -64,13 +168,14 @@ export function PackagesPage({ onToggleCreate }) {
             >
               Batal
             </button>
-            <button 
-              type="button" 
-              className="pi-btn" 
-              disabled 
-              style={{ background: '#e2e8f0', color: '#94a3b8', border: 0, borderRadius: '4px', padding: '6px 16px', fontSize: '12px', fontWeight: 'bold', cursor: 'not-allowed' }}
+            <button
+              type="button"
+              className="pi-btn"
+              disabled={!canSave}
+              onClick={handleSave}
+              style={{ background: canSave ? '#16a34a' : '#e2e8f0', color: canSave ? '#fff' : '#94a3b8', border: 0, borderRadius: '4px', padding: '6px 16px', fontSize: '12px', fontWeight: 'bold', cursor: canSave ? 'pointer' : 'not-allowed' }}
             >
-              ✓ Simpan
+              {saving ? 'Menyimpan...' : '✓ Simpan'}
             </button>
           </div>
         </div>
@@ -314,11 +419,10 @@ export function PackagesPage({ onToggleCreate }) {
                   </div>
                   <div className="pi-row-input">
                     <div style={{ position: 'relative', maxWidth: '200px' }}>
-                      <Calendar size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                      <input 
-                        type="text" 
-                        placeholder="Pilih hari" 
-                        className="pi-input-text" 
+                      <Calendar size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+                      <input
+                        type="date"
+                        className="pi-input-text"
                         style={{ paddingLeft: '32px', width: '100%', boxSizing: 'border-box' }}
                         value={tanggalMulaiJual}
                         onChange={(e) => setTanggalMulaiJual(e.target.value)}
@@ -374,12 +478,18 @@ export function PackagesPage({ onToggleCreate }) {
         <div>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#1e293b' }}>Daftar Paket Produk</h2>
           <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '500' }}>{packages.length} Paket Produk</span>
+          {error && <p style={{ color: '#dc2626', fontSize: 12, margin: '4px 0 0' }}>{error}</p>}
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="pi-btn" style={{ background: '#0284c7', color: '#ffffff', border: 0, borderRadius: '4px', padding: '8px 14px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
             <Copy size={14} /> Salin Paket Produk
           </button>
-          <button className="pi-btn" style={{ background: '#0284c7', color: '#ffffff', border: 0, borderRadius: '4px', padding: '8px 14px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+          <button
+            type="button"
+            onClick={() => { setImportResult(null); setImportFile(null); setShowImportModal(true); }}
+            className="pi-btn"
+            style={{ background: '#0284c7', color: '#ffffff', border: 0, borderRadius: '4px', padding: '8px 14px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+          >
             <Download size={14} /> Import
           </button>
           <button 
@@ -421,12 +531,13 @@ export function PackagesPage({ onToggleCreate }) {
       {/* Table */}
       <DataTable
         rows={filteredPackages}
+        emptyText={loading ? 'Memuat...' : 'Tidak ada data'}
         columns={[
-          { key: 'name', label: 'Nama Produk' },
-          { key: 'qty', label: 'Qty' },
-          { key: 'onlinePrice', label: 'Harga Jual Online', render: (row) => formatCurrency(row.onlinePrice) },
-          { key: 'offlinePrice', label: 'Harga Jual Offline', render: (row) => formatCurrency(row.offlinePrice) },
-          { key: 'published', label: 'Publikasi', render: (row) => <StatusBadge active={row.published} label={row.published ? 'Publish' : 'Draft'} /> },
+          { key: 'nama', label: 'Nama Produk' },
+          { key: 'qty', label: 'Qty', render: (row) => row.items?.length || 0 },
+          { key: 'harga_jual_online', label: 'Harga Jual Online', render: (row) => formatCurrency(row.harga_jual_online) },
+          { key: 'harga_jual_offline', label: 'Harga Jual Offline', render: (row) => formatCurrency(row.harga_jual_offline) },
+          { key: 'publikasi', label: 'Publikasi', render: (row) => <StatusBadge active={row.publikasi} label={row.publikasi ? 'Publish' : 'Draft'} /> },
         ]}
       />
 
@@ -443,6 +554,78 @@ export function PackagesPage({ onToggleCreate }) {
           </span>
         </div>
       </div>
+
+      {/* MODAL: Import Paket Produk via CSV */}
+      {showImportModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: '#ffffff', borderRadius: '8px', width: '90%', maxWidth: '520px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>Import Paket Produk (CSV)</h3>
+              <button
+                onClick={() => setShowImportModal(false)}
+                style={{ background: '#f1f5f9', border: 0, padding: '6px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#475569' }}
+              >
+                Tutup
+              </button>
+            </div>
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
+                Kolom CSV: <strong>product_combo_name, product_name, product_variant_name, sku, description, purchase_price, market_price, online_selling_price, store_selling_price, commission, minimum_order, maximum_order, selling_prices_stores_are_dynamic, ready_publish_sale, sale_start_date, loyalty_points, uom</strong>.
+                Baris dengan <strong>product_combo_name</strong> sama akan digabung jadi 1 paket berisi banyak produk. Produk dicocokkan berdasarkan SKU, lalu nama produk bila SKU kosong.
+              </p>
+              <a
+                href="/templates/paket-produk-template.csv"
+                download
+                style={{ fontSize: '12px', color: '#0284c7', fontWeight: 'bold', textDecoration: 'underline', width: 'fit-content' }}
+              >
+                Download Template CSV
+              </a>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(e) => setImportFile(e.target.files[0] || null)}
+                style={{ fontSize: '13px' }}
+              />
+              {importResult && (
+                <div style={{ fontSize: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '10px 12px' }}>
+                  <div style={{ color: '#16a34a', fontWeight: 'bold', marginBottom: importResult.errors.length ? 6 : 0 }}>
+                    {importResult.createdCount} paket berhasil dibuat.
+                  </div>
+                  {importResult.errors.length > 0 && (
+                    <ul style={{ margin: 0, paddingLeft: 18, color: '#dc2626' }}>
+                      {importResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '16px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+              <button
+                onClick={() => setShowImportModal(false)}
+                style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '8px 20px', fontSize: '13px', fontWeight: 'bold', color: '#475569', cursor: 'pointer' }}
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleImportCsv}
+                disabled={!importFile || importing}
+                style={{
+                  background: (!importFile || importing) ? '#93c5fd' : '#0284c7',
+                  border: 0,
+                  borderRadius: '4px',
+                  padding: '8px 24px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  color: '#ffffff',
+                  cursor: (!importFile || importing) ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {importing ? 'Memproses...' : 'Post Sekarang'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

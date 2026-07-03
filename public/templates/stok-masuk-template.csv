@@ -1,0 +1,3 @@
+product,variant,sku,supplier,qty,new_buy_price,rack
+Contoh Produk A,,SKU-001,Nama Supplier,10,15000,A1
+Contoh Produk B,"Warna,Ukuran",SKU-002,Nama Supplier,5,25000,A2

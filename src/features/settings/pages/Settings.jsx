@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import apiClient from '../../../api/apiClient';
+import { useTransaksiCrumb } from '../../transaksi/components/TransaksiContext';
 import {
   MENU_FEATURES,
   DEFAULT_PERMISSIONS,
@@ -102,6 +103,11 @@ export default function Settings() {
   const role = user?.role?.toLowerCase();
   const isOwner = role === 'owner';
   const canManageUsers = ['owner', 'manager'].includes(role);
+  const { setSubtitle } = useTransaksiCrumb();
+
+  useEffect(() => {
+    setSubtitle('Toko');
+  }, [setSubtitle]);
 
   // Tentukan tab default berdasarkan role
   const defaultTab = canManageUsers ? 'karyawan' : 'akun-saya';

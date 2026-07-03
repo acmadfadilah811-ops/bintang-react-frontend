@@ -13,7 +13,7 @@ import StaffDashboard from './features/dashboard/pages/StaffDashboard';
 import Orders from './features/orders/pages/Orders';
 import Inventory from './features/inventory/pages/Inventory';
 import Customers from './features/customerSupplier/pages/CustomersPageLegacy';
-import Settings from './features/settings/pages/Settings';
+import SettingsApp from './features/settings/pages/SettingsApp';
 import Profile from './features/settings/pages/Profile';
 import Employees from './features/hr/pages/Employees';
 import Payroll from './features/hr/pages/Payroll';
@@ -30,6 +30,10 @@ import WhatsAppChat from './features/whatsapp/pages/WhatsAppChat';
 import UploadDesain from './features/orders/pages/UploadDesain';
 import ProductInventoryApp from './features/inventory/pages/ProductInventoryApp';
 import CustomerSupplierApp from './features/customerSupplier/pages/CustomerSupplierApp';
+import TransaksiApp from './features/transaksi/pages/TransaksiApp';
+import LaporanApp from './features/laporan/pages/LaporanApp';
+import MarketingApp from './features/marketing/pages/MarketingApp';
+import KasirApp from './features/kasir/pages/KasirApp';
 
 let globalAlertTrigger = null;
 
@@ -37,6 +41,7 @@ function HomeRedirect() {
   const { user } = useAuth();
   const role = user?.role?.toLowerCase();
   if (role === 'staff') return <Navigate to="/staff-dashboard" replace />;
+  if (role === 'kasir') return <Navigate to="/kasir" replace />;
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -132,6 +137,15 @@ function App() {
                 <Route path="/whatsapp-chat" element={<WhatsAppChat />} />
                 <Route path="/komplain" element={<Komplain />} />
 
+                {/* Marketing */}
+                <Route path="/marketing/*" element={<MarketingApp />} />
+
+                {/* Transaksi & Pembayaran (full-screen, topbar sendiri) */}
+                <Route path="/transaksi/*" element={<TransaksiApp />} />
+
+                {/* Laporan dan Pembukuan (full-screen, topbar sendiri) */}
+                <Route path="/laporan/*" element={<LaporanApp />} />
+
                 {/* Tim */}
                 <Route path="/customers" element={<Customers />} />
                 <Route path="/users" element={<Employees />} />
@@ -145,7 +159,10 @@ function App() {
                 <Route path="/announcements" element={<Announcements />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/profile" element={<Profile />} />
-                <Route path="/settings" element={<Settings />} />
+                <Route path="/settings/*" element={<SettingsApp />} />
+
+                {/* Kasir / POS Terminal */}
+                <Route path="/kasir/*" element={<KasirApp />} />
               </Route>
             </Route>
           </Routes>

@@ -1,0 +1,964 @@
+import { useMemo, useState, useEffect, useRef, useCallback, Fragment } from 'react';
+import {
+  Search,
+  ArrowLeft,
+  FileText,
+  FileSpreadsheet,
+  ChevronsUpDown,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  Info,
+  ClipboardList,
+  X,
+} from 'lucide-react';
+import { Dropdown, DateRangePicker } from '../../../transaksi/components/TransactionScaffold';
+import { PRODUK_REPORTS } from './reportList';
+
+/**
+ * Panel kiri "Daftar Laporan" — bisa disembunyikan.
+ * Header "Daftar Laporan" berfungsi sebagai tombol toggle: saat hover muncul
+ * overlay "Klik untuk sembunyikan" (meniru perilaku Olsera).
+ */
+function DaftarLaporanPanel({ reports, activeId, onSelect, onCollapse }) {
+  const [keyword, setKeyword] = useState('');
+
+  const filtered = useMemo(() => {
+    const terms = keyword.toLowerCase().split(/\s+/).filter(Boolean);
+    if (terms.length === 0) return reports;
+    // Cocok bila SEMUA kata kunci ada di label (urutan bebas).
+    return reports.filter((r) => {
+      const label = r.label.toLowerCase();
+      return terms.every((t) => label.includes(t));
+    });
+  }, [keyword, reports]);
+
+  return (
+    <div className="w-72 shrink-0 border-r border-slate-200 flex flex-col bg-white">
+      {/* Header toggle + tooltip hover */}
+      <button
+        type="button"
+        onClick={onCollapse}
+        title="Klik untuk sembunyikan"
+        className="group relative flex items-center px-4 py-3 border-b border-slate-100 select-none cursor-pointer text-left"
+      >
+        <span className="text-[15px] font-bold text-slate-800">Daftar Laporan</span>
+        {/* Overlay "Klik untuk sembunyikan" */}
+        <span className="absolute inset-0 flex items-center justify-center bg-slate-800/85 text-white text-sm font-semibold rounded-sm opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+          Klik untuk sembunyikan
+        </span>
+      </button>
+
+      {/* Search keyword */}
+      <div className="px-3 py-3">
+        <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 focus-within:border-blue-400 transition-colors">
+          <Search size={15} className="text-slate-400 shrink-0" />
+          <input
+            type="text"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            placeholder="Ketikan keyword"
+            className="w-full text-[13px] bg-transparent outline-none text-slate-700 placeholder-slate-400"
+          />
+          {keyword && (
+            <button
+              type="button"
+              onClick={() => setKeyword('')}
+              title="Bersihkan"
+              className="shrink-0 text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Daftar item */}
+      <div className="flex-1 overflow-y-auto pb-4">
+        {filtered.map((r) => {
+          const isActive = r.id === activeId;
+          return (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => onSelect(r.id)}
+              className={`w-full text-left px-4 py-2 text-[13px] leading-snug transition-colors cursor-pointer ${
+                isActive
+                  ? 'bg-sky-50 text-sky-700 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {r.label}
+            </button>
+          );
+        })}
+        {filtered.length === 0 && (
+          <p className="px-4 py-6 text-center text-xs text-slate-400">
+            Tidak ada laporan yang cocok.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const MONTHS_SHORT = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+];
+const fmtSingle = (d) =>
+  `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]} ${String(d.getFullYear()).slice(-2)}`;
+const toInputDate = (d) => {
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+};
+// Format untuk <input type="datetime-local">: YYYY-MM-DDTHH:mm
+const toInputDateTime = (d) => {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(
+    d.getMinutes()
+  )}`;
+};
+
+/** Pemilih tanggal tunggal dengan navigasi mundur/maju per hari. */
+function SingleDatePicker({ value, onChange }) {
+  const shift = (dir) => {
+    const d = new Date(value);
+    d.setDate(d.getDate() + dir);
+    onChange(d);
+  };
+  return (
+    <div className="flex items-center gap-1 border border-slate-200 rounded-lg px-2 py-1 text-[13px] text-slate-600 bg-white">
+      <button
+        type="button"
+        onClick={() => shift(-1)}
+        className="p-1 hover:bg-slate-50 rounded text-slate-400 cursor-pointer"
+      >
+        <ChevronLeft size={16} />
+      </button>
+      <label className="relative flex items-center gap-1.5 px-2 whitespace-nowrap cursor-pointer hover:text-slate-800">
+        <Calendar size={15} /> {fmtSingle(value)}
+        <input
+          type="date"
+          value={toInputDate(value)}
+          onChange={(e) => e.target.value && onChange(new Date(e.target.value))}
+          className="absolute inset-0 opacity-0 cursor-pointer"
+        />
+      </label>
+      <button
+        type="button"
+        onClick={() => shift(1)}
+        className="p-1 hover:bg-slate-50 rounded text-slate-400 cursor-pointer"
+      >
+        <ChevronRight size={16} />
+      </button>
+    </div>
+  );
+}
+
+/** Dropdown statis — abu/non-aktif (default) atau putih/aktif (disabled=false). */
+function GhostSelect({ label, disabled = true }) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-2 border border-slate-200 rounded-lg px-2.5 py-1.5 min-w-[140px] text-[13px] select-none ${
+        disabled
+          ? 'text-slate-400 bg-slate-50 cursor-not-allowed'
+          : 'text-slate-600 bg-white cursor-pointer hover:bg-slate-50'
+      }`}
+    >
+      <span>{label}</span>
+      <ChevronDown size={14} className="text-slate-400" />
+    </div>
+  );
+}
+
+/** Tombol "Group" + popover filter (pilih/kecualikan grup produk). */
+function GroupFilter() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const onClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
+
+  const grupBox = (
+    <div className="w-full flex items-center justify-between gap-2 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-400 bg-white cursor-pointer select-none">
+      <span>Pilih Grup</span>
+      <ChevronDown size={14} className="text-slate-400" />
+    </div>
+  );
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[13px] text-slate-600 bg-white cursor-pointer hover:bg-slate-50 select-none"
+      >
+        <span>Group: 0 terpilih, 0 dikecualikan</span>
+        <ChevronDown size={14} className="text-slate-400" />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-30 w-72 bg-white rounded-lg border border-slate-200 shadow-lg p-4 space-y-3 animate-fade-in">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">
+              Produk grup dipilih
+            </label>
+            {grupBox}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">
+              Produk grup dikecualikan
+            </label>
+            {grupBox}
+          </div>
+          <button
+            type="button"
+            className="bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-lg px-4 py-2 cursor-pointer transition-colors"
+          >
+            Filter
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const alignCls = (a) =>
+  a === 'right' ? 'text-right' : a === 'center' ? 'text-center' : 'text-left';
+
+/**
+ * Tabel laporan generik: header (opsional sortable) + body.
+ * Dipakai untuk tabel utama maupun tabel "Ringkasan".
+ * - `title`   : label di atas header (mis. "Ringkasan").
+ * - `groups`  : header bertingkat (mis. "Harga beli" > "Harga lama"/"Harga Baru").
+ * - `rows`    : array data ({ [column.key]: value }); kosong = empty-state.
+ * - `sort`/`onToggleSort` : aktifkan sorting bila diberikan.
+ * - `emptyText`: teks empty-state; `null` = baris kosong polos.
+ */
+function ReportTable({
+  columns,
+  groups,
+  title,
+  rows = [],
+  sort,
+  onToggleSort,
+  paginated = false,
+  emptyText = 'No Data',
+}) {
+  // Kolom daun: dari grup (jika ada) atau langsung dari `columns`.
+  const leaf = groups
+    ? groups.flatMap((g) => (g.children ? g.children : [{ key: g.key, label: g.label }]))
+    : columns;
+
+  const [pageSize, setPageSize] = useState('50/page');
+  const [widths, setWidths] = useState({}); // index kolom -> lebar (px)
+  const dragRef = useRef(null);
+
+  const onResizing = useCallback((e) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const w = Math.max(60, d.startWidth + (e.clientX - d.startX));
+    setWidths((prev) => ({ ...prev, [d.index]: w }));
+  }, []);
+
+  const onResizeEnd = useCallback(() => {
+    dragRef.current = null;
+    window.removeEventListener('mousemove', onResizing);
+    window.removeEventListener('mouseup', onResizeEnd);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }, [onResizing]);
+
+  const onResizeStart = useCallback(
+    (e, index, th) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragRef.current = {
+        index,
+        startX: e.clientX,
+        startWidth: th ? th.getBoundingClientRect().width : 160,
+      };
+      window.addEventListener('mousemove', onResizing);
+      window.addEventListener('mouseup', onResizeEnd);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    },
+    [onResizing, onResizeEnd]
+  );
+
+  // Lepas listener bila komponen di-unmount saat masih men-drag.
+  useEffect(() => onResizeEnd, [onResizeEnd]);
+
+  return (
+    <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+      {title && (
+        <div className="px-3 py-2.5 text-[13px] font-semibold text-slate-600 bg-slate-50 border-b border-slate-200">
+          {title}
+        </div>
+      )}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <colgroup>
+            {leaf.map((c, i) => (
+              <col key={c.key} style={widths[i] ? { width: `${widths[i]}px` } : undefined} />
+            ))}
+          </colgroup>
+          <thead>
+            {groups ? (
+              <>
+                <tr className="bg-slate-50/70 border-y border-slate-200">
+                  {groups.map((g) =>
+                    g.children ? (
+                      <th
+                        key={g.label}
+                        colSpan={g.children.length}
+                        className="px-3 py-2 text-center text-[13px] font-semibold text-slate-600 whitespace-nowrap border-r border-b border-slate-200 last:border-r-0"
+                      >
+                        {g.label}
+                      </th>
+                    ) : (
+                      <th
+                        key={g.key}
+                        rowSpan={2}
+                        className="px-3 py-2 text-left align-middle text-[13px] font-semibold text-slate-600 whitespace-nowrap border-r border-slate-200 last:border-r-0"
+                      >
+                        {g.label}
+                      </th>
+                    )
+                  )}
+                </tr>
+                <tr className="bg-slate-50/70 border-b border-slate-200">
+                  {groups.flatMap((g) =>
+                    g.children
+                      ? g.children.map((c) => (
+                          <th
+                            key={c.key}
+                            className="px-3 py-2 text-left text-[13px] font-semibold text-slate-600 whitespace-nowrap border-r border-slate-200 last:border-r-0"
+                          >
+                            {c.label}
+                          </th>
+                        ))
+                      : []
+                  )}
+                </tr>
+              </>
+            ) : (
+              <tr className="bg-slate-50/70 border-y border-slate-200">
+                {leaf.map((c, i) => {
+                  const sortable = c.sortable && onToggleSort;
+                  const active = sort?.key === c.key;
+                  const isLast = i === leaf.length - 1;
+                  return (
+                    <th
+                      key={c.key}
+                      onClick={() => sortable && onToggleSort(c.key)}
+                      className={`relative px-3 py-2 text-left text-[13px] font-semibold text-slate-600 whitespace-nowrap border-r border-slate-200 last:border-r-0 ${
+                        sortable ? 'cursor-pointer hover:text-slate-800 select-none' : ''
+                      }`}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {c.label}
+                        {sortable && (
+                          <ChevronsUpDown
+                            size={13}
+                            className={active ? 'text-sky-600' : 'text-slate-300'}
+                          />
+                        )}
+                      </span>
+                      {/* Pegangan resize: tarik untuk mengatur lebar kolom. */}
+                      {!isLast && (
+                        <span
+                          onMouseDown={(e) => onResizeStart(e, i, e.currentTarget.parentElement)}
+                          onClick={(e) => e.stopPropagation()}
+                          title="Tarik untuk mengatur lebar kolom"
+                          className="absolute top-0 right-0 h-full w-1.5 translate-x-1/2 z-10 cursor-col-resize select-none hover:bg-sky-400/60"
+                        />
+                      )}
+                    </th>
+                  );
+                })}
+              </tr>
+            )}
+          </thead>
+          <tbody>
+            {rows.length > 0 ? (
+              rows.map((row, ri) => (
+                <tr
+                  key={row.id ?? ri}
+                  className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/60"
+                >
+                  {leaf.map((c) => (
+                    <td
+                      key={c.key}
+                      className={`px-3 py-2 text-[13px] text-slate-600 whitespace-nowrap border-r border-slate-200 last:border-r-0 ${alignCls(
+                        c.align
+                      )}`}
+                    >
+                      {row[c.key]}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                {emptyText ? (
+                  <td
+                    colSpan={leaf.length}
+                    className="px-3 py-10 text-center text-[13px] text-slate-400 italic"
+                  >
+                    {emptyText}
+                  </td>
+                ) : (
+                  <td colSpan={leaf.length} className="px-3 py-4">
+                    &nbsp;
+                  </td>
+                )}
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {paginated && (
+        <div className="flex items-center gap-2 px-3 py-2.5 border-t border-slate-200">
+          <select
+            value={pageSize}
+            onChange={(e) => setPageSize(e.target.value)}
+            className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-[13px] text-slate-700 bg-white outline-none focus:border-blue-400 cursor-pointer"
+          >
+            <option value="50/page">50/page</option>
+            <option value="100/page">100/page</option>
+          </select>
+          <button
+            type="button"
+            disabled
+            className="p-1.5 rounded-md border border-slate-200 text-slate-300 cursor-not-allowed"
+          >
+            <ChevronLeft size={15} />
+          </button>
+          <button
+            type="button"
+            className="px-3 py-1 rounded-md bg-blue-600 text-white text-[13px] font-semibold cursor-pointer"
+          >
+            1
+          </button>
+          <button
+            type="button"
+            disabled
+            className="p-1.5 rounded-md border border-slate-200 text-slate-300 cursor-not-allowed"
+          >
+            <ChevronRight size={15} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Laporan laba-rugi terstruktur (A. Pendapatan … G. Laba Bersih).
+ * `sections`: [{ code, title, total?, empty?, items: [{ label, value }] }]
+ */
+function LabaRugiTable({ sections }) {
+  return (
+    <div className="border border-slate-200 rounded-xl overflow-hidden bg-white text-[13px]">
+      {sections.map((sec) => (
+        <div key={sec.code}>
+          <div className="flex items-center justify-between px-4 py-2.5 font-semibold text-slate-700 border-b border-slate-200">
+            <span>
+              {sec.code}. {sec.title}
+            </span>
+            {sec.total != null && <span>{sec.total}</span>}
+          </div>
+          {sec.empty ? (
+            <div className="px-4 py-6 text-center text-slate-400 border-b border-slate-200">
+              No Data
+            </div>
+          ) : (
+            sec.items.map((it) => (
+              <div key={it.label} className="grid grid-cols-2 border-b border-slate-100 text-slate-600">
+                <div className="px-4 py-2.5 pl-7">{it.label}</div>
+                <div className="px-4 py-2.5 border-l border-slate-200">{it.value}</div>
+              </div>
+            ))
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Daftar accordion untuk laporan tipe `linkList` (mis. Laporan Keseluruhan
+ * Penjualan). Item dengan `summary`/`labaRugi` bisa dibuka; item tanpa konten
+ * tampil sebagai baris dengan chevron-kanan.
+ */
+function AccordionList({ items }) {
+  const [openSet, setOpenSet] = useState(() => new Set());
+  const toggle = (label) =>
+    setOpenSet((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  const norm = items.map((it) => (typeof it === 'string' ? { label: it } : it));
+
+  return (
+    <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+      {norm.map((it) => {
+        const open = openSet.has(it.label);
+        const expandable = !!it.summary || !!it.labaRugi;
+        return (
+          <div key={it.label} className="border-b border-slate-100 last:border-b-0">
+            <button
+              type="button"
+              onClick={() => expandable && toggle(it.label)}
+              className="w-full flex items-center justify-between px-4 py-3.5 text-[13px] text-slate-700 hover:bg-slate-50 cursor-pointer text-left"
+            >
+              <span>{it.label}</span>
+              {expandable ? (
+                <ChevronDown
+                  size={16}
+                  className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
+                />
+              ) : (
+                <ChevronRight size={16} className="text-slate-400" />
+              )}
+            </button>
+            {expandable && open && (
+              <div className="px-4 pb-4">
+                {it.labaRugi ? (
+                  <LabaRugiTable sections={it.labaRugi} />
+                ) : (
+                  <ReportTable
+                    columns={it.summary.columns}
+                    title={it.summary.title}
+                    rows={it.summary.rows}
+                    emptyText="No Data"
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Panel kanan — toolbar + tabel hasil laporan terpilih. */
+function LaporanDetail({ report, collapsed, onExpand }) {
+  const [dateFilter, setDateFilter] = useState(() => {
+    const d = new Date();
+    return { preset: 'today', start: d, end: d };
+  });
+  const [singleDate, setSingleDate] = useState(() => new Date());
+  const [dtEnd, setDtEnd] = useState(() => toInputDateTime(new Date()));
+  const [dtStart, setDtStart] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return toInputDateTime(d);
+  });
+  const [paket, setPaket] = useState('Non Paket');
+  const [selectVal, setSelectVal] = useState('');
+  const [sortByVal, setSortByVal] = useState('');
+  const [extraVals, setExtraVals] = useState({}); // nilai dropdown extraSelects per label
+  const [filterSel, setFilterSel] = useState(''); // dropdown band filter kedua
+  const [filterQuery, setFilterQuery] = useState(''); // search band filter kedua
+  const [cari, setCari] = useState('');
+  const [sort, setSort] = useState({ key: null, dir: 'asc' });
+  const rootRef = useRef(null);
+  const tableScrollRef = useRef(null);
+
+  // Saat laporan berganti, kembalikan tampilan ke atas agar kolom/tabel langsung
+  // terlihat: reset gulir area tabel sekaligus bawa panel ke puncak viewport.
+  useEffect(() => {
+    if (tableScrollRef.current) tableScrollRef.current.scrollTop = 0;
+    // Gulir mentok ke paling atas (semua kontainer yang bisa di-scroll + window)
+    // agar judul laporan langsung terlihat.
+    let el = rootRef.current?.parentElement;
+    while (el) {
+      const oy = getComputedStyle(el).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight) {
+        el.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      el = el.parentElement;
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Catatan: panel detail di-remount lewat key={report.id} di induk, jadi semua
+    // state toolbar (Select, Sort By, Cari, tanggal) otomatis kembali default.
+  }, [report.id]);
+
+  // Mode tanggal: 'range' (default), 'single' (satu hari + navigasi), atau 'none'.
+  const dateMode = report.dateMode || 'range';
+
+  // Konfigurasi toolbar per laporan.
+  // paket: undefined/true = dropdown "Non Paket" fungsional; 'select' = dropdown
+  //   "Select" non-aktif (abu); false = sembunyikan.
+  // cari: false = sembunyikan; 'left' = di kiri (urutan default); selain itu = kanan.
+  const paketMode = report.toolbar?.paket;
+  const cariMode = report.toolbar?.cari;
+  const showCari = cariMode !== false;
+
+  const toggleSort = (key) =>
+    setSort((s) => ({ key, dir: s.key === key && s.dir === 'asc' ? 'desc' : 'asc' }));
+
+  const cariBox = (
+    <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-2.5 py-1.5 min-w-[150px] focus-within:border-blue-400 transition-colors">
+      <Search size={13} className="text-slate-400 shrink-0" />
+      <input
+        type="text"
+        value={cari}
+        onChange={(e) => setCari(e.target.value)}
+        placeholder={report.toolbar?.cariPlaceholder || 'Cari'}
+        className="w-full text-[13px] bg-transparent outline-none text-slate-700 placeholder-slate-400"
+      />
+    </div>
+  );
+
+  const ghostCtl =
+    'flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[13px] text-slate-600 bg-white cursor-pointer hover:bg-slate-50 select-none';
+  const outlineBtn =
+    'flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer transition-colors';
+  const blueBtn =
+    'flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1.5 text-[13px] font-semibold cursor-pointer transition-colors';
+
+  // Render satu kontrol toolbar berdasarkan token. Urutan default bisa ditimpa
+  // lewat `toolbar.layout`, mis. ['paket', 'cari', 'date', 'export'].
+  const renderControl = (token) => {
+    switch (token) {
+      case 'cari':
+        return showCari ? <Fragment key="cari">{cariBox}</Fragment> : null;
+      case 'date':
+        if (dateMode === 'single')
+          return <SingleDatePicker key="date" value={singleDate} onChange={setSingleDate} />;
+        if (dateMode === 'range')
+          return <DateRangePicker key="date" value={dateFilter} onChange={setDateFilter} />;
+        return null;
+      case 'paket':
+        // undefined/true = dropdown "Non Paket" fungsional (default); false = sembunyikan.
+        if (paketMode === false) return null;
+        if (paketMode === 'select')
+          // 'select' dengan selectOptions = dropdown fungsional (placeholder "Select");
+          // tanpa opsi = dropdown abu non-aktif.
+          // Default menampilkan placeholder "Select"; setelah dipilih, menampilkan
+          // opsi Sort By yang dipilih.
+          return report.toolbar?.selectOptions ? (
+            <Dropdown
+              key="paket"
+              options={report.toolbar.selectOptions}
+              value={selectVal || report.toolbar.selectDefault || ''}
+              onChange={setSelectVal}
+              placeholder="Select"
+              minW="min-w-[200px]"
+            />
+          ) : (
+            <GhostSelect key="paket" label="Select" />
+          );
+        return (
+          <Dropdown
+            key="paket"
+            options={['Non Paket', '+Paket']}
+            value={paket}
+            onChange={setPaket}
+            minW="min-w-[200px]"
+          />
+        );
+      case 'extraSelects':
+        // Item bisa: string (abu), { label, disabled }, atau { label, options }
+        // (dropdown fungsional dengan placeholder = label).
+        return report.toolbar?.extraSelects?.map((it) => {
+          const label = typeof it === 'string' ? it : it.label;
+          if (it && it.options)
+            return (
+              <Dropdown
+                key={label}
+                options={it.options}
+                value={extraVals[label] || ''}
+                onChange={(v) => setExtraVals((p) => ({ ...p, [label]: v }))}
+                placeholder={label}
+                minW="min-w-[160px]"
+              />
+            );
+          const disabled = typeof it === 'string' ? true : it.disabled !== false;
+          return <GhostSelect key={label} label={label} disabled={disabled} />;
+        });
+      case 'group':
+        return report.toolbar?.groupFilter ? <GroupFilter key="group" /> : null;
+      case 'sortBy': {
+        const opts = report.toolbar?.sortByOptions;
+        if (opts)
+          return (
+            <Dropdown
+              key="sortBy"
+              options={opts}
+              value={sortByVal}
+              onChange={setSortByVal}
+              placeholder="Select"
+              minW="min-w-[170px]"
+            />
+          );
+        return report.toolbar?.sortBy ? (
+          <div key="sortBy" className={ghostCtl}>
+            <span>Sort By: {report.toolbar.sortBy}</span>
+            <ChevronDown size={14} className="text-slate-400" />
+          </div>
+        ) : null;
+      }
+      case 'sync':
+        return report.toolbar?.sync ? (
+          <button key="sync" type="button" className={blueBtn}>
+            {typeof report.toolbar.sync === 'string' ? report.toolbar.sync : 'Sinkronkan'}
+          </button>
+        ) : null;
+      case 'pdf':
+        return report.toolbar?.pdf !== false ? (
+          <button key="pdf" type="button" className={outlineBtn}>
+            <FileText size={15} className="text-rose-500" /> PDF
+          </button>
+        ) : null;
+      case 'excel':
+        return report.toolbar?.excel !== false ? (
+          <button key="excel" type="button" className={outlineBtn}>
+            <FileSpreadsheet size={15} className="text-emerald-600" /> EXCEL
+          </button>
+        ) : null;
+      case 'export':
+        return report.toolbar?.exportButton ? (
+          <button key="export" type="button" className={blueBtn}>
+            <FileSpreadsheet size={15} /> Export
+          </button>
+        ) : null;
+      default:
+        return null;
+    }
+  };
+
+  // Urutan default meniru tata letak sebelumnya; bisa ditimpa via toolbar.layout.
+  const defaultLayout = [
+    ...(cariMode === 'left' ? ['cari'] : []),
+    'date',
+    'paket',
+    'extraSelects',
+    'group',
+    'sortBy',
+    'sync',
+    ...(showCari && cariMode !== 'left' ? ['cari'] : []),
+    'pdf',
+    'excel',
+    'export',
+  ];
+  const layout = report.toolbar?.layout || defaultLayout;
+
+  return (
+    <div ref={rootRef} className="flex-1 min-w-0 flex flex-col">
+      {/* Header judul + toolbar. Panel terbuka: judul di baris atas sendiri
+          (basis-full), toolbar di bawah. Panel disembunyikan: satu baris. */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 px-4 py-2.5 border-b border-slate-100 bg-white">
+        <div className={`flex items-center gap-2 min-w-0 ${collapsed ? '' : 'basis-full'}`}>
+          {collapsed && (
+            <button
+              type="button"
+              onClick={onExpand}
+              title="Tampilkan daftar laporan"
+              className="p-1 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 cursor-pointer shrink-0"
+            >
+              <ArrowLeft size={18} />
+            </button>
+          )}
+          <h3 className="text-sm font-bold text-slate-800 truncate">{report.label}</h3>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {layout.map((token) => renderControl(token))}
+        </div>
+      </div>
+
+      {/* Band rentang tanggal+jam (mode 'datetime') — dua input + tombol Kirim. */}
+      {report.dateMode === 'datetime' && (
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-slate-100">
+          <input
+            type="datetime-local"
+            value={dtStart}
+            onChange={(e) => setDtStart(e.target.value)}
+            className="border border-slate-200 rounded-lg px-3 py-1.5 text-[13px] text-slate-700 outline-none focus:border-blue-400"
+          />
+          <input
+            type="datetime-local"
+            value={dtEnd}
+            onChange={(e) => setDtEnd(e.target.value)}
+            className="border border-slate-200 rounded-lg px-3 py-1.5 text-[13px] text-slate-700 outline-none focus:border-blue-400"
+          />
+          <button
+            type="button"
+            className="bg-green-500 hover:bg-green-600 text-white rounded-lg px-4 py-1.5 text-[13px] font-semibold cursor-pointer transition-colors"
+          >
+            Kirim
+          </button>
+        </div>
+      )}
+
+      {/* Band filter kedua (Select / input / search + tombol Kirim) */}
+      {report.filterBar && (
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-slate-100">
+          {report.filterBar.select && (
+            <Dropdown
+              options={report.filterBar.select}
+              value={filterSel}
+              onChange={setFilterSel}
+              placeholder="Select"
+              minW="min-w-[180px]"
+            />
+          )}
+          {report.filterBar.inputPlaceholder && (
+            <input
+              type="text"
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              placeholder={report.filterBar.inputPlaceholder}
+              className="border border-slate-200 rounded-lg px-3 py-1.5 text-[13px] text-slate-700 outline-none focus:border-blue-400 min-w-[200px] placeholder-slate-400"
+            />
+          )}
+          {report.filterBar.searchPlaceholder && (
+            <div className="flex-1 min-w-[200px] flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-1.5 focus-within:border-blue-400">
+              <Search size={14} className="text-slate-400 shrink-0" />
+              <input
+                type="text"
+                value={filterQuery}
+                onChange={(e) => setFilterQuery(e.target.value)}
+                placeholder={report.filterBar.searchPlaceholder}
+                className="w-full text-[13px] bg-transparent outline-none text-slate-700 placeholder-slate-400"
+              />
+            </div>
+          )}
+          {report.filterBar.submitLabel && (
+            <button
+              type="button"
+              className="bg-green-500 hover:bg-green-600 text-white rounded-lg px-4 py-1.5 text-[13px] font-semibold cursor-pointer transition-colors"
+            >
+              {report.filterBar.submitLabel}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Tabel */}
+      <div ref={tableScrollRef} className="flex-1 overflow-auto px-4 py-3 space-y-3 bg-white">
+        {report.summary &&
+          (report.summary.type === 'list' ? (
+            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+              <div className="text-[13px] font-semibold text-slate-600 px-3 py-2.5 bg-slate-50 border-b border-slate-200">
+                {report.summary.title}
+              </div>
+              <div className="space-y-1 text-[13px] text-slate-600 px-3 py-2.5">
+                {report.summary.items.map((it) => (
+                  <div key={it.label}>
+                    {it.label}:{it.value ? ` ${it.value}` : ''}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : report.summary.type === 'grid' ? (
+            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white grid grid-cols-2 sm:grid-cols-4">
+              {report.summary.items.map((it) => (
+                <div key={it.label} className="px-4 py-3 border-r border-b border-slate-200">
+                  <div className="text-[11px] text-slate-400">{it.label}</div>
+                  <div className="text-sm font-bold text-slate-700 mt-0.5">{it.value}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ReportTable
+              columns={report.summary.columns}
+              title={report.summary.title}
+              rows={report.summary.rows}
+              emptyText="No Data"
+            />
+          ))}
+        {report.notice && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50">
+            <div className="flex items-start gap-2 text-[13px] text-slate-600">
+              <Info size={15} className="text-blue-500 mt-0.5 shrink-0" />
+              <span>{report.notice.text}</span>
+            </div>
+            {report.notice.summaryButton && (
+              <button
+                type="button"
+                className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-slate-600 bg-white hover:bg-slate-50 cursor-pointer shrink-0"
+              >
+                <ClipboardList size={15} /> Ringkasan
+              </button>
+            )}
+          </div>
+        )}
+        {report.linkList ? (
+          <AccordionList items={report.linkList} />
+        ) : report.labaRugi ? (
+          <LabaRugiTable sections={report.labaRugi} />
+        ) : (
+          !report.hideTable && (
+            <ReportTable
+              columns={report.columns}
+              groups={report.groups}
+              rows={report.rows}
+              sort={sort}
+              onToggleSort={toggleSort}
+              paginated={!!report.paginate}
+            />
+          )
+        )}
+      </div>
+
+      {/* Band bawah (mis. Pilih Pesanan + tombol Gabung Resi) */}
+      {report.bottomBar && (
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-slate-200">
+          <span className="text-[13px] text-slate-600">{report.bottomBar.label}</span>
+          <button
+            type="button"
+            disabled
+            className="bg-slate-200 text-slate-400 rounded-lg px-4 py-1.5 text-[13px] font-semibold cursor-not-allowed"
+          >
+            {report.bottomBar.button}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Browser laporan generik (master–detail). `reports` default = laporan Produk,
+// tapi bisa dipakai ulang untuk tab lain (mis. Pembelian) dengan daftar berbeda.
+export default function LaporanProduk({ reports = PRODUK_REPORTS }) {
+  const [activeId, setActiveId] = useState(reports[0].id);
+  const [panelOpen, setPanelOpen] = useState(true);
+
+  const report = useMemo(
+    () => reports.find((r) => r.id === activeId) || reports[0],
+    [activeId, reports]
+  );
+
+  return (
+    <div className="flex flex-1 min-h-0 border border-slate-200 rounded-xl overflow-hidden bg-white">
+      {panelOpen && (
+        <DaftarLaporanPanel
+          reports={reports}
+          activeId={activeId}
+          onSelect={setActiveId}
+          onCollapse={() => setPanelOpen(false)}
+        />
+      )}
+      <LaporanDetail
+        key={report.id}
+        report={report}
+        collapsed={!panelOpen}
+        onExpand={() => setPanelOpen(true)}
+      />
+    </div>
+  );
+}

@@ -1,14 +1,54 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import DataTable from '../components/DataTable';
-import { specifications } from '../productInventoryData';
+import apiClient from '../../../../api/apiClient';
 
 export function SpecificationsPage() {
+  const [specifications, setSpecifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [namaSpesifikasi, setNamaSpesifikasi] = useState('');
 
+  const fetchSpecifications = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.get('/specifications/');
+      setSpecifications(Array.isArray(res.data) ? res.data : res.data?.results || []);
+    } catch (err) {
+      console.error('[SpecificationsPage] fetch error:', err);
+      setError('Gagal memuat daftar spesifikasi.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSpecifications();
+  }, []);
+
+  const canSave = namaSpesifikasi.trim() && !saving;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    try {
+      await apiClient.post('/specifications/', { nama: namaSpesifikasi });
+      setNamaSpesifikasi('');
+      await fetchSpecifications();
+    } catch (err) {
+      console.error('[SpecificationsPage] save error:', err);
+      setError('Gagal menyimpan spesifikasi.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const filteredSpecs = specifications.filter(spec =>
-    spec.name.toLowerCase().includes(searchQuery.toLowerCase())
+    spec.nama.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -18,12 +58,13 @@ export function SpecificationsPage() {
         <div className="pi-category-card">
           <div className="pi-category-card-header" style={{ padding: '16px 20px' }}>
             <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', color: '#1e293b' }}>Tambah Spesifikasi</h3>
-            <button 
+            <button
               type="button"
-              disabled
-              style={{ background: '#e2e8f0', color: '#94a3b8', border: 0, borderRadius: '4px', padding: '6px 16px', fontSize: '12px', fontWeight: 'bold', cursor: 'not-allowed' }}
+              disabled={!canSave}
+              onClick={handleSave}
+              style={{ background: canSave ? '#16a34a' : '#e2e8f0', color: canSave ? '#fff' : '#94a3b8', border: 0, borderRadius: '4px', padding: '6px 16px', fontSize: '12px', fontWeight: 'bold', cursor: canSave ? 'pointer' : 'not-allowed' }}
             >
-              ✓ Simpan
+              {saving ? 'Menyimpan...' : '✓ Simpan'}
             </button>
           </div>
           <div className="pi-category-card-body" style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -66,11 +107,13 @@ export function SpecificationsPage() {
               />
             </div>
 
-            <DataTable 
-              rows={filteredSpecs} 
+            {error && <p style={{ color: '#dc2626', fontSize: 12, margin: '0 0 8px' }}>{error}</p>}
+            <DataTable
+              rows={filteredSpecs}
+              emptyText={loading ? 'Memuat...' : 'Tidak ada data'}
               columns={[
-                { key: 'name', label: 'Nama Spesifikasi' }
-              ]} 
+                { key: 'nama', label: 'Nama Spesifikasi' }
+              ]}
             />
           </div>
         </div>

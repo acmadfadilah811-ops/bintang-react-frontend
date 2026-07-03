@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Calendar, Download, ChevronsUpDown, ChevronDown } from 'lucide-react';
 import { PolarBearSvg } from './_shared';
+import apiClient from '../../../../api/apiClient';
 
 export function StockMovementPage() {
   const [startDate, setStartDate] = useState('2026-06-25');
@@ -16,65 +17,68 @@ export function StockMovementPage() {
   const [sortKey, setSortKey] = useState(null);
   const [sortDirection, setSortDirection] = useState('asc');
 
-  // Stock Movement Data with localStorage support
-  const [movementList, setMovementList] = useState(() => {
-    const saved = localStorage.getItem('stock_movements');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed to parse stock_movements', e);
-      }
-    }
-    // High-fidelity sample data showing stock calculations
-    return [
-      {
-        id: 'mv-1',
-        group: 'Print Outdoor',
-        product: 'Banner Flexi China 340 gsm',
-        initial: 150,
-        in: 100,
-        returnStock: 0,
-        sales: 45,
-        out: 0,
-        sisa: 205, // 150 + 100 + 0 - 45 - 0
-        date: '25-Jun-2026'
-      },
-      {
-        id: 'mv-2',
-        group: 'Print Indoor',
-        product: 'Sticker Vinyl Laminasi Glossy',
-        initial: 80,
-        in: 50,
-        returnStock: 2,
-        sales: 20,
-        out: 5,
-        sisa: 107, // 80 + 50 + 2 - 20 - 5
-        date: '24-Jun-2026'
-      },
-      {
-        id: 'mv-3',
-        group: 'Merchandise',
-        product: 'Kartu Nama Art Carton 260',
-        initial: 300,
-        in: 0,
-        returnStock: 0,
-        sales: 120,
-        out: 10,
-        sisa: 170, // 300 + 0 + 0 - 120 - 10
-        date: '23-Jun-2026'
-      }
-    ];
-  });
+  // Stock Movement Data with API integration
+  const [movementList, setMovementList] = useState([]);
+  const [listLoading, setListLoading] = useState(false);
+  const [fetchError, setFetchError] = useState('');
 
   useEffect(() => {
-    localStorage.setItem('stock_movements', JSON.stringify(movementList));
-  }, [movementList]);
+    let isMounted = true;
+    const fetchData = async () => {
+      setListLoading(true);
+      setFetchError('');
+      try {
+        const res = await apiClient.get('/product-stock-movements/summary/', {
+          params: {
+            start_date: startDate,
+            end_date: endDate
+          }
+        });
+        if (isMounted) {
+          setMovementList(res.data);
+        }
+      } catch (err) {
+        console.error('Error fetching stock movements:', err);
+        if (isMounted) {
+          setFetchError('Gagal memuat data pergerakan stok');
+        }
+      } finally {
+        if (isMounted) {
+          setListLoading(false);
+        }
+      }
+    };
+    fetchData();
+    return () => {
+      isMounted = false;
+    };
+  }, [startDate, endDate]);
 
   // Reset page number on filter changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchVal, pageSize]);
+
+  const handleDownloadExcel = async () => {
+    try {
+      const response = await apiClient.get(`/export/stock-movement/`, {
+        params: {
+          start_date: startDate,
+          end_date: endDate
+        },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `summary-${startDate}__${endDate}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error('Gagal mendownload Excel:', err);
+    }
+  };
 
   const handleSort = (key) => {
     if (sortKey === key) {
@@ -179,23 +183,7 @@ export function StockMovementPage() {
   // Filter list
   const filteredList = sortedList.filter(row => {
     const q = searchVal.toLowerCase();
-    const matchesSearch = row.product.toLowerCase().includes(q) || row.group.toLowerCase().includes(q);
-    
-    // Parse the row date (DD-MMM-YYYY format, e.g. 25-Jun-2026)
-    let matchesDate = true;
-    if (row.date) {
-      const parts = row.date.split('-');
-      if (parts.length === 3) {
-        const months = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, Mei: 4, Jun: 5, Jul: 6, Agu: 7, Sep: 8, Okt: 9, Nov: 10, Des: 11 };
-        const rowDate = new Date(parts[2], months[parts[1]] || 0, parts[0]);
-        
-        // Start and end dates are YYYY-MM-DD
-        const start = new Date(startDate + 'T00:00:00');
-        const end = new Date(endDate + 'T23:59:59');
-        matchesDate = rowDate >= start && rowDate <= end;
-      }
-    }
-    return matchesSearch && matchesDate;
+    return row.product.toLowerCase().includes(q) || row.group.toLowerCase().includes(q);
   });
 
   // Pagination calculation
@@ -349,6 +337,7 @@ export function StockMovementPage() {
 
           <button 
             type="button"
+            onClick={handleDownloadExcel}
             style={{ 
               display: 'flex', 
               alignItems: 'center', 
@@ -489,7 +478,19 @@ export function StockMovementPage() {
             </tr>
           </thead>
           <tbody>
-            {paginatedList.length === 0 ? (
+            {listLoading ? (
+              <tr>
+                <td colSpan={8} style={{ padding: '40px 20px', textAlign: 'center' }}>
+                  <span style={{ fontSize: '14px', color: '#64748b' }}>Memuat data...</span>
+                </td>
+              </tr>
+            ) : fetchError ? (
+              <tr>
+                <td colSpan={8} style={{ padding: '40px 20px', textAlign: 'center' }}>
+                  <span style={{ fontSize: '14px', color: '#dc2626', fontWeight: 'bold' }}>{fetchError}</span>
+                </td>
+              </tr>
+            ) : paginatedList.length === 0 ? (
               <tr>
                 <td colSpan={8} style={{ padding: '40px 20px', textAlign: 'center' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

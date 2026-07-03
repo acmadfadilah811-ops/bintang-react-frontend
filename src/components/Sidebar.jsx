@@ -28,7 +28,27 @@ import {
   Tag,
   Barcode,
   Receipt,
+  Wallet,
+  ShoppingBag,
+  ArrowLeftRight,
+  CreditCard,
+  History,
+  Banknote,
+  Store,
 } from 'lucide-react';
+
+const PENGATURAN_GROUP = {
+  id: 'pengaturan',
+  label: 'Pengaturan',
+  icon: Settings,
+  isGroup: true,
+  submenus: [
+    { path: '/settings/toko', label: 'Toko', icon: Store },
+    { path: '/settings/point-of-sale', label: 'Point Of Sale', icon: CreditCard },
+    { path: '/settings/notifikasi', label: 'Notifikasi', icon: Bell },
+    { path: '/settings/sistem-stok', label: 'Sistem Stok', icon: Boxes },
+  ],
+};
 
 const groupedMenuOwnerManager = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, isGroup: false },
@@ -49,7 +69,40 @@ const groupedMenuOwnerManager = [
       { path: '/product-inventory/merge-stocks', label: 'Gabung Stok', icon: Layers },
     ],
   },
+  {
+    id: 'marketing',
+    label: 'Marketing',
+    icon: Tag,
+    isGroup: true,
+    submenus: [
+      { path: '/marketing/voucher-diskon', label: 'Voucher & Diskon', icon: Tag },
+    ],
+  },
   { path: '/customer-supplier', label: 'Pelanggan & Supplier', icon: Users, isGroup: false },
+  {
+    id: 'transaksi_pembayaran',
+    label: 'Transaksi & Pembayaran',
+    icon: Wallet,
+    accent: 'emerald',
+    isGroup: true,
+    submenus: [
+      { path: '/kasir/terminal', label: 'Kasir (POS)', icon: CreditCard },
+      { path: '/transaksi/penjualan', label: 'Penjualan', icon: ShoppingCart },
+      { path: '/transaksi/pembelian', label: 'Pembelian', icon: ShoppingBag },
+      { path: '/transaksi/pendapatan-pengeluaran', label: 'Pendapatan/Pengeluaran', icon: ArrowLeftRight },
+      { path: '/transaksi/digital-payment', label: 'Digital Payment', icon: CreditCard },
+    ],
+  },
+  {
+    id: 'laporan_pembukuan',
+    label: 'Laporan dan Pembukuan',
+    icon: History,
+    isGroup: true,
+    submenus: [
+      { path: '/laporan/pencairan-dana', label: 'Pencairan Dana', icon: Banknote },
+      { path: '/laporan/laporan', label: 'Laporan', icon: BarChart3 },
+    ],
+  },
   {
     id: 'operasional',
     label: 'Operasional',
@@ -89,7 +142,7 @@ const groupedMenuOwnerManager = [
     ],
   },
   { path: '/profile', label: 'Profil', icon: User, isGroup: false },
-  { path: '/settings', label: 'Pengaturan', icon: Settings, isGroup: false },
+  PENGATURAN_GROUP,
 ];
 
 const menuStaff = [
@@ -98,11 +151,24 @@ const menuStaff = [
   { path: '/profile', label: 'Profil', icon: User, isGroup: false },
 ];
 
+const menuKasir = [
+  { path: '/kasir/dashboard', label: 'Dashboard', icon: LayoutDashboard, isGroup: false },
+  { path: '/kasir/terminal', label: 'Kasir (POS)', icon: CreditCard, isGroup: false },
+  { path: '/kasir/buat-order', label: 'Buat Order', icon: ShoppingCart, isGroup: false },
+  { path: '/kasir/produk', label: 'Daftar Produk', icon: Package, isGroup: false },
+  { path: '/kasir/antrean-wa', label: 'Antrean WA', icon: MessageSquare, isGroup: false },
+  { path: '/kasir/riwayat', label: 'Riwayat Transaksi', icon: History, isGroup: false },
+  { path: '/kasir/shift', label: 'Shift & Kas', icon: Wallet, isGroup: false },
+  { path: '/kasir/pengaturan-wa', label: 'Pengaturan WA', icon: Settings, isGroup: false },
+  { path: '/profile', label: 'Profil', icon: User, isGroup: false },
+];
+
 const menuAdmin = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, isGroup: false },
+  { path: '/kasir/terminal', label: 'Kasir (POS)', icon: CreditCard, isGroup: false },
   { path: '/produksi', label: 'Papan Kerja (SPK)', icon: Kanban, isGroup: false },
   { path: '/profile', label: 'Profil', icon: User, isGroup: false },
-  { path: '/settings', label: 'Pengaturan', icon: Settings, isGroup: false },
+  PENGATURAN_GROUP,
 ];
 
 const getLogoUrl = (url) => {
@@ -114,6 +180,17 @@ const getLogoUrl = (url) => {
   );
   const path = url.startsWith('/') ? url : `/${url}`;
   return `${apiBase}${path}`;
+};
+
+// Aksen warna khusus per grup menu (selain biru default).
+// Kelas ditulis literal agar terbaca oleh Tailwind.
+const GROUP_ACCENTS = {
+  emerald: {
+    groupActive: 'bg-emerald-50 text-emerald-700 font-extrabold border-l-2 border-emerald-500',
+    groupIdle: 'text-emerald-700 hover:bg-emerald-50/60 hover:text-emerald-800 font-semibold',
+    icon: 'text-emerald-600',
+    subActive: 'text-emerald-700 font-extrabold bg-emerald-50/70',
+  },
 };
 
 export default function Sidebar() {
@@ -131,8 +208,12 @@ export default function Sidebar() {
   const [openGroups, setOpenGroups] = useState({
     operasional: true, // Default terbuka
     produk_inventori: true,
+    marketing: true,
+    transaksi_pembayaran: true,
+    laporan_pembukuan: true,
     hr_kepegawaian: false,
     keuangan_logistik: false,
+    pengaturan: false,
   });
 
   const userRole = user?.role?.toLowerCase() || 'staff';
@@ -141,6 +222,7 @@ export default function Sidebar() {
     if (path === '/dashboard' || path === '/') return 'dashboard';
     if (path === '/staff-dashboard') return 'staff-dashboard';
     if (path === '/orders') return 'orders';
+    if (path.startsWith('/kasir')) return 'kasir-pos';
     if (path === '/jobs' || path === '/produksi') return 'jobs';
     if (path === '/customers') return 'customers';
     if (path === '/whatsapp-chat') return 'whatsapp-chat';
@@ -155,12 +237,18 @@ export default function Sidebar() {
     if (path === '/buku-besar') return 'buku-besar';
     if (path === '/pricelist') return 'pricelist';
     if (path === '/divisi') return 'divisi';
-    if (path === '/settings') return 'settings';
+    if (path === '/settings' || path.startsWith('/settings/')) return 'settings';
     return null;
   };
 
   const baseMenu =
-    userRole === 'staff' ? menuStaff : userRole === 'admin' ? menuAdmin : groupedMenuOwnerManager;
+    userRole === 'staff'
+      ? menuStaff
+      : userRole === 'kasir'
+      ? menuKasir
+      : userRole === 'admin'
+      ? menuAdmin
+      : groupedMenuOwnerManager;
 
   // Filter menu berdasarkan perizinan hak akses dinamis
   const filteredMenu = baseMenu
@@ -266,6 +354,7 @@ export default function Sidebar() {
             const isOpen = openGroups[item.id];
             const isAnySubActive = item.submenus.some((sub) => location.pathname === sub.path || location.pathname.startsWith(`${sub.path}/`));
             const GroupIcon = item.icon;
+            const accent = item.accent ? GROUP_ACCENTS[item.accent] : null;
 
             return (
               <div key={item.id} className="space-y-1">
@@ -277,12 +366,17 @@ export default function Sidebar() {
                     isCollapsed ? 'justify-center p-2.5' : 'px-3 py-2 gap-3'
                   } ${
                     isAnySubActive
-                      ? 'bg-slate-50 text-blue-600 font-extrabold border-l-2 border-blue-500'
-                      : 'text-slate-650 hover:bg-slate-50/50 hover:text-slate-800 font-semibold'
+                      ? accent?.groupActive ||
+                        'bg-slate-50 text-blue-600 font-extrabold border-l-2 border-blue-500'
+                      : accent?.groupIdle ||
+                        'text-slate-650 hover:bg-slate-50/50 hover:text-slate-800 font-semibold'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <GroupIcon size={isCollapsed ? 20 : 18} className="shrink-0" />
+                    <GroupIcon
+                      size={isCollapsed ? 20 : 18}
+                      className={`shrink-0 ${accent?.icon || ''}`}
+                    />
                     {!isCollapsed && (
                       <span className="whitespace-nowrap text-left">{item.label}</span>
                     )}
@@ -318,7 +412,7 @@ export default function Sidebar() {
                               : 'pl-9 pr-3 py-1.5 gap-2 text-xs'
                           } ${
                             isSubActive
-                              ? 'text-blue-600 font-extrabold bg-blue-50/60'
+                              ? accent?.subActive || 'text-blue-600 font-extrabold bg-blue-50/60'
                               : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50/30'
                           }`}
                         >

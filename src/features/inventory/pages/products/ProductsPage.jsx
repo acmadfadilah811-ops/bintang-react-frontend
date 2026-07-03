@@ -1,27 +1,85 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MoreHorizontal, Plus, Trash2, MoreVertical, Upload, Download, Copy, ChevronUp } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import FormDrawer from '../components/FormDrawer';
 import { Button, PageHeader, Select, StatusBadge, Toolbar } from '../components/PageShell';
-import { formatCurrency, productRows } from '../productInventoryData';
+import { formatCurrency } from '../productInventoryData';
 import { useAuth } from '../../../../context/AuthContext';
+import apiClient from '../../../../api/apiClient';
 
 export default function ProductsPage() {
   const { businessSettings } = useAuth();
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   const [isCreating, setIsCreating] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [brandFilter, setBrandFilter] = useState('');
 
   // Form states matching screenshot
+  const [formNama, setFormNama] = useState('');
+  const [formNamaAlt, setFormNamaAlt] = useState('');
+  const [formKategori, setFormKategori] = useState('');
+  const [formHargaToko, setFormHargaToko] = useState('');
+  const [formDeskripsi, setFormDeskripsi] = useState('');
   const [onlinePriceSame, setOnlinePriceSame] = useState(true);
   const [trackInventory, setTrackInventory] = useState(false);
   const [hasVariants, setHasVariants] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null);
+
+  const fetchProducts = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = {};
+      if (search) params.search = search;
+      if (categoryFilter) params.kategori = categoryFilter;
+      const res = await apiClient.get('/products/', { params });
+      const data = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      const filtered = brandFilter ? data.filter((p) => String(p.brand) === String(brandFilter)) : data;
+      setProducts(filtered);
+    } catch (err) {
+      console.error('[ProductsPage] fetch products error:', err);
+      setError('Gagal memuat daftar produk.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [catRes, brandRes] = await Promise.all([
+          apiClient.get('/product-categories/'),
+          apiClient.get('/brands/'),
+        ]);
+        setCategories(Array.isArray(catRes.data) ? catRes.data : catRes.data?.results || []);
+        setBrands(Array.isArray(brandRes.data) ? brandRes.data : brandRes.data?.results || []);
+      } catch (err) {
+        console.error('[ProductsPage] fetch categories/brands error:', err);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    fetchProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, categoryFilter, brandFilter]);
 
   const toggleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedIds(productRows.map(r => r.id));
+      setSelectedIds(products.map((r) => r.id));
     } else {
       setSelectedIds([]);
     }
@@ -29,9 +87,76 @@ export default function ProductsPage() {
 
   const toggleSelectRow = (id) => {
     if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter(x => x !== id));
+      setSelectedIds(selectedIds.filter((x) => x !== id));
     } else {
       setSelectedIds([...selectedIds, id]);
+    }
+  };
+
+  const resetForm = () => {
+    setFormNama('');
+    setFormNamaAlt('');
+    setFormKategori('');
+    setFormHargaToko('');
+    setFormDeskripsi('');
+    setOnlinePriceSame(true);
+    setTrackInventory(false);
+    setHasVariants(false);
+    setDetailOpen(false);
+    setSelectedPhoto(null);
+    setPhotoPreviewUrl(null);
+  };
+
+  const handlePhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setSelectedPhoto(file);
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleSaveProduct = async () => {
+    if (!formNama.trim() || saving) return;
+    setSaving(true);
+    try {
+      const res = await apiClient.post('/products/', {
+        nama: formNama,
+        nama_alternatif: formNamaAlt || null,
+        kategori: formKategori || null,
+        harga_jual_toko: formHargaToko || 0,
+        harga_online_sama: onlinePriceSame,
+        lacak_inventori: trackInventory,
+        has_variant: hasVariants,
+        deskripsi: formDeskripsi || null,
+      });
+      if (selectedPhoto) {
+        const fd = new FormData();
+        fd.append('product', res.data.id);
+        fd.append('is_primary', 'true');
+        fd.append('foto', selectedPhoto);
+        await apiClient.post('/product-images/', fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      }
+      resetForm();
+      setIsCreating(false);
+      await fetchProducts();
+    } catch (err) {
+      console.error('[ProductsPage] create product error:', err);
+      setError('Gagal menyimpan produk.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    try {
+      await Promise.all(selectedIds.map((id) => apiClient.delete(`/products/${id}/`)));
+      setSelectedIds([]);
+      await fetchProducts();
+    } catch (err) {
+      console.error('[ProductsPage] delete products error:', err);
+      setError('Gagal menghapus produk terpilih.');
     }
   };
 
@@ -39,31 +164,35 @@ export default function ProductsPage() {
     {
       key: 'select',
       label: (
-        <input 
-          type="checkbox" 
-          checked={selectedIds.length === productRows.length && productRows.length > 0} 
-          onChange={toggleSelectAll} 
+        <input
+          type="checkbox"
+          checked={selectedIds.length === products.length && products.length > 0}
+          onChange={toggleSelectAll}
         />
       ),
       render: (row) => (
-        <input 
-          type="checkbox" 
-          checked={selectedIds.includes(row.id)} 
-          onChange={() => toggleSelectRow(row.id)} 
+        <input
+          type="checkbox"
+          checked={selectedIds.includes(row.id)}
+          onChange={() => toggleSelectRow(row.id)}
         />
-      )
+      ),
     },
-    { key: 'photo', label: 'Foto', render: () => <div className="pi-product-thumb" /> },
-    { key: 'name', label: 'Nama Produk' },
-    { key: 'variant', label: 'Variant' },
-    { key: 'sku', label: 'SKU' },
-    { key: 'barcode', label: 'Barcode' },
-    { key: 'stock', label: 'Qty Stok' },
-    { key: 'unit', label: 'Satuan' },
-    { key: 'cost', label: 'Harga Beli', render: (row) => formatCurrency(row.cost) },
-    { key: 'storePrice', label: 'Harga Jual di Toko', render: (row) => formatCurrency(row.storePrice) },
-    { key: 'onlinePrice', label: 'Harga Jual Online', render: (row) => formatCurrency(row.onlinePrice) },
-    { key: 'online', label: 'Tersedia Online', render: (row) => <StatusBadge active={row.online} label={row.online ? 'Ya' : 'Tidak'} /> },
+    { key: 'photo', label: 'Foto', render: (row) => (
+      row.fotos?.[0]?.foto
+        ? <img src={row.fotos[0].foto} alt={row.nama} className="pi-product-thumb" style={{ objectFit: 'cover' }} />
+        : <div className="pi-product-thumb" />
+    ) },
+    { key: 'nama', label: 'Nama Produk' },
+    { key: 'variant', label: 'Variant', render: (row) => (row.has_variant ? `${row.variants?.length || 0} varian` : '-') },
+    { key: 'sku', label: 'SKU', render: (row) => row.sku || '-' },
+    { key: 'barcode', label: 'Barcode', render: (row) => row.barcode || '-' },
+    { key: 'qty_stok', label: 'Qty Stok', render: (row) => (row.lacak_inventori ? row.qty_stok : '-') },
+    { key: 'satuan', label: 'Satuan' },
+    { key: 'harga_beli', label: 'Harga Beli', render: (row) => formatCurrency(row.harga_beli) },
+    { key: 'harga_jual_toko', label: 'Harga Jual di Toko', render: (row) => formatCurrency(row.harga_jual_toko) },
+    { key: 'harga_jual_online', label: 'Harga Jual Online', render: (row) => formatCurrency(row.harga_jual_online) },
+    { key: 'tersedia_online', label: 'Tersedia Online', render: (row) => <StatusBadge active={row.tersedia_online} label={row.tersedia_online ? 'Ya' : 'Tidak'} /> },
     { key: 'action', label: '', render: () => <button className="pi-icon-button"><MoreHorizontal size={16} /></button> },
   ];
 
@@ -73,7 +202,7 @@ export default function ProductsPage() {
         <div className="pi-create-header">
           <h2>Tambah Produk</h2>
           <div className="pi-create-actions">
-            <button className="pi-btn pi-btn-secondary" onClick={() => setIsCreating(false)}>
+            <button className="pi-btn pi-btn-secondary" onClick={() => { resetForm(); setIsCreating(false); }}>
               Batal
             </button>
             <div className="pi-store-select-group">
@@ -82,8 +211,13 @@ export default function ProductsPage() {
                 <option>{businessSettings?.nama_bisnis || 'Bintang Advertising'}</option>
               </select>
             </div>
-            <button className="pi-btn pi-btn-secondary" disabled style={{ background: '#e2e8f0', color: '#94a3b8', border: '0' }}>
-              Simpan
+            <button
+              className="pi-btn pi-btn-secondary"
+              disabled={!formNama.trim() || saving}
+              onClick={handleSaveProduct}
+              style={!formNama.trim() || saving ? { background: '#e2e8f0', color: '#94a3b8', border: '0' } : undefined}
+            >
+              {saving ? 'Menyimpan...' : 'Simpan'}
             </button>
           </div>
         </div>
@@ -98,9 +232,14 @@ export default function ProductsPage() {
               </span>
             </div>
             <div className="pi-row-input">
-              <div className="pi-upload-square">
-                <Plus size={24} />
-              </div>
+              <label className="pi-upload-square" style={{ cursor: 'pointer', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {photoPreviewUrl ? (
+                  <img src={photoPreviewUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <Plus size={24} />
+                )}
+                <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
+              </label>
             </div>
           </div>
 
@@ -113,7 +252,7 @@ export default function ProductsPage() {
               </span>
             </div>
             <div className="pi-row-input">
-              <input type="text" placeholder="Masukkan Nama Produk" />
+              <input type="text" placeholder="Masukkan Nama Produk" value={formNama} onChange={(e) => setFormNama(e.target.value)} />
             </div>
           </div>
 
@@ -126,7 +265,7 @@ export default function ProductsPage() {
               </span>
             </div>
             <div className="pi-row-input">
-              <input type="text" placeholder="Masukkan Nama Produk Alternatif" />
+              <input type="text" placeholder="Masukkan Nama Produk Alternatif" value={formNamaAlt} onChange={(e) => setFormNamaAlt(e.target.value)} />
             </div>
           </div>
 
@@ -139,10 +278,11 @@ export default function ProductsPage() {
               </span>
             </div>
             <div className="pi-row-input">
-              <select defaultValue="">
+              <select value={formKategori} onChange={(e) => setFormKategori(e.target.value)}>
                 <option value="" disabled>Pilih salah satu</option>
-                <option>Print Outdoor</option>
-                <option>Print Indoor</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.nama}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -153,7 +293,7 @@ export default function ProductsPage() {
               <span className="pi-row-label">Harga Jual di Toko</span>
             </div>
             <div className="pi-row-input">
-              <input type="text" placeholder="Rp. 0,00" />
+              <input type="text" placeholder="Rp. 0,00" value={formHargaToko} onChange={(e) => setFormHargaToko(e.target.value)} />
             </div>
           </div>
 
@@ -164,10 +304,10 @@ export default function ProductsPage() {
             </div>
             <div className="pi-row-input">
               <label className="pi-switch">
-                <input 
-                  type="checkbox" 
-                  checked={onlinePriceSame} 
-                  onChange={(e) => setOnlinePriceSame(e.target.checked)} 
+                <input
+                  type="checkbox"
+                  checked={onlinePriceSame}
+                  onChange={(e) => setOnlinePriceSame(e.target.checked)}
                 />
                 <span className="pi-slider">
                   <span className="pi-slider-text">{onlinePriceSame ? 'Ya' : 'Tidak'}</span>
@@ -186,10 +326,10 @@ export default function ProductsPage() {
             </div>
             <div className="pi-row-input">
               <label className="pi-switch">
-                <input 
-                  type="checkbox" 
-                  checked={trackInventory} 
-                  onChange={(e) => setTrackInventory(e.target.checked)} 
+                <input
+                  type="checkbox"
+                  checked={trackInventory}
+                  onChange={(e) => setTrackInventory(e.target.checked)}
                 />
                 <span className="pi-slider">
                   <span className="pi-slider-text">{trackInventory ? 'Ya' : 'Tidak'}</span>
@@ -208,10 +348,10 @@ export default function ProductsPage() {
             </div>
             <div className="pi-row-input">
               <label className="pi-switch">
-                <input 
-                  type="checkbox" 
-                  checked={hasVariants} 
-                  onChange={(e) => setHasVariants(e.target.checked)} 
+                <input
+                  type="checkbox"
+                  checked={hasVariants}
+                  onChange={(e) => setHasVariants(e.target.checked)}
                 />
                 <span className="pi-slider">
                   <span className="pi-slider-text">{hasVariants ? 'Ya' : 'Tidak'}</span>
@@ -232,7 +372,12 @@ export default function ProductsPage() {
               <div className="pi-form-grid" style={{ gridTemplateColumns: '1fr' }}>
                 <label>
                   Deskripsi Produk
-                  <textarea placeholder="Masukkan deskripsi produk..." style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '10px', minHeight: '100px', font: 'inherit', width: '100%', boxSizing: 'border-box' }} />
+                  <textarea
+                    placeholder="Masukkan deskripsi produk..."
+                    value={formDeskripsi}
+                    onChange={(e) => setFormDeskripsi(e.target.value)}
+                    style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '10px', minHeight: '100px', font: 'inherit', width: '100%', boxSizing: 'border-box' }}
+                  />
                 </label>
               </div>
             </div>
@@ -251,18 +396,21 @@ export default function ProductsPage() {
       />
       <Toolbar
         searchPlaceholder="Cari Produk / SKU / Barcode"
+        searchValue={search}
+        onSearchChange={(e) => setSearch(e.target.value)}
         left={
           <>
-            <button 
-              className="pi-btn-icon-only" 
+            <button
+              className="pi-btn-icon-only"
               title="Hapus Terpilih"
               disabled={selectedIds.length === 0}
+              onClick={handleDeleteSelected}
             >
               <Trash2 size={16} />
             </button>
             <div className="pi-dropdown-container">
-              <button 
-                className="pi-btn-icon-only" 
+              <button
+                className="pi-btn-icon-only"
                 title="Fitur Lainnya"
                 onClick={() => setMoreMenuOpen(!moreMenuOpen)}
               >
@@ -277,9 +425,18 @@ export default function ProductsPage() {
                 </div>
               )}
             </div>
-            <Select defaultValue=""><option value="">Kategori</option><option>Print Outdoor</option><option>Print Indoor</option></Select>
-            <Select defaultValue=""><option value="">Brand</option><option>Flexi China</option><option>Albatros</option></Select>
-            <Select defaultValue=""><option value="">Koleksi</option><option>Koleksi Promo</option></Select>
+            <select className="pi-select" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+              <option value="">Kategori</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>{cat.nama}</option>
+              ))}
+            </select>
+            <select className="pi-select" value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)}>
+              <option value="">Brand</option>
+              {brands.map((brand) => (
+                <option key={brand.id} value={brand.id}>{brand.nama}</option>
+              ))}
+            </select>
           </>
         }
         right={
@@ -288,15 +445,18 @@ export default function ProductsPage() {
           </Button>
         }
       />
-      
-      <DataTable columns={columns} rows={productRows} />
+
+      {error && <p className="pi-table-error" style={{ color: '#dc2626', fontSize: 13, margin: '8px 0' }}>{error}</p>}
+
+      <DataTable columns={columns} rows={products} emptyText={loading ? 'Memuat...' : 'Tidak ada data'} />
 
       <div className="pi-pagination-container">
         <div className="pi-pagination-left">
-          <button 
-            className="pi-btn-icon-only" 
+          <button
+            className="pi-btn-icon-only"
             title="Hapus Terpilih"
             disabled={selectedIds.length === 0}
+            onClick={handleDeleteSelected}
           >
             <Trash2 size={16} />
           </button>
@@ -307,7 +467,7 @@ export default function ProductsPage() {
             <option value="20">20/page</option>
             <option value="50">50/page</option>
           </Select>
-          <span>Total {productRows.length}</span>
+          <span>Total {products.length}</span>
           <div className="pi-pagination-pages">
             <button className="pi-pagination-btn" disabled>&lt;</button>
             <span className="pi-pagination-active-page">1</span>

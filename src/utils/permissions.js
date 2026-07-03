@@ -2,6 +2,7 @@
 export const MENU_FEATURES = [
   { id: 'dashboard', label: 'Dashboard Utama', path: '/' },
   { id: 'staff-dashboard', label: 'Dashboard Staff', path: '/staff-dashboard' },
+  { id: 'kasir-pos', label: 'Point of Sale (Kasir)', path: '/kasir-pos' },
   { id: 'orders', label: 'Pesanan (Orders)', path: '/orders' },
   { id: 'jobs', label: 'Papan Produksi (Jobs)', path: '/jobs' },
   { id: 'customers', label: 'Pelanggan (Customers)', path: '/customers' },
@@ -23,6 +24,7 @@ export const MENU_FEATURES = [
 export const DEFAULT_PERMISSIONS = {
   owner: [
     'dashboard',
+    'kasir-pos',
     'orders',
     'jobs',
     'customers',
@@ -42,6 +44,7 @@ export const DEFAULT_PERMISSIONS = {
   ],
   manager: [
     'dashboard',
+    'kasir-pos',
     'orders',
     'jobs',
     'customers',
@@ -61,6 +64,7 @@ export const DEFAULT_PERMISSIONS = {
   ],
   admin: [
     'dashboard',
+    'kasir-pos',
     'orders',
     'jobs',
     'customers',
@@ -73,6 +77,7 @@ export const DEFAULT_PERMISSIONS = {
     'settings',
   ],
   staff: ['staff-dashboard', 'jobs'],
+  kasir: ['kasir-pos'],
 };
 
 
@@ -81,6 +86,7 @@ const LOCKED_PERMISSIONS = {
   admin: ['dashboard', 'settings', 'jobs'],
   manager: ['dashboard'],
   staff: ['staff-dashboard'],
+  kasir: ['kasir-pos'],
 };
 
 // Mendapatkan hak akses saat ini, dengan jaminan LOCKED_PERMISSIONS selalu ada

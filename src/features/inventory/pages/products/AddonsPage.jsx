@@ -1,9 +1,21 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Search } from 'lucide-react';
 import DataTable from '../components/DataTable';
-import { addons, formatCurrency } from '../productInventoryData';
+import { formatCurrency } from '../productInventoryData';
+import apiClient from '../../../../api/apiClient';
+
+const parseRupiah = (raw) => {
+  const cleaned = String(raw ?? '').replace(/\./g, '').replace(',', '.').replace(/[^0-9.]/g, '');
+  const value = parseFloat(cleaned);
+  return Number.isNaN(value) ? 0 : value;
+};
 
 export function AddonsPage({ onToggleCreate }) {
+  const [addons, setAddons] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+
   const [isCreating, setIsCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [rowsPerPage, setRowsPerPage] = useState('10');
@@ -16,6 +28,24 @@ export function AddonsPage({ onToggleCreate }) {
   const [grupBerlaku, setGrupBerlaku] = useState('');
   const [produkBerlaku, setProdukBerlaku] = useState('');
 
+  const fetchAddons = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.get('/addons/');
+      setAddons(Array.isArray(res.data) ? res.data : res.data?.results || []);
+    } catch (err) {
+      console.error('[AddonsPage] fetch error:', err);
+      setError('Gagal memuat daftar add-on.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAddons();
+  }, []);
+
   const handleSetIsCreating = (val) => {
     setIsCreating(val);
     if (onToggleCreate) {
@@ -23,8 +53,35 @@ export function AddonsPage({ onToggleCreate }) {
     }
   };
 
+  const canSave = namaAddon.trim() && !saving;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    try {
+      await apiClient.post('/addons/', {
+        nama: namaAddon,
+        harga: parseRupiah(hargaAddon),
+        is_active: true,
+      });
+      setNamaAddon('');
+      setHargaAddon('0,00');
+      setHubungkanProduk('');
+      setQtyAddon('1.00');
+      setGrupBerlaku('');
+      setProdukBerlaku('');
+      handleSetIsCreating(false);
+      await fetchAddons();
+    } catch (err) {
+      console.error('[AddonsPage] save error:', err);
+      setError('Gagal menyimpan add-on.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const filteredAddons = addons.filter(addon =>
-    addon.name.toLowerCase().includes(searchQuery.toLowerCase())
+    addon.nama.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (isCreating) {
@@ -41,12 +98,13 @@ export function AddonsPage({ onToggleCreate }) {
               >
                 Batal
               </button>
-              <button 
-                type="button" 
-                disabled 
-                style={{ background: '#e2e8f0', color: '#94a3b8', border: 0, borderRadius: '4px', padding: '6px 20px', fontSize: '12px', fontWeight: 'bold', cursor: 'not-allowed' }}
+              <button
+                type="button"
+                disabled={!canSave}
+                onClick={handleSave}
+                style={{ background: canSave ? '#16a34a' : '#e2e8f0', color: canSave ? '#fff' : '#94a3b8', border: 0, borderRadius: '4px', padding: '6px 20px', fontSize: '12px', fontWeight: 'bold', cursor: canSave ? 'pointer' : 'not-allowed' }}
               >
-                ✓ Simpan
+                {saving ? 'Menyimpan...' : '✓ Simpan'}
               </button>
             </div>
           </div>
@@ -183,12 +241,14 @@ export function AddonsPage({ onToggleCreate }) {
         </button>
       </div>
 
-      <DataTable 
-        rows={filteredAddons} 
+      {error && <p style={{ color: '#dc2626', fontSize: 12, margin: '0 0 8px' }}>{error}</p>}
+      <DataTable
+        rows={filteredAddons}
+        emptyText={loading ? 'Memuat...' : 'Tidak ada data'}
         columns={[
-          { key: 'name', label: 'Nama Produk' }, 
-          { key: 'price', label: 'Harga', render: (row) => formatCurrency(row.price) }
-        ]} 
+          { key: 'nama', label: 'Nama Produk' },
+          { key: 'harga', label: 'Harga', render: (row) => formatCurrency(row.harga) }
+        ]}
       />
 
       {/* Pagination Footer */}
