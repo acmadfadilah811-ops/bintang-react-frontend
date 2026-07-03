@@ -5,7 +5,7 @@ import { Button, PageHeader, Select, StatusBadge, Toolbar } from '../components/
 import { formatCurrency } from '../productInventoryData';
 import { useAuth } from '../../../../context/AuthContext';
 import apiClient from '../../../../api/apiClient';
-import VariantModal from './VariantModal';
+import VariantModal, { PriceInput } from './VariantModal';
 
 export default function ProductsPage() {
   const { businessSettings } = useAuth();
@@ -192,12 +192,12 @@ export default function ProductsPage() {
     if (!formNama.trim() || saving) return;
     setSaving(true);
     try {
-      const trackingAtProductLevel = trackInventory && !hasVariants;
+      const trackingAtProductLevel = trackInventory;
       const res = await apiClient.post('/products/', {
         nama: formNama,
         nama_alternatif: formNamaAlt || null,
         kategori: formKategori || null,
-        harga_jual_toko: formHargaToko || 0,
+        harga_jual_toko: String(formHargaToko || '').replace(/[^0-9]/g, '') || 0,
         harga_online_sama: onlinePriceSame,
         lacak_inventori: trackInventory,
         rack: trackingAtProductLevel ? formRack || '' : '',
@@ -216,10 +216,10 @@ export default function ProductsPage() {
               nama_alternatif: row.nama_alternatif || null,
               barcode: row.barcode || null,
               sku: row.sku || null,
-              harga_beli: row.harga_beli || 0,
-              harga_pasar: row.harga_pasar || 0,
-              harga_jual_online: row.harga_jual_online || 0,
-              harga_jual_toko: row.harga_jual_toko || 0,
+              harga_beli: String(row.harga_beli || '').replace(/[^0-9]/g, '') || 0,
+              harga_pasar: String(row.harga_pasar || '').replace(/[^0-9]/g, '') || 0,
+              harga_jual_online: String(row.harga_jual_online || '').replace(/[^0-9]/g, '') || 0,
+              harga_jual_toko: String(row.harga_jual_toko || '').replace(/[^0-9]/g, '') || 0,
               lacak_inventori: variantTrackInventory,
               qty_stok: variantTrackInventory ? row.qty_stok || 0 : 0,
               rack: variantTrackInventory ? row.rack || '' : '',
@@ -393,7 +393,7 @@ export default function ProductsPage() {
               <span className="pi-row-label">Harga Jual di Toko</span>
             </div>
             <div className="pi-row-input">
-              <input type="text" placeholder="Rp. 0,00" value={formHargaToko} onChange={(e) => setFormHargaToko(e.target.value)} />
+              <PriceInput placeholder="Rp. 0,00" value={formHargaToko} onChange={(val) => setFormHargaToko(val)} style={{ width: '100%' }} />
             </div>
           </div>
 
@@ -438,7 +438,7 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          {trackInventory && !hasVariants && (
+          {trackInventory && (
             <>
               <div className="pi-create-row">
                 <div className="pi-row-label-desc">

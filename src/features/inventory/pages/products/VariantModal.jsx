@@ -20,6 +20,59 @@ const inputBorder = {
   boxSizing: 'border-box',
 };
 
+export function PriceInput({ value, placeholder, onChange, style }) {
+  const [isFocused, setIsFocused] = useState(false);
+
+  const displayValue = () => {
+    if (isFocused) {
+      if (!value || value === 'Rp. 0,00' || value === '0') {
+        return 'Rp. 0';
+      }
+      return value;
+    } else {
+      if (!value || value === 'Rp. 0' || value === '0') {
+        return '';
+      }
+      return value;
+    }
+  };
+
+  const handleChange = (e) => {
+    let inputVal = e.target.value;
+    let raw = inputVal.replace(/^Rp\.\s*/i, '').trim();
+    let digits = raw.replace(/\D/g, '');
+    let prevDigits = (value || '').replace(/\D/g, '');
+    
+    if ((prevDigits === '0' || prevDigits === '') && digits.length > 1) {
+      if (digits.startsWith('0')) {
+        digits = digits.substring(1);
+      }
+    }
+    
+    if (digits === '') {
+      onChange('Rp. 0');
+    } else {
+      let formatted = 'Rp. ' + parseInt(digits, 10).toLocaleString('id-ID');
+      onChange(formatted);
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      placeholder={placeholder}
+      value={displayValue()}
+      onFocus={() => setIsFocused(true)}
+      onBlur={() => setIsFocused(false)}
+      onChange={handleChange}
+      style={{
+        ...inputBorder,
+        ...style
+      }}
+    />
+  );
+}
+
 const RP_PLACEHOLDER = 'Rp. 0,00';
 
 export default function VariantModal({
@@ -225,16 +278,16 @@ export default function VariantModal({
                         <input type="text" placeholder="SKU" value={row.sku} onChange={(e) => onUpdateRow(row.label, 'sku', e.target.value)} style={{ ...inputBorder, width: 130 }} />
                       </td>
                       <td style={{ padding: 8 }}>
-                        <input type="text" placeholder={RP_PLACEHOLDER} value={row.harga_beli} onChange={(e) => onUpdateRow(row.label, 'harga_beli', e.target.value)} style={{ ...inputBorder, width: 130 }} />
+                        <PriceInput placeholder={RP_PLACEHOLDER} value={row.harga_beli} onChange={(val) => onUpdateRow(row.label, 'harga_beli', val)} style={{ width: 130 }} />
                       </td>
                       <td style={{ padding: 8 }}>
-                        <input type="text" placeholder={RP_PLACEHOLDER} value={row.harga_pasar} onChange={(e) => onUpdateRow(row.label, 'harga_pasar', e.target.value)} style={{ ...inputBorder, width: 130 }} />
+                        <PriceInput placeholder={RP_PLACEHOLDER} value={row.harga_pasar} onChange={(val) => onUpdateRow(row.label, 'harga_pasar', val)} style={{ width: 130 }} />
                       </td>
                       <td style={{ padding: 8 }}>
-                        <input type="text" placeholder={RP_PLACEHOLDER} value={row.harga_jual_online} onChange={(e) => onUpdateRow(row.label, 'harga_jual_online', e.target.value)} style={{ ...inputBorder, width: 130 }} />
+                        <PriceInput placeholder={RP_PLACEHOLDER} value={row.harga_jual_online} onChange={(val) => onUpdateRow(row.label, 'harga_jual_online', val)} style={{ width: 130 }} />
                       </td>
                       <td style={{ padding: 8 }}>
-                        <input type="text" placeholder={RP_PLACEHOLDER} value={row.harga_jual_toko} onChange={(e) => onUpdateRow(row.label, 'harga_jual_toko', e.target.value)} style={{ ...inputBorder, width: 130 }} />
+                        <PriceInput placeholder={RP_PLACEHOLDER} value={row.harga_jual_toko} onChange={(val) => onUpdateRow(row.label, 'harga_jual_toko', val)} style={{ width: 130 }} />
                       </td>
                       {trackInventory && (
                         <>
