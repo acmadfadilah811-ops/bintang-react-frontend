@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { MoreHorizontal, Plus, Trash2, MoreVertical, Upload, Download, Copy, ChevronUp } from 'lucide-react';
 import DataTable from '../components/DataTable';
-import FormDrawer from '../components/FormDrawer';
 import { Button, PageHeader, Select, StatusBadge, Toolbar } from '../components/PageShell';
 import { formatCurrency } from '../productInventoryData';
 import { useAuth } from '../../../../context/AuthContext';
 import apiClient from '../../../../api/apiClient';
+import VariantModal from './VariantModal';
 
 export default function ProductsPage() {
   const { businessSettings } = useAuth();
@@ -16,7 +16,6 @@ export default function ProductsPage() {
   const [error, setError] = useState(null);
 
   const [isCreating, setIsCreating] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -34,9 +33,75 @@ export default function ProductsPage() {
   const [formDeskripsi, setFormDeskripsi] = useState('');
   const [onlinePriceSame, setOnlinePriceSame] = useState(true);
   const [trackInventory, setTrackInventory] = useState(false);
+  const [formRack, setFormRack] = useState('');
+  const [formQtyStok, setFormQtyStok] = useState('');
+  const [formStokMinimum, setFormStokMinimum] = useState('');
+  const [formQtyFastMoving, setFormQtyFastMoving] = useState('');
   const [hasVariants, setHasVariants] = useState(false);
+  const [showVariantModal, setShowVariantModal] = useState(false);
+  const [variantTrackInventory, setVariantTrackInventory] = useState(false);
+  const [variantTypes, setVariantTypes] = useState([{ name: '', values: [] }]);
+  const [variantRows, setVariantRows] = useState([]);
+  const [removedVariantLabels, setRemovedVariantLabels] = useState([]);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null);
+
+  const updateVariantTypeName = (idx, name) =>
+    setVariantTypes((prev) => prev.map((t, i) => (i === idx ? { ...t, name } : t)));
+  const addVariantTypeValue = (idx, value) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    setVariantTypes((prev) =>
+      prev.map((t, i) => (i === idx && !t.values.includes(trimmed) ? { ...t, values: [...t.values, trimmed] } : t))
+    );
+  };
+  const removeVariantTypeValue = (idx, value) =>
+    setVariantTypes((prev) => prev.map((t, i) => (i === idx ? { ...t, values: t.values.filter((v) => v !== value) } : t)));
+  const addVariantType = () => setVariantTypes((prev) => [...prev, { name: '', values: [] }]);
+  const removeVariantType = (idx) => setVariantTypes((prev) => prev.filter((_, i) => i !== idx));
+  const updateVariantRow = (label, key, value) =>
+    setVariantRows((prev) => prev.map((r) => (r.label === label ? { ...r, [key]: value } : r)));
+  const removeVariantRow = (label) => {
+    setRemovedVariantLabels((prev) => [...prev, label]);
+    setVariantRows((prev) => prev.filter((r) => r.label !== label));
+  };
+
+  useEffect(() => {
+    if (!hasVariants) return;
+    const cleaned = variantTypes
+      .map((t) => ({ name: t.name.trim(), values: t.values }))
+      .filter((t) => t.name && t.values.length > 0);
+    // Urutan mengikuti Olsera: tipe yang ditambahkan belakangan berganti paling lambat (outer loop),
+    // tipe yang ditambahkan duluan berganti paling cepat (inner loop) — mis. warna,ukuran -> hijau,s / biru,s / hijau,m / biru,m
+    const labels = cleaned.length
+      ? [...cleaned]
+          .reverse()
+          .reduce((acc, type) => acc.flatMap((combo) => type.values.map((v) => [v, ...combo])), [[]])
+          .map((combo) => combo.join(','))
+      : [];
+    setVariantRows((prev) => {
+      const prevByLabel = Object.fromEntries(prev.map((r) => [r.label, r]));
+      return labels
+        .filter((label) => !removedVariantLabels.includes(label))
+        .map(
+          (label) =>
+            prevByLabel[label] || {
+              label,
+              nama_alternatif: '',
+              barcode: '',
+              sku: '',
+              harga_beli: '',
+              harga_pasar: '',
+              harga_jual_online: '',
+              harga_jual_toko: '',
+              berat: '1',
+              qty_stok: '',
+              rack: '',
+            }
+        );
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variantTypes, hasVariants]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -101,7 +166,16 @@ export default function ProductsPage() {
     setFormDeskripsi('');
     setOnlinePriceSame(true);
     setTrackInventory(false);
+    setFormRack('');
+    setFormQtyStok('');
+    setFormStokMinimum('');
+    setFormQtyFastMoving('');
     setHasVariants(false);
+    setShowVariantModal(false);
+    setVariantTrackInventory(false);
+    setVariantTypes([{ name: '', values: [] }]);
+    setVariantRows([]);
+    setRemovedVariantLabels([]);
     setDetailOpen(false);
     setSelectedPhoto(null);
     setPhotoPreviewUrl(null);
@@ -118,6 +192,7 @@ export default function ProductsPage() {
     if (!formNama.trim() || saving) return;
     setSaving(true);
     try {
+      const trackingAtProductLevel = trackInventory && !hasVariants;
       const res = await apiClient.post('/products/', {
         nama: formNama,
         nama_alternatif: formNamaAlt || null,
@@ -125,9 +200,34 @@ export default function ProductsPage() {
         harga_jual_toko: formHargaToko || 0,
         harga_online_sama: onlinePriceSame,
         lacak_inventori: trackInventory,
+        rack: trackingAtProductLevel ? formRack || '' : '',
+        qty_stok: trackingAtProductLevel ? formQtyStok || 0 : 0,
+        stok_minimum: trackingAtProductLevel ? formStokMinimum || 0 : 0,
+        qty_fast_moving: trackingAtProductLevel ? formQtyFastMoving || 0 : 0,
         has_variant: hasVariants,
         deskripsi: formDeskripsi || null,
       });
+      if (hasVariants && variantRows.length > 0) {
+        await Promise.all(
+          variantRows.map((row) =>
+            apiClient.post('/product-variants/', {
+              product: res.data.id,
+              nama_varian: row.label,
+              nama_alternatif: row.nama_alternatif || null,
+              barcode: row.barcode || null,
+              sku: row.sku || null,
+              harga_beli: row.harga_beli || 0,
+              harga_pasar: row.harga_pasar || 0,
+              harga_jual_online: row.harga_jual_online || 0,
+              harga_jual_toko: row.harga_jual_toko || 0,
+              lacak_inventori: variantTrackInventory,
+              qty_stok: variantTrackInventory ? row.qty_stok || 0 : 0,
+              rack: variantTrackInventory ? row.rack || '' : '',
+              berat: row.berat || null,
+            })
+          )
+        );
+      }
       if (selectedPhoto) {
         const fd = new FormData();
         fd.append('product', res.data.id);
@@ -338,6 +438,47 @@ export default function ProductsPage() {
             </div>
           </div>
 
+          {trackInventory && !hasVariants && (
+            <>
+              <div className="pi-create-row">
+                <div className="pi-row-label-desc">
+                  <span className="pi-row-label">Rack</span>
+                </div>
+                <div className="pi-row-input">
+                  <input type="text" placeholder="Masukkan Rack" value={formRack} onChange={(e) => setFormRack(e.target.value)} />
+                </div>
+              </div>
+              <div className="pi-create-row">
+                <div className="pi-row-label-desc">
+                  <span className="pi-row-label">Jumlah stok yang tersedia saat ini</span>
+                  <span className="pi-row-desc">
+                    Jika produk ini memiliki beberapa varian/pilihan, maka sistem akan mengecek ketersediaan stok berdasarkan masing-masing varian/pilihan.
+                  </span>
+                </div>
+                <div className="pi-row-input">
+                  <input type="text" placeholder="Masukkan angka contoh: 1234" value={formQtyStok} onChange={(e) => setFormQtyStok(e.target.value)} />
+                </div>
+              </div>
+              <div className="pi-create-row">
+                <div className="pi-row-label-desc">
+                  <span className="pi-row-label">Peringatan Sisa Stok</span>
+                  <span className="pi-row-desc">Jika stok sudah mencapai batas, maka sistem akan memberi peringatan sebelum stok habis</span>
+                </div>
+                <div className="pi-row-input">
+                  <input type="text" placeholder="Masukkan angka contoh: 1234" value={formStokMinimum} onChange={(e) => setFormStokMinimum(e.target.value)} />
+                </div>
+              </div>
+              <div className="pi-create-row">
+                <div className="pi-row-label-desc">
+                  <span className="pi-row-label">Qty Fast Moving</span>
+                </div>
+                <div className="pi-row-input">
+                  <input type="text" placeholder="Masukkan angka contoh: 1234" value={formQtyFastMoving} onChange={(e) => setFormQtyFastMoving(e.target.value)} />
+                </div>
+              </div>
+            </>
+          )}
+
           {/* Varian */}
           <div className="pi-create-row">
             <div className="pi-row-label-desc">
@@ -359,7 +500,44 @@ export default function ProductsPage() {
               </label>
             </div>
           </div>
+
+          {hasVariants && (
+            <div className="pi-create-row">
+              <div className="pi-row-label-desc">
+                <span className="pi-row-label">Kelola Varian</span>
+                <span className="pi-row-desc">Atur tipe varian (mis. Warna, Ukuran) dan detail tiap kombinasinya</span>
+              </div>
+              <div className="pi-row-input" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
+                {variantRows.length === 0 && (
+                  <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>(Varian harus diisi)</span>
+                )}
+                <button type="button" className="pi-btn pi-btn-secondary" onClick={() => setShowVariantModal(true)}>
+                  Manage Variant
+                </button>
+                {variantRows.length > 0 && (
+                  <span style={{ fontSize: 12, color: '#64748b' }}>{variantRows.length} varian dikonfigurasi</span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
+
+        <VariantModal
+          open={showVariantModal}
+          onClose={() => setShowVariantModal(false)}
+          variantTypes={variantTypes}
+          onUpdateTypeName={updateVariantTypeName}
+          onAddTypeValue={addVariantTypeValue}
+          onRemoveTypeValue={removeVariantTypeValue}
+          onAddType={addVariantType}
+          onRemoveType={removeVariantType}
+          variantRows={variantRows}
+          onUpdateRow={updateVariantRow}
+          onRemoveRow={removeVariantRow}
+          trackInventory={variantTrackInventory}
+          onTrackInventoryChange={setVariantTrackInventory}
+          storeName={businessSettings?.nama_bisnis || 'Bintang Advertising'}
+        />
 
         {/* Informasi Detail Collapsible */}
         <div className="pi-collapsible-section">
@@ -479,22 +657,6 @@ export default function ProductsPage() {
           </div>
         </div>
       </div>
-
-      <FormDrawer open={drawerOpen} title="Tambah Produk" onClose={() => setDrawerOpen(false)}>
-        <div className="pi-form-grid">
-          <label>Nama Produk<input placeholder="Nama produk" /></label>
-          <label>Nama Alternatif<input placeholder="Opsional" /></label>
-          <label>Kategori<select><option>Print Outdoor</option><option>Print Indoor</option></select></label>
-          <label>Harga Jual di Toko<input placeholder="Rp 0" /></label>
-          <label>SKU<input placeholder="SKU" /></label>
-          <label>Barcode<input placeholder="Nomor barcode" /></label>
-        </div>
-        <div className="pi-switch-list">
-          <label><input type="checkbox" defaultChecked /> Harga online sama dengan harga toko</label>
-          <label><input type="checkbox" /> Lacak inventori</label>
-          <label><input type="checkbox" /> Produk memiliki varian</label>
-        </div>
-      </FormDrawer>
     </>
   );
 }
