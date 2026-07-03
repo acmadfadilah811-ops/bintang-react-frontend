@@ -6,6 +6,8 @@ import { formatCurrency } from '../productInventoryData';
 import { useAuth } from '../../../../context/AuthContext';
 import apiClient from '../../../../api/apiClient';
 import VariantModal, { PriceInput } from './VariantModal';
+import ImportProductModal from './ImportProductModal';
+import ImportRecipeModal from './ImportRecipeModal';
 
 export default function ProductsPage() {
   const { businessSettings } = useAuth();
@@ -20,6 +22,10 @@ export default function ProductsPage() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [detailOpen, setDetailOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const [showImportProductModal, setShowImportProductModal] = useState(false);
+  const [showImportRecipeModal, setShowImportRecipeModal] = useState(false);
+  const [importModalTitle, setImportModalTitle] = useState('Import Produk');
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -257,6 +263,24 @@ export default function ProductsPage() {
     } catch (err) {
       console.error('[ProductsPage] delete products error:', err);
       setError('Gagal menghapus produk terpilih.');
+    }
+  };
+
+  const handleExportProducts = async () => {
+    try {
+      const res = await apiClient.get('/export/products/', {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `products_export_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error('[ProductsPage] Export products error:', err);
+      setError('Gagal mengekspor data produk.');
     }
   };
 
@@ -596,10 +620,44 @@ export default function ProductsPage() {
               </button>
               {moreMenuOpen && (
                 <div className="pi-dropdown-menu">
-                  <button className="pi-dropdown-item" onClick={() => setMoreMenuOpen(false)}><Upload size={14} /> Import Produk</button>
-                  <button className="pi-dropdown-item" onClick={() => setMoreMenuOpen(false)}><Upload size={14} /> Import Bahan / Resep</button>
-                  <button className="pi-dropdown-item" onClick={() => setMoreMenuOpen(false)}><Download size={14} /> Export</button>
-                  <button className="pi-dropdown-item" onClick={() => setMoreMenuOpen(false)}><Copy size={14} /> Salin Product</button>
+                  <button
+                    className="pi-dropdown-item"
+                    onClick={() => {
+                      setImportModalTitle('Import Produk');
+                      setShowImportProductModal(true);
+                      setMoreMenuOpen(false);
+                    }}
+                  >
+                    <Upload size={14} /> Import Produk
+                  </button>
+                  <button
+                    className="pi-dropdown-item"
+                    onClick={() => {
+                      setShowImportRecipeModal(true);
+                      setMoreMenuOpen(false);
+                    }}
+                  >
+                    <Upload size={14} /> Import Bahan / Resep
+                  </button>
+                  <button
+                    className="pi-dropdown-item"
+                    onClick={() => {
+                      handleExportProducts();
+                      setMoreMenuOpen(false);
+                    }}
+                  >
+                    <Download size={14} /> Export
+                  </button>
+                  <button
+                    className="pi-dropdown-item"
+                    onClick={() => {
+                      setImportModalTitle('Salin Product');
+                      setShowImportProductModal(true);
+                      setMoreMenuOpen(false);
+                    }}
+                  >
+                    <Copy size={14} /> Salin Product
+                  </button>
                 </div>
               )}
             </div>
@@ -657,6 +715,19 @@ export default function ProductsPage() {
           </div>
         </div>
       </div>
+
+      <ImportProductModal
+        open={showImportProductModal}
+        onClose={() => setShowImportProductModal(false)}
+        onSuccess={fetchProducts}
+        title={importModalTitle}
+      />
+
+      <ImportRecipeModal
+        open={showImportRecipeModal}
+        onClose={() => setShowImportRecipeModal(false)}
+        onSuccess={fetchProducts}
+      />
     </>
   );
 }
