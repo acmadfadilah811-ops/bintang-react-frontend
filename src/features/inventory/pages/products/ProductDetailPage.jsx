@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { formatCurrency } from '../productInventoryData';
 import apiClient from '../../../../api/apiClient';
+import { PriceInput } from './VariantModal';
 
 const DETAIL_TABS = [
   { id: 'profil', label: 'Profil' },
@@ -143,6 +144,89 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null);
 
+  const [isCopying, setIsCopying] = useState(false);
+  const [savingCopy, setSavingCopy] = useState(false);
+  const [copyPhoto, setCopyPhoto] = useState(false);
+  const [copyVariant, setCopyVariant] = useState(false);
+  const [copyTiers, setCopyTiers] = useState(false);
+  const [copyBom, setCopyBom] = useState(false);
+  const [formHargaSama, setFormHargaSama] = useState(true);
+  const [formHargaOnline, setFormHargaOnline] = useState('Rp. 0');
+  const [formLacakInventori, setFormLacakInventori] = useState(true);
+  const [formRack, setFormRack] = useState('');
+  const [formQtyStok, setFormQtyStok] = useState(0);
+  const [formStokMinimum, setFormStokMinimum] = useState(5);
+  const [formQtyFastMoving, setFormQtyFastMoving] = useState(0);
+
+  const startCopyProduct = () => {
+    setFormNama(product.nama || '');
+    setFormNamaAlt(product.nama_alternatif || '');
+    setFormKategori(product.kategori || '');
+    setFormHargaSama(!!product.harga_online_sama);
+    const initialPriceOnline = product.harga_jual_online ? 'Rp. ' + parseInt(product.harga_jual_online).toLocaleString('id-ID') : 'Rp. 0';
+    setFormHargaOnline(initialPriceOnline);
+    setFormLacakInventori(!!product.lacak_inventori);
+    setFormRack(product.rack || '');
+    setFormQtyStok(0);
+    setFormStokMinimum(product.stok_minimum || 5);
+    setFormQtyFastMoving(product.qty_fast_moving || 0);
+    setCopyPhoto(false);
+    setCopyVariant(false);
+    setCopyTiers(false);
+    setCopyBom(false);
+    setIsCopying(true);
+  };
+
+  const handleSaveCopy = async () => {
+    if (savingCopy) return;
+    setSavingCopy(true);
+    try {
+      const digits = formHargaOnline.replace(/\D/g, '');
+      const numericOnlinePrice = digits ? parseInt(digits, 10) : 0;
+
+      const res = await apiClient.post(`/products/${product.id}/copy/`, {
+        nama: formNama,
+        nama_alternatif: formNamaAlt || null,
+        kategori_id: formKategori || null,
+        harga_jual_online: numericOnlinePrice,
+        harga_online_sama: formHargaSama,
+        lacak_inventori: formLacakInventori,
+        rack: formRack || '',
+        qty_stok: formQtyStok ? parseFloat(formQtyStok) : 0.00,
+        stok_minimum: formStokMinimum ? parseFloat(formStokMinimum) : 0.00,
+        qty_fast_moving: formQtyFastMoving ? parseFloat(formQtyFastMoving) : 0.00,
+        copy_photo: copyPhoto,
+        copy_variant: copyVariant,
+        copy_tiers: copyTiers,
+        copy_bom: copyBom
+      });
+
+      alert('Produk berhasil disalin!');
+      onUpdated?.(res.data);
+      setIsCopying(false);
+    } catch (err) {
+      console.error('[ProductDetailPage] copy product error:', err);
+      alert('Gagal menyalin produk.');
+    } finally {
+      setSavingCopy(false);
+    }
+  };
+
+  useEffect(() => {
+    const el = document.querySelector('.pi-content-topbar h1');
+    if (el) {
+      const original = el.innerText;
+      if (isCopying) {
+        el.innerText = 'Katalog Produk / Product Copy';
+      } else {
+        el.innerText = 'Katalog Produk / Detail Produk';
+      }
+      return () => {
+        el.innerText = original;
+      };
+    }
+  }, [isCopying]);
+
   useEffect(() => {
     apiClient
       .get('/collections/')
@@ -218,6 +302,159 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
     }
   };
 
+  if (isCopying) {
+    return (
+      <div>
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid #e2e8f0' }}>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1e293b' }}>Tambah Produk</h3>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setIsCopying(false)}
+                disabled={savingCopy}
+                style={{ color: '#64748b', fontSize: 13, fontWeight: 600, border: 0, background: 'none', cursor: 'pointer', marginRight: 20 }}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCopy}
+                disabled={savingCopy}
+                style={{ background: '#0284c7', color: '#fff', border: 0, borderRadius: 6, padding: '8px 24px', fontSize: 13, fontWeight: 700, cursor: savingCopy ? 'default' : 'pointer' }}
+              >
+                {savingCopy ? 'Menyimpan...' : 'Simpan'}
+              </button>
+            </div>
+          </div>
+          <div style={{ padding: '0 18px' }}>
+            <FormRow label="Salin Foto" desc="Salin foto dari produk asli">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <label className="pi-switch">
+                  <input type="checkbox" checked={copyPhoto} onChange={(e) => setCopyPhoto(e.target.checked)} />
+                  <span className="pi-slider">
+                    <span className="pi-slider-text">{copyPhoto ? 'Ya' : 'Tidak'}</span>
+                  </span>
+                </label>
+                <span style={{ fontSize: 12, color: '#64748b' }}>{copyPhoto ? 'Ya' : 'Tidak'}</span>
+              </div>
+            </FormRow>
+
+            <FormRow label="Nama Produk" desc="Tulis nama produk sesuai jenis, merek, dan rincian produk *">
+              <input type="text" value={formNama} onChange={(e) => setFormNama(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13 }} />
+            </FormRow>
+
+            <FormRow label="Nama Produk Alternatif" desc="Tulis alternatif nama produk dalam bahasa Mandarin / Latin">
+              <input type="text" value={formNamaAlt} onChange={(e) => setFormNamaAlt(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13 }} />
+            </FormRow>
+
+            <FormRow label="Kategori Produk" desc="Pilih dari yang ada atau tambahkan yang baru *">
+              <select value={formKategori} onChange={(e) => setFormKategori(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13, background: '#fff' }}>
+                <option value="">Pilih salah satu</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.nama}</option>
+                ))}
+              </select>
+            </FormRow>
+
+            <FormRow label="Harga jual online sama dengan harga jual toko">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <label className="pi-switch">
+                  <input type="checkbox" checked={formHargaSama} onChange={(e) => setFormHargaSama(e.target.checked)} />
+                  <span className="pi-slider">
+                    <span className="pi-slider-text">{formHargaSama ? 'Ya' : 'Tidak'}</span>
+                  </span>
+                </label>
+                <span style={{ fontSize: 12, color: '#64748b' }}>{formHargaSama ? 'Ya' : 'Tidak'}</span>
+              </div>
+            </FormRow>
+
+            {!formHargaSama && (
+              <FormRow label="Harga Jual Online">
+                <div style={{ width: '100%' }}>
+                  <PriceInput value={formHargaOnline} onChange={setFormHargaOnline} />
+                </div>
+              </FormRow>
+            )}
+
+            <FormRow label="Lacak Inventori" desc="Jika anda mengaktifkan lacak inventori, sistem akan mengecek ketersediaan stok barang sebelum menjual ke pembeli">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <label className="pi-switch">
+                  <input type="checkbox" checked={formLacakInventori} onChange={(e) => setFormLacakInventori(e.target.checked)} />
+                  <span className="pi-slider">
+                    <span className="pi-slider-text">{formLacakInventori ? 'Ya' : 'Tidak'}</span>
+                  </span>
+                </label>
+                <span style={{ fontSize: 12, color: '#64748b' }}>{formLacakInventori ? 'Ya' : 'Tidak'}</span>
+              </div>
+            </FormRow>
+
+            <FormRow label="Rack">
+              <input type="text" placeholder="Masukkan Rack" value={formRack} onChange={(e) => setFormRack(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13 }} />
+            </FormRow>
+
+            {formLacakInventori && (
+              <FormRow label="Jumlah stok yang tersedia saat ini" desc="Sistem akan mengecek ketersediaan stok barang sebelum menjual ke pembeli. Jika produk memiliki varian, sistem mengecek stok per varian.">
+                <input type="number" value={formQtyStok} onChange={(e) => setFormQtyStok(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13 }} />
+              </FormRow>
+            )}
+
+            <FormRow label="Peringatan Sisa Stok" desc="Jika stok sudah mencapai batas, maka sistem akan memberi peringatan sebelum stok habis.">
+              <input type="number" value={formStokMinimum} onChange={(e) => setFormStokMinimum(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13 }} />
+            </FormRow>
+
+            <FormRow label="Qty Fast Moving">
+              <input type="number" value={formQtyFastMoving} onChange={(e) => setFormQtyFastMoving(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13 }} />
+            </FormRow>
+
+            <FormRow label="Salin Variant" desc="Salin variant dari produk asli">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <label className="pi-switch">
+                  <input type="checkbox" checked={copyVariant} onChange={(e) => setCopyVariant(e.target.checked)} />
+                  <span className="pi-slider">
+                    <span className="pi-slider-text">{copyVariant ? 'Ya' : 'Tidak'}</span>
+                  </span>
+                </label>
+                <span style={{ fontSize: 12, color: '#64748b' }}>{copyVariant ? 'Ya' : 'Tidak'}</span>
+              </div>
+            </FormRow>
+
+            <FormRow label="Salin Tingkatan Harga" desc="Salin tingkatan harga dari produk asli">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <label className="pi-switch">
+                  <input type="checkbox" checked={copyTiers} onChange={(e) => setCopyTiers(e.target.checked)} />
+                  <span className="pi-slider">
+                    <span className="pi-slider-text">{copyTiers ? 'Ya' : 'Tidak'}</span>
+                  </span>
+                </label>
+                <span style={{ fontSize: 12, color: '#64748b' }}>{copyTiers ? 'Ya' : 'Tidak'}</span>
+              </div>
+            </FormRow>
+
+            <FormRow label="Salin Bahan/Resep" desc="Salin Bahan/Resep dari produk asli">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <label className="pi-switch">
+                  <input type="checkbox" checked={copyBom} onChange={(e) => setCopyBom(e.target.checked)} />
+                  <span className="pi-slider">
+                    <span className="pi-slider-text">{copyBom ? 'Ya' : 'Tidak'}</span>
+                  </span>
+                </label>
+                <span style={{ fontSize: 12, color: '#64748b' }}>{copyBom ? 'Ya' : 'Tidak'}</span>
+              </div>
+            </FormRow>
+
+            <div style={{ borderTop: '1px solid #e2e8f0', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#1e293b', fontWeight: 600 }}>
+              <span>Informasi Detail (opsional)</span>
+              <button type="button" style={{ background: '#f1f5f9', border: 0, borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <Plus size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 16, borderBottom: '1px solid #e2e8f0', paddingBottom: 4 }}>
@@ -264,7 +501,16 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
               editingSection === 'info_umum' ? (
                 <SaveCancelHeader storeName={storeName} onCancel={cancelEdit} onSave={saveInfoUmum} saving={savingSection} />
               ) : (
-                <EditButton onClick={startEditInfoUmum} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <EditButton onClick={startEditInfoUmum} />
+                  <button
+                    type="button"
+                    onClick={startCopyProduct}
+                    style={{ background: '#fff', color: '#334155', border: '1px solid #cbd5e1', borderRadius: 6, padding: '7px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Salin
+                  </button>
+                </div>
               )
             }
           >
