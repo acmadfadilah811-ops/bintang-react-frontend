@@ -178,6 +178,7 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
 
   // Harga section edit states
   const [hargaDinamisEdit, setHargaDinamisEdit] = useState(false);
+  const [hargaOnlineSamaEdit, setHargaOnlineSamaEdit] = useState(true);
   const [hargaPasarEdit, setHargaPasarEdit] = useState('0');
   const [hargaBeliEdit, setHargaBeliEdit] = useState('0');
   const [hargaJualOnlineEdit, setHargaJualOnlineEdit] = useState('0');
@@ -435,6 +436,7 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
 
   const startEditHarga = () => {
     setHargaDinamisEdit(!!product.harga_dinamis);
+    setHargaOnlineSamaEdit(!!product.harga_online_sama);
     setHargaPasarEdit(product.harga_pasar ? String(Math.round(parseFloat(product.harga_pasar))) : '0');
     setHargaBeliEdit(product.harga_beli ? String(Math.round(parseFloat(product.harga_beli))) : '0');
     setHargaJualOnlineEdit(product.harga_jual_online ? String(Math.round(parseFloat(product.harga_jual_online))) : '0');
@@ -452,6 +454,7 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
     try {
       const payload = {
         harga_dinamis: hargaDinamisEdit,
+        harga_online_sama: hargaOnlineSamaEdit,
         minimal_pesanan: parseInt(minimalPesananEdit, 10) || 1,
         maksimal_pesanan: parseInt(maksimalPesananEdit, 10) || 0,
       };
@@ -1003,6 +1006,23 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                     </span>
                   </div>
                 </Row>
+                <Row label="Harga jual online sama dengan harga jual toko">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '6px 0' }}>
+                    <label className="pi-switch">
+                      <input
+                        type="checkbox"
+                        checked={hargaOnlineSamaEdit}
+                        onChange={(e) => setHargaOnlineSamaEdit(e.target.checked)}
+                      />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{hargaOnlineSamaEdit ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+                      {hargaOnlineSamaEdit ? 'Ya' : 'Tidak'}
+                    </span>
+                  </div>
+                </Row>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, padding: '14px 0' }}>
                   {/* Card 1: Harga Pasar */}
                   {hasVariant ? (
@@ -1170,6 +1190,7 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
             ) : (
               <>
                 <Row label="Harga jual di toko bersifat dinamis" value={yaTidak(product.harga_dinamis)} />
+                <Row label="Harga jual online sama dengan harga jual toko" value={yaTidak(product.harga_online_sama)} />
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, padding: '14px 0' }}>
                   {hasVariant ? (
                     <>
