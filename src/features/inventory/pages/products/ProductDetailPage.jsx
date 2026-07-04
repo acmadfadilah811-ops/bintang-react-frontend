@@ -158,10 +158,32 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
   const [formStokMinimum, setFormStokMinimum] = useState(5);
   const [formQtyFastMoving, setFormQtyFastMoving] = useState(0);
 
+  // New optional detail fields states
+  const [showDetailOptional, setShowDetailOptional] = useState(false);
+  const [formHargaDinamis, setFormHargaDinamis] = useState(false);
+  const [formSatuan, setFormSatuan] = useState('pcs');
+  const [formStokKosong, setFormStokKosong] = useState(false);
+  const [formButuhPengiriman, setFormButuhPengiriman] = useState(true);
+  const [formBerat, setFormBerat] = useState('0.2000');
+  const [formTersediaOnline, setFormTersediaOnline] = useState(true);
+  const [formTanggalTersediaOnline, setFormTanggalTersediaOnline] = useState('');
+  const [formTidakTersediaOfflinePos, setFormTidakTersediaOfflinePos] = useState(false);
+  const [formMetaKeywords, setFormMetaKeywords] = useState('');
+  const [formMetaDescription, setFormMetaDescription] = useState('');
+  const [formDeskripsi, setFormDeskripsi] = useState('');
+  const [formCatatan, setFormCatatan] = useState('');
+
   const startCopyProduct = () => {
     setFormNama(product.nama || '');
     setFormNamaAlt(product.nama_alternatif || '');
     setFormKategori(product.kategori || '');
+    setFormKoleksi(product.koleksi || '');
+    setFormBrand(product.brand || '');
+    setFormSku(product.sku || '');
+    setFormBarcode(product.barcode || '');
+    setFormKondisi(product.kondisi || 'Baru');
+    setFormBebasPajak(!!product.bebas_pajak);
+    setFormBebasBiayaLayanan(!!product.bebas_biaya_layanan);
     setFormHargaSama(!!product.harga_online_sama);
     const initialPriceOnline = product.harga_jual_online ? 'Rp. ' + parseInt(product.harga_jual_online).toLocaleString('id-ID') : 'Rp. 0';
     setFormHargaOnline(initialPriceOnline);
@@ -174,6 +196,24 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
     setCopyVariant(false);
     setCopyTiers(false);
     setCopyBom(false);
+
+    // Populate optional fields
+    setFormHargaDinamis(!!product.harga_dinamis);
+    setFormSatuan(product.satuan || 'pcs');
+    setFormStokKosong(Number(product.qty_stok) <= 0);
+    setFormButuhPengiriman(!!product.butuh_pengiriman);
+    setFormBerat(product.berat !== null && product.berat !== undefined ? String(product.berat) : '0.2000');
+    setFormTersediaOnline(!!product.tersedia_online);
+    
+    const today = new Date().toISOString().split('T')[0];
+    setFormTanggalTersediaOnline(product.tanggal_tersedia_online || today);
+    setFormTidakTersediaOfflinePos(!!product.tidak_tersedia_offline_pos);
+    setFormMetaKeywords(product.meta_keywords || '');
+    setFormMetaDescription(product.meta_description || '');
+    setFormDeskripsi(product.deskripsi || '');
+    setFormCatatan(product.catatan || '');
+    
+    setShowDetailOptional(false);
     setIsCopying(true);
   };
 
@@ -198,7 +238,27 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
         copy_photo: copyPhoto,
         copy_variant: copyVariant,
         copy_tiers: copyTiers,
-        copy_bom: copyBom
+        copy_bom: copyBom,
+
+        // Optional detail fields
+        sku: formSku || null,
+        barcode: formBarcode || null,
+        koleksi_id: formKoleksi || null,
+        brand_id: formBrand || null,
+        kondisi: formKondisi,
+        deskripsi: formDeskripsi || null,
+        catatan: formCatatan || '',
+        harga_dinamis: formHargaDinamis,
+        satuan: formSatuan,
+        butuh_pengiriman: formButuhPengiriman,
+        berat: formBerat ? parseFloat(formBerat) : null,
+        bebas_pajak: formBebasPajak,
+        bebas_biaya_layanan: formBebasBiayaLayanan,
+        tersedia_online: formTersediaOnline,
+        tanggal_tersedia_online: formTanggalTersediaOnline || null,
+        tidak_tersedia_offline_pos: formTidakTersediaOfflinePos,
+        meta_keywords: formMetaKeywords || '',
+        meta_description: formMetaDescription || ''
       });
 
       alert('Produk berhasil disalin!');
@@ -445,10 +505,205 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
 
             <div style={{ borderTop: '1px solid #e2e8f0', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#1e293b', fontWeight: 600 }}>
               <span>Informasi Detail (opsional)</span>
-              <button type="button" style={{ background: '#f1f5f9', border: 0, borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                <Plus size={16} />
+              <button
+                type="button"
+                onClick={() => setShowDetailOptional(!showDetailOptional)}
+                style={{ background: '#f1f5f9', border: 0, borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                {showDetailOptional ? (
+                  <span style={{ fontSize: 18, fontWeight: 700, color: '#475569' }}>-</span>
+                ) : (
+                  <Plus size={16} />
+                )}
               </button>
             </div>
+
+            {showDetailOptional && (
+              <div style={{ padding: '0 18px 18px 18px', borderTop: '1px solid #f1f5f9' }}>
+                <FormRow label="SKU" desc="SKU (Stock Keeping Unit) atau Barcode dapat dipergunakan untuk pencarian produk">
+                  <input type="text" placeholder="Masukkan SKU" value={formSku} onChange={(e) => setFormSku(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13 }} />
+                </FormRow>
+
+                <FormRow label="Barcode" desc="Barcode untuk produk Anda">
+                  <input type="text" placeholder="Masukkan Barcode" value={formBarcode} onChange={(e) => setFormBarcode(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13 }} />
+                </FormRow>
+
+                <FormRow label="Koleksi" desc="Nama koleksi produk, e.g. Koleksi Hari Raya, dll.">
+                  <select value={formKoleksi} onChange={(e) => setFormKoleksi(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13, background: '#fff' }}>
+                    <option value="">Pilih salah satu</option>
+                    {collections.map((col) => (
+                      <option key={col.id} value={col.id}>{col.nama}</option>
+                    ))}
+                  </select>
+                </FormRow>
+
+                <FormRow label="Brand" desc="Pilih dari yang ada atau tambahkan yang baru">
+                  <select value={formBrand} onChange={(e) => setFormBrand(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13, background: '#fff' }}>
+                    <option value="">Pilih salah satu</option>
+                    {brands.map((b) => (
+                      <option key={b.id} value={b.id}>{b.nama}</option>
+                    ))}
+                  </select>
+                </FormRow>
+
+                <FormRow label="Kondisi" desc="Pilih salah satu">
+                  <div style={{ display: 'flex', border: '1px solid #cbd5e1', borderRadius: 6, overflow: 'hidden', width: 'fit-content' }}>
+                    {['Tidak ada', 'Baru', 'Pembaharuan', 'Bekas'].map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setFormKondisi(opt)}
+                        style={{
+                          padding: '8px 16px',
+                          fontSize: 13,
+                          fontWeight: formKondisi === opt ? 700 : 500,
+                          background: formKondisi === opt ? '#f1f5f9' : '#fff',
+                          color: '#1e293b',
+                          border: 0,
+                          borderRight: opt !== 'Bekas' ? '1px solid #cbd5e1' : 'none',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </FormRow>
+
+                <FormRow label="Deskripsi Produk">
+                  <textarea value={formDeskripsi} onChange={(e) => setFormDeskripsi(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13, minHeight: 80 }} />
+                </FormRow>
+
+                <FormRow label="Catatan">
+                  <textarea placeholder="Masukkan Catatan" value={formCatatan} onChange={(e) => setFormCatatan(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13, minHeight: 80 }} />
+                </FormRow>
+
+                {/* Harga Produk */}
+                <div style={{ padding: '14px 0 8px 0', borderBottom: '1px solid #e2e8f0', marginBottom: 12, fontSize: 13, fontWeight: 700, color: '#475569' }}>
+                  Harga Produk
+                </div>
+                <FormRow label="Harga jual di toko bersifat dinamis" desc="Kasir bisa mengubah harga jual">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <label className="pi-switch">
+                      <input type="checkbox" checked={formHargaDinamis} onChange={(e) => setFormHargaDinamis(e.target.checked)} />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{formHargaDinamis ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 12, color: '#64748b' }}>{formHargaDinamis ? 'Ya' : 'Tidak'}</span>
+                  </div>
+                </FormRow>
+
+                {/* Pemesanan */}
+                <div style={{ padding: '14px 0 8px 0', borderBottom: '1px solid #e2e8f0', marginBottom: 12, fontSize: 13, fontWeight: 700, color: '#475569' }}>
+                  Pemesanan
+                </div>
+
+                {/* Inventori */}
+                <div style={{ padding: '14px 0 8px 0', borderBottom: '1px solid #e2e8f0', marginBottom: 12, fontSize: 13, fontWeight: 700, color: '#475569' }}>
+                  Inventori
+                </div>
+                <FormRow label="Unit Pengukuran">
+                  <input type="text" value={formSatuan} onChange={(e) => setFormSatuan(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13 }} />
+                </FormRow>
+                <FormRow label="Stok kosong" desc="Aktifkan jika stok produk sedang kosong">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <label className="pi-switch">
+                      <input type="checkbox" checked={formStokKosong} onChange={(e) => setFormStokKosong(e.target.checked)} />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{formStokKosong ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 12, color: '#64748b' }}>{formStokKosong ? 'Ya' : 'Tidak'}</span>
+                  </div>
+                </FormRow>
+
+                {/* Pengiriman */}
+                <div style={{ padding: '14px 0 8px 0', borderBottom: '1px solid #e2e8f0', marginBottom: 12, fontSize: 13, fontWeight: 700, color: '#475569' }}>
+                  Pengiriman
+                </div>
+                <FormRow label="Butuh Pengiriman" desc="Jika pengiriman dibutuhkan, pastikan daftar harga pengiriman telah diisi dengan benar di bagian menu &quot;Pengaturan > Pengiriman&quot;">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <label className="pi-switch">
+                      <input type="checkbox" checked={formButuhPengiriman} onChange={(e) => setFormButuhPengiriman(e.target.checked)} />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{formButuhPengiriman ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 12, color: '#64748b' }}>{formButuhPengiriman ? 'Ya' : 'Tidak'}</span>
+                  </div>
+                </FormRow>
+                <FormRow label="Berat Produk" desc="Berat produk dalam kilogram (kg). Gunakan titik &quot;.&quot; untuk desimal">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                    <input type="text" value={formBerat} onChange={(e) => setFormBerat(e.target.value)} style={{ flex: 1, border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13 }} />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>kg</span>
+                  </div>
+                </FormRow>
+
+                {/* Informasi Tambahan */}
+                <div style={{ padding: '14px 0 8px 0', borderBottom: '1px solid #e2e8f0', marginBottom: 12, fontSize: 13, fontWeight: 700, color: '#475569' }}>
+                  Informasi Tambahan
+                </div>
+                <FormRow label="Harga produk sudah termasuk pajak" desc="Aktifkan jika produk bebas pajak">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <label className="pi-switch">
+                      <input type="checkbox" checked={formBebasPajak} onChange={(e) => setFormBebasPajak(e.target.checked)} />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{formBebasPajak ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 12, color: '#64748b' }}>{formBebasPajak ? 'Ya' : 'Tidak'}</span>
+                  </div>
+                </FormRow>
+                <FormRow label="Produk tidak dikenakan biaya layanan">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <label className="pi-switch">
+                      <input type="checkbox" checked={formBebasBiayaLayanan} onChange={(e) => setFormBebasBiayaLayanan(e.target.checked)} />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{formBebasBiayaLayanan ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 12, color: '#64748b' }}>{formBebasBiayaLayanan ? 'Ya' : 'Tidak'}</span>
+                  </div>
+                </FormRow>
+                <FormRow label="Siap publikasikan untuk dijual" desc="Ketika produk anda dipublikasikan untuk dijual, maka pembeli bisa membeli lewat toko online atau POS (Point of Sale), sesuai dengan tanggal mulai dijual/diaktifkan">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <label className="pi-switch">
+                      <input type="checkbox" checked={formTersediaOnline} onChange={(e) => setFormTersediaOnline(e.target.checked)} />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{formTersediaOnline ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 12, color: '#64748b' }}>{formTersediaOnline ? 'Ya' : 'Tidak'}</span>
+                  </div>
+                </FormRow>
+                <FormRow label="Tanggal mulai jual">
+                  <input type="date" value={formTanggalTersediaOnline} onChange={(e) => setFormTanggalTersediaOnline(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13 }} />
+                </FormRow>
+                <FormRow label="Tidak muncul di Point Of Sale" desc="Dengan tidak memunculkan di Point Of Sale, anda tidak akan melihat dan tidak akan bisa menjual produk ini">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <label className="pi-switch">
+                      <input type="checkbox" checked={formTidakTersediaOfflinePos} onChange={(e) => setFormTidakTersediaOfflinePos(e.target.checked)} />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{formTidakTersediaOfflinePos ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 12, color: '#64748b' }}>{formTidakTersediaOfflinePos ? 'Ya' : 'Tidak'}</span>
+                  </div>
+                </FormRow>
+
+                {/* SEO */}
+                <div style={{ padding: '14px 0 8px 0', borderBottom: '1px solid #e2e8f0', marginBottom: 12, fontSize: 13, fontWeight: 700, color: '#475569' }}>
+                  SEO (Search Engine Optimization)
+                </div>
+                <FormRow label="Meta Keywords" desc="Kata-kata kunci/hashtags yang sesuai dengan produk Anda. Buatlah 10-15 kata kunci/hashtags yang mewakili produk ini. Tekan &quot;Enter&quot; untuk mengakhiri sebuah kata atau kombinasi kata">
+                  <input type="text" value={formMetaKeywords} onChange={(e) => setFormMetaKeywords(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13 }} />
+                </FormRow>
+                <FormRow label="Meta Description" desc="Paragraf pendek yang menjelaskan produk Anda. Meta description akan muncul di halaman hasil pencarian search engine (google/bing), sehingga sangat penting untuk menulis penjelasan singkat yang menarik.">
+                  <textarea value={formMetaDescription} onChange={(e) => setFormMetaDescription(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13, minHeight: 60 }} />
+                </FormRow>
+              </div>
+            )}
           </div>
         </div>
       </div>
