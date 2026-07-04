@@ -1,0 +1,440 @@
+import { useEffect, useState } from 'react';
+import { Plus } from 'lucide-react';
+import { formatCurrency } from '../productInventoryData';
+import apiClient from '../../../../api/apiClient';
+
+const DETAIL_TABS = [
+  { id: 'profil', label: 'Profil' },
+  { id: 'variant', label: 'Variant' },
+  { id: 'bahan-resep', label: 'Bahan/Resep' },
+  { id: 'tingkatan-harga', label: 'Tingkatan Harga' },
+  { id: 'terkait', label: 'Terkait' },
+  { id: 'seri', label: 'Seri' },
+  { id: 'spesifikasi', label: 'Spesifikasi' },
+  { id: 'satuan', label: 'Satuan' },
+];
+
+const yaTidak = (v) => (v ? 'Ya' : 'Tidak');
+
+const formatTanggal = (value) => {
+  if (!value) return '-';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '-';
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+};
+
+function Section({ title, headerRight, children }) {
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '14px 18px', borderBottom: '1px solid #e2e8f0' }}>
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1e293b', paddingTop: 6 }}>{title}</h3>
+        {headerRight}
+      </div>
+      <div style={{ padding: '0 18px' }}>{children}</div>
+    </div>
+  );
+}
+
+function EditButton({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ background: '#026da7', color: '#fff', border: 0, borderRadius: 6, padding: '7px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+    >
+      Ubah
+    </button>
+  );
+}
+
+function SaveCancelHeader({ storeName, onCancel, onSave, saving }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+      <div>
+        <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>Simpan di:</div>
+        <select disabled style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '6px 10px', fontSize: 12, color: '#334155', background: '#f8fafc' }}>
+          <option>{storeName}</option>
+        </select>
+      </div>
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={saving}
+        style={{ background: '#16a34a', color: '#fff', border: 0, borderRadius: 6, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: saving ? 'default' : 'pointer' }}
+      >
+        {saving ? 'Menyimpan...' : 'Simpan'}
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        disabled={saving}
+        style={{ background: '#fff', color: '#334155', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: saving ? 'default' : 'pointer' }}
+      >
+        Batal
+      </button>
+    </div>
+  );
+}
+
+function Row({ label, value }) {
+  return (
+    <div style={{ padding: '13px 0', borderBottom: '1px solid #f1f5f9' }}>
+      <div style={{ fontSize: 12, color: '#0284c7', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>{value || value === 0 ? value : '-'}</div>
+    </div>
+  );
+}
+
+function ReferVarianCard({ label, aggregate }) {
+  return (
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
+      <div style={{ fontSize: 12, color: '#0284c7', marginBottom: 8 }}>{label}</div>
+      <div style={{ background: '#eff6ff', color: '#0284c7', fontSize: 12, padding: '7px 10px', borderRadius: 6, marginBottom: aggregate === undefined ? 0 : 8 }}>
+        Refer Ke varian
+      </div>
+      {aggregate !== undefined && (
+        <div style={{ background: '#f1f5f9', color: '#334155', fontSize: 13, fontWeight: 700, padding: '7px 10px', borderRadius: 6 }}>
+          {aggregate}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlainCard({ label, value }) {
+  return (
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
+      <div style={{ fontSize: 12, color: '#0284c7', marginBottom: 8 }}>{label}</div>
+      <div style={{ background: '#f1f5f9', color: '#334155', fontSize: 13, fontWeight: 700, padding: '7px 10px', borderRadius: 6 }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function FormRow({ label, desc, children }) {
+  return (
+    <div className="pi-create-row">
+      <div className="pi-row-label-desc">
+        <span className="pi-row-label">{label}</span>
+        {desc && <span className="pi-row-desc">{desc}</span>}
+      </div>
+      <div className="pi-row-input">{children}</div>
+    </div>
+  );
+}
+
+export default function ProductDetailPage({ product, onBack, onUpdated, categories = [], brands = [], storeName = 'Bintang Advertising' }) {
+  const [activeTab, setActiveTab] = useState('profil');
+  const [editingSection, setEditingSection] = useState(null);
+  const [savingSection, setSavingSection] = useState(false);
+  const [collections, setCollections] = useState([]);
+
+  const [formNama, setFormNama] = useState('');
+  const [formNamaAlt, setFormNamaAlt] = useState('');
+  const [formKategori, setFormKategori] = useState('');
+  const [formKoleksi, setFormKoleksi] = useState('');
+  const [formBrand, setFormBrand] = useState('');
+  const [formSku, setFormSku] = useState('');
+  const [formBarcode, setFormBarcode] = useState('');
+  const [formKondisi, setFormKondisi] = useState('Baru');
+  const [formBebasPajak, setFormBebasPajak] = useState(false);
+  const [formBebasBiayaLayanan, setFormBebasBiayaLayanan] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null);
+
+  useEffect(() => {
+    apiClient
+      .get('/collections/')
+      .then((res) => setCollections(Array.isArray(res.data) ? res.data : res.data?.results || []))
+      .catch((err) => console.error('[ProductDetailPage] fetch collections error:', err));
+  }, []);
+
+  if (!product) return null;
+
+  const hasVariant = product.has_variant && product.variants?.length > 0;
+  const firstVariant = hasVariant ? product.variants[0] : null;
+
+  const stokKosong = hasVariant
+    ? product.variants.every((v) => Number(v.qty_stok) <= 0)
+    : Number(product.qty_stok) <= 0;
+
+  const startEditInfoUmum = () => {
+    setFormNama(product.nama || '');
+    setFormNamaAlt(product.nama_alternatif || '');
+    setFormKategori(product.kategori || '');
+    setFormKoleksi(product.koleksi || '');
+    setFormBrand(product.brand || '');
+    setFormSku(product.sku || '');
+    setFormBarcode(product.barcode || '');
+    setFormKondisi(product.kondisi || 'Baru');
+    setFormBebasPajak(!!product.bebas_pajak);
+    setFormBebasBiayaLayanan(!!product.bebas_biaya_layanan);
+    setSelectedPhoto(null);
+    setPhotoPreviewUrl(product.fotos?.[0]?.foto || null);
+    setEditingSection('info_umum');
+  };
+
+  const cancelEdit = () => setEditingSection(null);
+
+  const handlePhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setSelectedPhoto(file);
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const saveInfoUmum = async () => {
+    if (savingSection) return;
+    setSavingSection(true);
+    try {
+      await apiClient.patch(`/products/${product.id}/`, {
+        nama: formNama,
+        nama_alternatif: formNamaAlt || null,
+        kategori: formKategori || null,
+        koleksi: formKoleksi || null,
+        brand: formBrand || null,
+        sku: formSku || null,
+        barcode: formBarcode || null,
+        kondisi: formKondisi,
+        bebas_pajak: formBebasPajak,
+        bebas_biaya_layanan: formBebasBiayaLayanan,
+      });
+      if (selectedPhoto) {
+        const fd = new FormData();
+        fd.append('product', product.id);
+        fd.append('is_primary', 'true');
+        fd.append('foto', selectedPhoto);
+        await apiClient.post('/product-images/', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      }
+      const fresh = await apiClient.get(`/products/${product.id}/`);
+      onUpdated?.(fresh.data);
+      setEditingSection(null);
+    } catch (err) {
+      console.error('[ProductDetailPage] save info umum error:', err);
+      alert('Gagal menyimpan perubahan.');
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 16, borderBottom: '1px solid #e2e8f0', paddingBottom: 4 }}>
+        <button
+          type="button"
+          onClick={onBack}
+          style={{
+            background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer',
+            fontSize: 13, fontWeight: 700, color: '#026da7', padding: '8px 16px',
+          }}
+        >
+          Kembali
+        </button>
+        {DETAIL_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              background: 'none',
+              border: 0,
+              borderBottom: activeTab === tab.id ? '2px solid #026da7' : '2px solid transparent',
+              color: activeTab === tab.id ? '#026da7' : '#0f172a',
+              fontWeight: 700,
+              fontSize: 13,
+              padding: '8px 0',
+              cursor: 'pointer',
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab !== 'profil' ? (
+        <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+          Tab ini belum dibangun — kirim contoh tampilannya dari Olsera untuk saya bangun berikutnya.
+        </div>
+      ) : (
+        <>
+          <Section
+            title="Info Umum"
+            headerRight={
+              editingSection === 'info_umum' ? (
+                <SaveCancelHeader storeName={storeName} onCancel={cancelEdit} onSave={saveInfoUmum} saving={savingSection} />
+              ) : (
+                <EditButton onClick={startEditInfoUmum} />
+              )
+            }
+          >
+            {editingSection === 'info_umum' ? (
+              <>
+                <FormRow label="Foto" desc="Rekomendasi: 3-5 Gambar Produk. Gunakan 5 foto terbaik untuk produk ini. (Format: JPG, JPEG, PNG, WEBP, max 1 MB)">
+                  <label className="pi-upload-square" style={{ cursor: 'pointer', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {photoPreviewUrl ? (
+                      <img src={photoPreviewUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <Plus size={24} />
+                    )}
+                    <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
+                  </label>
+                </FormRow>
+                <FormRow label="Nama Produk" desc="Tulis nama produk sesuai jenis, merek, dan rincian produk">
+                  <input type="text" value={formNama} onChange={(e) => setFormNama(e.target.value)} />
+                </FormRow>
+                <FormRow label="Nama Produk Alternatif" desc="Tulis alternatif nama produk dalam bahasa Mandarin / Latin">
+                  <input type="text" value={formNamaAlt} onChange={(e) => setFormNamaAlt(e.target.value)} />
+                </FormRow>
+                <FormRow label="Grup" desc="Pilih dari yang ada atau tambahkan yang baru">
+                  <select value={formKategori} onChange={(e) => setFormKategori(e.target.value)}>
+                    <option value="">Pilih salah satu</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.nama}</option>
+                    ))}
+                  </select>
+                </FormRow>
+                <FormRow label="Koleksi" desc="Nama koleksi produk, e.g. Koleksi Hari Raya, dll">
+                  <select value={formKoleksi} onChange={(e) => setFormKoleksi(e.target.value)}>
+                    <option value="">Pilih salah satu</option>
+                    {collections.map((col) => (
+                      <option key={col.id} value={col.id}>{col.nama}</option>
+                    ))}
+                  </select>
+                </FormRow>
+                <FormRow label="Brand" desc="Pilih dari yang ada atau tambahkan yang baru">
+                  <select value={formBrand} onChange={(e) => setFormBrand(e.target.value)}>
+                    <option value="">Pilih salah satu</option>
+                    {brands.map((b) => (
+                      <option key={b.id} value={b.id}>{b.nama}</option>
+                    ))}
+                  </select>
+                </FormRow>
+                <FormRow label="SKU" desc="SKU (Stock Keeping Unit) atau Barcode dapat dipergunakan untuk pencarian produk">
+                  <input type="text" value={formSku} onChange={(e) => setFormSku(e.target.value)} />
+                </FormRow>
+                <FormRow label="Barcode" desc="Barcode untuk produk Anda">
+                  <input type="text" value={formBarcode} onChange={(e) => setFormBarcode(e.target.value)} />
+                </FormRow>
+                <FormRow label="Kondisi">
+                  <select value={formKondisi} onChange={(e) => setFormKondisi(e.target.value)}>
+                    <option value="Baru">Baru</option>
+                    <option value="Bekas">Bekas</option>
+                  </select>
+                </FormRow>
+                <FormRow label="Product bebas pajak" desc="Aktifkan jika produk bebas pajak">
+                  <label className="pi-switch">
+                    <input type="checkbox" checked={formBebasPajak} onChange={(e) => setFormBebasPajak(e.target.checked)} />
+                    <span className="pi-slider">
+                      <span className="pi-slider-text">{formBebasPajak ? 'Ya' : 'Tidak'}</span>
+                    </span>
+                  </label>
+                </FormRow>
+                <FormRow label="Produk tidak dikenakan biaya layanan">
+                  <label className="pi-switch">
+                    <input type="checkbox" checked={formBebasBiayaLayanan} onChange={(e) => setFormBebasBiayaLayanan(e.target.checked)} />
+                    <span className="pi-slider">
+                      <span className="pi-slider-text">{formBebasBiayaLayanan ? 'Ya' : 'Tidak'}</span>
+                    </span>
+                  </label>
+                </FormRow>
+              </>
+            ) : (
+              <>
+                <Row label="Nama Produk" value={product.nama} />
+                <Row label="Nama Produk Alternatif" value={product.nama_alternatif} />
+                <Row label="Klasifikasi" value={product.klasifikasi} />
+                <Row label="Produk Grup" value={product.kategori_nama} />
+                <Row label="Koleksi" value={product.koleksi_nama} />
+                <Row label="SKU" value={product.sku} />
+                <Row label="Barcode" value={product.barcode} />
+                <Row label="Brand" value={product.brand_nama} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Harga" headerRight={<EditButton onClick={() => {}} />}>
+            <Row label="Harga jual di toko bersifat dinamis" value={yaTidak(product.harga_dinamis || hasVariant)} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, padding: '14px 0' }}>
+              {hasVariant ? (
+                <>
+                  <ReferVarianCard label="Harga Pasar" aggregate={formatCurrency(firstVariant.harga_pasar)} />
+                  <ReferVarianCard label="Harga Beli" aggregate={formatCurrency(firstVariant.harga_beli)} />
+                  <ReferVarianCard label="Harga Jual Online" aggregate={formatCurrency(firstVariant.harga_jual_online)} />
+                  <ReferVarianCard label="Harga Jual di Toko" aggregate={formatCurrency(firstVariant.harga_jual_toko)} />
+                </>
+              ) : (
+                <>
+                  <PlainCard label="Harga Pasar" value={formatCurrency(product.harga_pasar)} />
+                  <PlainCard label="Harga Beli" value={formatCurrency(product.harga_beli)} />
+                  <PlainCard label="Harga Jual Online" value={formatCurrency(product.harga_jual_online)} />
+                  <PlainCard label="Harga Jual di Toko" value={formatCurrency(product.harga_jual_toko)} />
+                </>
+              )}
+            </div>
+            <Row label="Komisi" value={formatCurrency(product.komisi)} />
+            <Row label="Minimal Pesanan" value={product.minimal_pesanan} />
+            <Row label="Maksimal Pesanan" value={product.maksimal_pesanan} />
+          </Section>
+
+          <Section title="Inventori" headerRight={<EditButton onClick={() => {}} />}>
+            <Row label="Lacak Inventori" value={yaTidak(product.lacak_inventori)} />
+            <div style={{ padding: '13px 0', borderBottom: '1px solid #f1f5f9' }}>
+              <ReferVarianCard label="On hold qty" />
+            </div>
+            <Row label="Peringatan jika stock sisa" value={product.stok_minimum} />
+            <div style={{ padding: '13px 0', borderBottom: '1px solid #f1f5f9' }}>
+              {hasVariant ? (
+                <ReferVarianCard label="Qty Stok" aggregate={firstVariant.qty_stok} />
+              ) : (
+                <Row label="Qty Stok" value={product.qty_stok} />
+              )}
+            </div>
+            <div style={{ padding: '13px 0', borderBottom: '1px solid #f1f5f9' }}>
+              <ReferVarianCard label="Qty Fast Moving" />
+            </div>
+            <Row label="Unit Pengukuran" value={product.satuan} />
+            <Row label="Stok kosong" value={yaTidak(stokKosong)} />
+          </Section>
+
+          <Section title="Pengiriman" headerRight={<EditButton onClick={() => {}} />}>
+            <Row label="Butuh Pengiriman" value={yaTidak(product.butuh_pengiriman)} />
+            <Row label="Berat Produk" value={product.berat ? `${product.berat} kg` : '-'} />
+          </Section>
+
+          <Section title="Penjualan" headerRight={<EditButton onClick={() => {}} />}>
+            <Row label="Pesanan disertai pengisian No Seri." value={yaTidak(product.pesanan_no_seri)} />
+          </Section>
+
+          <Section title="Kategori Tambahan" headerRight={<EditButton onClick={() => {}} />}>
+            <Row label="Kategorikan sebagai Unggulan" value={yaTidak(product.kategori_unggulan)} />
+            <Row label="Kategorikan sebagai Sale" value={yaTidak(product.kategori_sale)} />
+            <Row label="Kategorikan sebagai Pre-order" value={yaTidak(product.kategori_preorder)} />
+            <Row label="Kategorikan sebagai Rilis terbaru" value={yaTidak(product.kategori_rilis_terbaru)} />
+            <Row label="Kategorikan sebagai Populer" value={yaTidak(product.kategori_populer)} />
+            <Row label="Kategorikan sebagai Bahan Mentah" value={yaTidak(product.kategori_bahan_mentah)} />
+          </Section>
+
+          <Section title="Deskripsi" headerRight={<EditButton onClick={() => {}} />}>
+            <Row label="Deskripsi" value={product.deskripsi || '-'} />
+          </Section>
+
+          <Section title="SEO (Search Engine Optimization)" headerRight={<EditButton onClick={() => {}} />}>
+            <Row label="Meta Keywords" value={product.meta_keywords || '-'} />
+            <Row label="Meta Description" value={product.meta_description || '-'} />
+          </Section>
+
+          <Section title="Ketersediaan" headerRight={<EditButton onClick={() => {}} />}>
+            <Row label="Tersedia Online" value={yaTidak(product.tersedia_online)} />
+            <Row label="Tanggal tersedia Online" value={formatTanggal(product.tanggal_tersedia_online)} />
+            <Row label="Tidak tersedia Offline (di POS)" value={yaTidak(product.tidak_tersedia_offline_pos)} />
+          </Section>
+
+          <Section title="Catatan" headerRight={<EditButton onClick={() => {}} />}>
+            <Row label="Catatan tambahan untuk produk ini" value={product.catatan || '-'} />
+          </Section>
+        </>
+      )}
+    </div>
+  );
+}

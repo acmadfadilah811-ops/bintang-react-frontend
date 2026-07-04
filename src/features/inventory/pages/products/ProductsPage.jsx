@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { MoreHorizontal, Plus, Trash2, MoreVertical, Upload, Download, Copy, ChevronUp } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { MoreHorizontal, Plus, Trash2, MoreVertical, Upload, Download, Copy, ChevronUp, Check, X, Eye, Boxes, CheckCircle2, History } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import { Button, PageHeader, Select, StatusBadge, Toolbar } from '../components/PageShell';
 import { formatCurrency } from '../productInventoryData';
@@ -8,6 +9,53 @@ import apiClient from '../../../../api/apiClient';
 import VariantModal, { PriceInput } from './VariantModal';
 import ImportProductModal from './ImportProductModal';
 import ImportRecipeModal from './ImportRecipeModal';
+import ProductDetailPage from './ProductDetailPage';
+
+const rowMenuItemStyle = {
+  display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 14px',
+  background: 'none', border: 0, textAlign: 'left', fontSize: 13, color: '#334155', cursor: 'pointer',
+};
+
+function RowActionMenu({ rowMenu, product, onDetail, onToggleAvailability, onDelete, onClose }) {
+  if (!rowMenu || rowMenu.productId !== product.id) return null;
+  const { rect } = rowMenu;
+  const menuWidth = 190;
+  const top = rect.bottom + 4;
+  const left = Math.max(8, rect.right - menuWidth);
+
+  return createPortal(
+    <>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 199 }} onClick={onClose} />
+      <div
+        style={{
+          position: 'fixed', top, left, width: menuWidth, background: '#fff',
+          border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 10px 28px rgba(15,23,42,0.14)',
+          zIndex: 200, overflow: 'hidden', padding: '4px 0',
+        }}
+      >
+        <button type="button" style={rowMenuItemStyle} onClick={onClose}>
+          <Copy size={14} /> Salin
+        </button>
+        <button type="button" style={rowMenuItemStyle} onClick={onDetail}>
+          <Eye size={14} /> Detail
+        </button>
+        <button type="button" style={rowMenuItemStyle} onClick={onClose}>
+          <Boxes size={14} /> Detail Stok
+        </button>
+        <button type="button" style={rowMenuItemStyle} onClick={onToggleAvailability}>
+          <CheckCircle2 size={14} /> Ubah ketersediaan
+        </button>
+        <button type="button" style={rowMenuItemStyle} onClick={onClose}>
+          <History size={14} /> Log
+        </button>
+        <button type="button" style={{ ...rowMenuItemStyle, color: '#dc2626' }} onClick={onDelete}>
+          <Trash2 size={14} /> Hapus
+        </button>
+      </div>
+    </>,
+    document.body
+  );
+}
 
 export default function ProductsPage() {
   const { businessSettings } = useAuth();
@@ -23,9 +71,146 @@ export default function ProductsPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [rowMenu, setRowMenu] = useState(null); // { productId, rect }
+  const [viewingProduct, setViewingProduct] = useState(null);
+
+  const toggleRowMenu = (product, e) => {
+    if (rowMenu?.productId === product.id) {
+      setRowMenu(null);
+    } else {
+      setRowMenu({ productId: product.id, rect: e.currentTarget.getBoundingClientRect() });
+    }
+  };
+
+  const openProductDetail = async (productId) => {
+    setRowMenu(null);
+    try {
+      const res = await apiClient.get(`/products/${productId}/`);
+      setViewingProduct(res.data);
+    } catch (err) {
+      console.error('[ProductsPage] fetch product detail error:', err);
+      setError('Gagal memuat detail produk.');
+    }
+  };
+  const closeProductDetail = () => {
+    setViewingProduct(null);
+    fetchProducts();
+  };
+
+  const handleToggleAvailability = async (product) => {
+    setRowMenu(null);
+    try {
+      await apiClient.patch(`/products/${product.id}/`, { tersedia_online: !product.tersedia_online });
+      await fetchProducts();
+    } catch (err) {
+      console.error('[ProductsPage] toggle availability error:', err);
+      setError('Gagal mengubah ketersediaan produk.');
+    }
+  };
+
+  const handleDeleteRow = async (product) => {
+    setRowMenu(null);
+    if (!window.confirm(`Hapus produk "${product.nama}"?`)) return;
+    try {
+      await apiClient.delete(`/products/${product.id}/`);
+      await fetchProducts();
+    } catch (err) {
+      console.error('[ProductsPage] delete product error:', err);
+      setError('Gagal menghapus produk.');
+    }
+  };
+
   const [showImportProductModal, setShowImportProductModal] = useState(false);
   const [showImportRecipeModal, setShowImportRecipeModal] = useState(false);
   const [importModalTitle, setImportModalTitle] = useState('Import Produk');
+
+  // Inline edit harga langsung di tabel (klik nilai -> input + konfirmasi/batal)
+  const [editingCell, setEditingCell] = useState(null); // { productId, variantId, field }
+  const [editValue, setEditValue] = useState('');
+  const [savingCell, setSavingCell] = useState(false);
+
+  const startEditCell = (productId, variantId, field, currentValue) => {
+    setEditingCell({ productId, variantId, field });
+    setEditValue(currentValue ? `Rp. ${Number(currentValue).toLocaleString('id-ID')}` : 'Rp. 0');
+  };
+  const cancelEditCell = () => {
+    setEditingCell(null);
+    setEditValue('');
+  };
+  const confirmEditCell = async () => {
+    if (!editingCell || savingCell) return;
+    const digits = editValue.replace(/\D/g, '');
+    const numericValue = digits ? parseInt(digits, 10) : 0;
+    const { productId, variantId, field } = editingCell;
+    setSavingCell(true);
+    try {
+      if (variantId) {
+        await apiClient.patch(`/product-variants/${variantId}/`, { [field]: numericValue });
+      } else {
+        await apiClient.patch(`/products/${productId}/`, { [field]: numericValue });
+      }
+      await fetchProducts();
+      setEditingCell(null);
+      setEditValue('');
+    } catch (err) {
+      console.error('[ProductsPage] update price error:', err);
+      setError('Gagal menyimpan perubahan harga.');
+    } finally {
+      setSavingCell(false);
+    }
+  };
+
+  const renderPriceColumn = (row, field) => {
+    const items =
+      row.has_variant && row.variants?.length > 0
+        ? row.variants.map((v) => ({ id: v.id, isVariant: true, value: v[field] }))
+        : [{ id: row.id, isVariant: false, value: row[field] }];
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {items.map((item) => {
+          const isEditing =
+            editingCell?.productId === row.id &&
+            editingCell?.variantId === (item.isVariant ? item.id : null) &&
+            editingCell?.field === field;
+
+          if (isEditing) {
+            return (
+              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                <PriceInput value={editValue} onChange={setEditValue} style={{ width: 90 }} />
+                <button
+                  type="button"
+                  onClick={confirmEditCell}
+                  disabled={savingCell}
+                  style={{ width: 22, height: 22, borderRadius: 6, border: 0, background: '#16a34a', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: savingCell ? 'default' : 'pointer', flexShrink: 0 }}
+                >
+                  <Check size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEditCell}
+                  disabled={savingCell}
+                  style={{ width: 22, height: 22, borderRadius: 6, border: '1px solid #fecaca', background: '#fef2f2', color: '#dc2626', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: savingCell ? 'default' : 'pointer', flexShrink: 0 }}
+                >
+                  <X size={13} strokeWidth={2.5} />
+                </button>
+              </div>
+            );
+          }
+
+          return (
+            <span
+              key={item.id}
+              onClick={() => startEditCell(row.id, item.isVariant ? item.id : null, field, item.value)}
+              style={{ cursor: 'pointer', textDecoration: 'underline dashed', textUnderlineOffset: 3, color: '#0ea5e9' }}
+            >
+              {formatCurrency(item.value)}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -284,6 +469,22 @@ export default function ProductsPage() {
     }
   };
 
+  // Produk dengan varian: setiap kolom terkait (SKU/Barcode/Qty/Harga) menampilkan nilai
+  // per-varian bertumpuk, karena datanya memang tersimpan di masing-masing ProductVariant,
+  // bukan di Product itu sendiri (yang tetap kosong/0 untuk produk berv arian).
+  const renderStacked = (row, getValue) => {
+    if (row.has_variant && row.variants?.length > 0) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {row.variants.map((v) => (
+            <span key={v.id}>{getValue(v)}</span>
+          ))}
+        </div>
+      );
+    }
+    return getValue(row);
+  };
+
   const columns = [
     {
       key: 'select',
@@ -316,17 +517,63 @@ export default function ProductsPage() {
       ),
     },
     { key: 'nama', label: 'Nama Produk', width: 250 },
-    { key: 'variant', label: 'Variant', width: 120, render: (row) => (row.has_variant ? `${row.variants?.length || 0} varian` : '-') },
-    { key: 'sku', label: 'SKU', width: 150, render: (row) => row.sku || '-' },
-    { key: 'barcode', label: 'Barcode', width: 150, render: (row) => row.barcode || '-' },
-    { key: 'qty_stok', label: 'Qty Stok', width: 120, render: (row) => (row.lacak_inventori ? row.qty_stok : '-') },
+    {
+      key: 'variant',
+      label: 'Variant',
+      width: 120,
+      render: (row) =>
+        row.has_variant && row.variants?.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {row.variants.map((v) => (
+              <span key={v.id}>{v.nama_varian}</span>
+            ))}
+          </div>
+        ) : (
+          '-'
+        ),
+    },
+    { key: 'sku', label: 'SKU', width: 150, render: (row) => renderStacked(row, (r) => r.sku || '-') },
+    { key: 'barcode', label: 'Barcode', width: 150, render: (row) => renderStacked(row, (r) => r.barcode || '-') },
+    { key: 'qty_stok', label: 'Qty Stok', width: 120, render: (row) => renderStacked(row, (r) => (r.lacak_inventori ? r.qty_stok : '-')) },
     { key: 'satuan', label: 'Satuan', width: 100 },
-    { key: 'harga_beli', label: 'Harga Beli', width: 150, render: (row) => formatCurrency(row.harga_beli) },
-    { key: 'harga_jual_toko', label: 'Harga Jual di Toko', width: 160, render: (row) => formatCurrency(row.harga_jual_toko) },
-    { key: 'harga_jual_online', label: 'Harga Jual Online', width: 160, render: (row) => formatCurrency(row.harga_jual_online) },
+    { key: 'harga_beli', label: 'Harga Beli', width: 190, render: (row) => renderPriceColumn(row, 'harga_beli') },
+    { key: 'harga_jual_toko', label: 'Harga Jual di Toko', width: 200, render: (row) => renderPriceColumn(row, 'harga_jual_toko') },
+    { key: 'harga_jual_online', label: 'Harga Jual Online', width: 200, render: (row) => renderPriceColumn(row, 'harga_jual_online') },
     { key: 'tersedia_online', label: 'Tersedia Online', width: 150, render: (row) => <StatusBadge active={row.tersedia_online} label={row.tersedia_online ? 'Ya' : 'Tidak'} /> },
-    { key: 'action', label: '', width: 60, render: () => <button className="pi-icon-button"><MoreHorizontal size={16} /></button> },
+    {
+      key: 'action',
+      label: '',
+      width: 60,
+      render: (row) => (
+        <>
+          <button className="pi-icon-button" onClick={(e) => toggleRowMenu(row, e)}>
+            <MoreHorizontal size={16} />
+          </button>
+          <RowActionMenu
+            rowMenu={rowMenu}
+            product={row}
+            onDetail={() => openProductDetail(row.id)}
+            onToggleAvailability={() => handleToggleAvailability(row)}
+            onDelete={() => handleDeleteRow(row)}
+            onClose={() => setRowMenu(null)}
+          />
+        </>
+      ),
+    },
   ];
+
+  if (viewingProduct) {
+    return (
+      <ProductDetailPage
+        product={viewingProduct}
+        onBack={closeProductDetail}
+        onUpdated={setViewingProduct}
+        categories={categories}
+        brands={brands}
+        storeName={businessSettings?.nama_bisnis || 'Bintang Advertising'}
+      />
+    );
+  }
 
   if (isCreating) {
     return (
