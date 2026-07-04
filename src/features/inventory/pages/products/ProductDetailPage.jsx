@@ -78,22 +78,22 @@ function SaveCancelHeader({ storeName, onCancel, onSave, saving }) {
 
 function Row({ label, value }) {
   return (
-    <div style={{ padding: '13px 0', borderBottom: '1px solid #f1f5f9' }}>
-      <div style={{ fontSize: 12, color: '#0284c7', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>{value || value === 0 ? value : '-'}</div>
+    <div style={{ padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
+      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{value || value === 0 ? value : '-'}</div>
     </div>
   );
 }
 
 function ReferVarianCard({ label, aggregate }) {
   return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
-      <div style={{ fontSize: 12, color: '#0284c7', marginBottom: 8 }}>{label}</div>
-      <div style={{ background: '#eff6ff', color: '#0284c7', fontSize: 12, padding: '7px 10px', borderRadius: 6, marginBottom: aggregate === undefined ? 0 : 8 }}>
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px' }}>
+      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 4 }}>{label}</div>
+      <div style={{ background: '#eff6ff', color: '#0284c7', fontSize: 11, padding: '4px 8px', borderRadius: 6, marginBottom: aggregate === undefined ? 0 : 6 }}>
         Refer Ke varian
       </div>
       {aggregate !== undefined && (
-        <div style={{ background: '#f1f5f9', color: '#334155', fontSize: 13, fontWeight: 700, padding: '7px 10px', borderRadius: 6 }}>
+        <div style={{ background: '#f1f5f9', color: '#334155', fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 6 }}>
           {aggregate}
         </div>
       )}
@@ -103,9 +103,9 @@ function ReferVarianCard({ label, aggregate }) {
 
 function PlainCard({ label, value }) {
   return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
-      <div style={{ fontSize: 12, color: '#0284c7', marginBottom: 8 }}>{label}</div>
-      <div style={{ background: '#f1f5f9', color: '#334155', fontSize: 13, fontWeight: 700, padding: '7px 10px', borderRadius: 6 }}>
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px' }}>
+      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 4 }}>{label}</div>
+      <div style={{ background: '#f1f5f9', color: '#334155', fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 6 }}>
         {value}
       </div>
     </div>
