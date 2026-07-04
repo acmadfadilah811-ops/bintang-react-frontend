@@ -129,6 +129,9 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
   const [activeTab, setActiveTab] = useState('profil');
   const [editingSection, setEditingSection] = useState(null);
   const [savingSection, setSavingSection] = useState(false);
+  
+  const [localCategories, setLocalCategories] = useState(categories);
+  const [localBrands, setLocalBrands] = useState(brands);
   const [collections, setCollections] = useState([]);
 
   const [formNama, setFormNama] = useState('');
@@ -173,12 +176,28 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
   const [formDeskripsi, setFormDeskripsi] = useState('');
   const [formCatatan, setFormCatatan] = useState('');
 
+  const refreshDropdowns = async () => {
+    try {
+      const [catRes, brandRes, collRes] = await Promise.all([
+        apiClient.get('/product-categories/'),
+        apiClient.get('/brands/'),
+        apiClient.get('/collections/'),
+      ]);
+      setLocalCategories(Array.isArray(catRes.data) ? catRes.data : catRes.data?.results || []);
+      setLocalBrands(Array.isArray(brandRes.data) ? brandRes.data : brandRes.data?.results || []);
+      setCollections(Array.isArray(collRes.data) ? collRes.data : collRes.data?.results || []);
+    } catch (err) {
+      console.error('[ProductDetailPage] refreshDropdowns error:', err);
+    }
+  };
+
   const startCopyProduct = () => {
+    refreshDropdowns(); // dynamically refresh dropdown data in the background
     setFormNama(product.nama || '');
     setFormNamaAlt(product.nama_alternatif || '');
-    setFormKategori(product.kategori || '');
-    setFormKoleksi(product.koleksi || '');
-    setFormBrand(product.brand || '');
+    setFormKategori(product.kategori ? String(product.kategori) : '');
+    setFormKoleksi(product.koleksi ? String(product.koleksi) : '');
+    setFormBrand(product.brand ? String(product.brand) : '');
     setFormSku(product.sku || '');
     setFormBarcode(product.barcode || '');
     setFormKondisi(product.kondisi || 'Baru');
@@ -304,11 +323,12 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
     : Number(product.qty_stok) <= 0;
 
   const startEditInfoUmum = () => {
+    refreshDropdowns(); // dynamically refresh dropdown data
     setFormNama(product.nama || '');
     setFormNamaAlt(product.nama_alternatif || '');
-    setFormKategori(product.kategori || '');
-    setFormKoleksi(product.koleksi || '');
-    setFormBrand(product.brand || '');
+    setFormKategori(product.kategori ? String(product.kategori) : '');
+    setFormKoleksi(product.koleksi ? String(product.koleksi) : '');
+    setFormBrand(product.brand ? String(product.brand) : '');
     setFormSku(product.sku || '');
     setFormBarcode(product.barcode || '');
     setFormKondisi(product.kondisi || 'Baru');
@@ -409,10 +429,10 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
             </FormRow>
 
             <FormRow label="Kategori Produk" desc="Pilih dari yang ada atau tambahkan yang baru *">
-              <select value={formKategori} onChange={(e) => setFormKategori(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13, background: '#fff' }}>
+              <select value={formKategori ? String(formKategori) : ''} onChange={(e) => setFormKategori(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13, background: '#fff' }}>
                 <option value="">Pilih salah satu</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.nama}</option>
+                {localCategories.map((cat) => (
+                  <option key={cat.id} value={String(cat.id)}>{cat.nama}</option>
                 ))}
               </select>
             </FormRow>
@@ -528,20 +548,20 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                   <input type="text" placeholder="Masukkan Barcode" value={formBarcode} onChange={(e) => setFormBarcode(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13 }} />
                 </FormRow>
 
-                <FormRow label="Koleksi" desc="Nama koleksi produk, e.g. Koleksi Hari Raya, dll.">
-                  <select value={formKoleksi} onChange={(e) => setFormKoleksi(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13, background: '#fff' }}>
+                 <FormRow label="Koleksi" desc="Nama koleksi produk, e.g. Koleksi Hari Raya, dll.">
+                  <select value={formKoleksi ? String(formKoleksi) : ''} onChange={(e) => setFormKoleksi(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13, background: '#fff' }}>
                     <option value="">Pilih salah satu</option>
                     {collections.map((col) => (
-                      <option key={col.id} value={col.id}>{col.nama}</option>
+                      <option key={col.id} value={String(col.id)}>{col.nama}</option>
                     ))}
                   </select>
                 </FormRow>
 
                 <FormRow label="Brand" desc="Pilih dari yang ada atau tambahkan yang baru">
-                  <select value={formBrand} onChange={(e) => setFormBrand(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13, background: '#fff' }}>
+                  <select value={formBrand ? String(formBrand) : ''} onChange={(e) => setFormBrand(e.target.value)} style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 12px', fontSize: 13, background: '#fff' }}>
                     <option value="">Pilih salah satu</option>
-                    {brands.map((b) => (
-                      <option key={b.id} value={b.id}>{b.nama}</option>
+                    {localBrands.map((b) => (
+                      <option key={b.id} value={String(b.id)}>{b.nama}</option>
                     ))}
                   </select>
                 </FormRow>
@@ -788,26 +808,26 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                   <input type="text" value={formNamaAlt} onChange={(e) => setFormNamaAlt(e.target.value)} />
                 </FormRow>
                 <FormRow label="Grup" desc="Pilih dari yang ada atau tambahkan yang baru">
-                  <select value={formKategori} onChange={(e) => setFormKategori(e.target.value)}>
+                  <select value={formKategori ? String(formKategori) : ''} onChange={(e) => setFormKategori(e.target.value)}>
                     <option value="">Pilih salah satu</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>{cat.nama}</option>
+                    {localCategories.map((cat) => (
+                      <option key={cat.id} value={String(cat.id)}>{cat.nama}</option>
                     ))}
                   </select>
                 </FormRow>
                 <FormRow label="Koleksi" desc="Nama koleksi produk, e.g. Koleksi Hari Raya, dll">
-                  <select value={formKoleksi} onChange={(e) => setFormKoleksi(e.target.value)}>
+                  <select value={formKoleksi ? String(formKoleksi) : ''} onChange={(e) => setFormKoleksi(e.target.value)}>
                     <option value="">Pilih salah satu</option>
                     {collections.map((col) => (
-                      <option key={col.id} value={col.id}>{col.nama}</option>
+                      <option key={col.id} value={String(col.id)}>{col.nama}</option>
                     ))}
                   </select>
                 </FormRow>
                 <FormRow label="Brand" desc="Pilih dari yang ada atau tambahkan yang baru">
-                  <select value={formBrand} onChange={(e) => setFormBrand(e.target.value)}>
+                  <select value={formBrand ? String(formBrand) : ''} onChange={(e) => setFormBrand(e.target.value)}>
                     <option value="">Pilih salah satu</option>
-                    {brands.map((b) => (
-                      <option key={b.id} value={b.id}>{b.nama}</option>
+                    {localBrands.map((b) => (
+                      <option key={b.id} value={String(b.id)}>{b.nama}</option>
                     ))}
                   </select>
                 </FormRow>
