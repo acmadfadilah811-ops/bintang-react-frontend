@@ -287,6 +287,7 @@ export default function ProductsPage() {
   const columns = [
     {
       key: 'select',
+      width: 50,
       label: (
         <input
           type="checkbox"
@@ -302,22 +303,29 @@ export default function ProductsPage() {
         />
       ),
     },
-    { key: 'photo', label: 'Foto', render: (row) => (
-      row.fotos?.[0]?.foto
-        ? <img src={row.fotos[0].foto} alt={row.nama} className="pi-product-thumb" style={{ objectFit: 'cover' }} />
-        : <div className="pi-product-thumb" />
-    ) },
-    { key: 'nama', label: 'Nama Produk' },
-    { key: 'variant', label: 'Variant', render: (row) => (row.has_variant ? `${row.variants?.length || 0} varian` : '-') },
-    { key: 'sku', label: 'SKU', render: (row) => row.sku || '-' },
-    { key: 'barcode', label: 'Barcode', render: (row) => row.barcode || '-' },
-    { key: 'qty_stok', label: 'Qty Stok', render: (row) => (row.lacak_inventori ? row.qty_stok : '-') },
-    { key: 'satuan', label: 'Satuan' },
-    { key: 'harga_beli', label: 'Harga Beli', render: (row) => formatCurrency(row.harga_beli) },
-    { key: 'harga_jual_toko', label: 'Harga Jual di Toko', render: (row) => formatCurrency(row.harga_jual_toko) },
-    { key: 'harga_jual_online', label: 'Harga Jual Online', render: (row) => formatCurrency(row.harga_jual_online) },
-    { key: 'tersedia_online', label: 'Tersedia Online', render: (row) => <StatusBadge active={row.tersedia_online} label={row.tersedia_online ? 'Ya' : 'Tidak'} /> },
-    { key: 'action', label: '', render: () => <button className="pi-icon-button"><MoreHorizontal size={16} /></button> },
+    {
+      key: 'photo',
+      label: 'Foto',
+      width: 80,
+      render: (row) => (
+        row.fotos?.[0]?.foto ? (
+          <img src={row.fotos[0].foto} alt={row.nama} className="pi-product-thumb" style={{ objectFit: 'cover' }} />
+        ) : (
+          <div className="pi-product-thumb" />
+        )
+      ),
+    },
+    { key: 'nama', label: 'Nama Produk', width: 250 },
+    { key: 'variant', label: 'Variant', width: 120, render: (row) => (row.has_variant ? `${row.variants?.length || 0} varian` : '-') },
+    { key: 'sku', label: 'SKU', width: 150, render: (row) => row.sku || '-' },
+    { key: 'barcode', label: 'Barcode', width: 150, render: (row) => row.barcode || '-' },
+    { key: 'qty_stok', label: 'Qty Stok', width: 120, render: (row) => (row.lacak_inventori ? row.qty_stok : '-') },
+    { key: 'satuan', label: 'Satuan', width: 100 },
+    { key: 'harga_beli', label: 'Harga Beli', width: 150, render: (row) => formatCurrency(row.harga_beli) },
+    { key: 'harga_jual_toko', label: 'Harga Jual di Toko', width: 160, render: (row) => formatCurrency(row.harga_jual_toko) },
+    { key: 'harga_jual_online', label: 'Harga Jual Online', width: 160, render: (row) => formatCurrency(row.harga_jual_online) },
+    { key: 'tersedia_online', label: 'Tersedia Online', width: 150, render: (row) => <StatusBadge active={row.tersedia_online} label={row.tersedia_online ? 'Ya' : 'Tidak'} /> },
+    { key: 'action', label: '', width: 60, render: () => <button className="pi-icon-button"><MoreHorizontal size={16} /></button> },
   ];
 
   if (isCreating) {
