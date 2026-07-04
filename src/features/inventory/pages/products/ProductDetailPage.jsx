@@ -176,6 +176,17 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
   const [formDeskripsi, setFormDeskripsi] = useState('');
   const [formCatatan, setFormCatatan] = useState('');
 
+  // Harga section edit states
+  const [hargaDinamisEdit, setHargaDinamisEdit] = useState(false);
+  const [hargaPasarEdit, setHargaPasarEdit] = useState('0');
+  const [hargaBeliEdit, setHargaBeliEdit] = useState('0');
+  const [hargaJualOnlineEdit, setHargaJualOnlineEdit] = useState('0');
+  const [hargaJualTokoEdit, setHargaJualTokoEdit] = useState('0');
+  const [komisiEdit, setKomisiEdit] = useState('0');
+  const [komisiTipeEdit, setKomisiTipeEdit] = useState('nominal'); // 'nominal' or 'persen'
+  const [minimalPesananEdit, setMinimalPesananEdit] = useState(1);
+  const [maksimalPesananEdit, setMaksimalPesananEdit] = useState(0);
+
   const refreshDropdowns = async () => {
     try {
       const [catRes, brandRes, collRes] = await Promise.all([
@@ -377,6 +388,50 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
     } catch (err) {
       console.error('[ProductDetailPage] save info umum error:', err);
       alert('Gagal menyimpan perubahan.');
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  const startEditHarga = () => {
+    setHargaDinamisEdit(!!product.harga_dinamis);
+    setHargaPasarEdit(product.harga_pasar ? String(Math.round(parseFloat(product.harga_pasar))) : '0');
+    setHargaBeliEdit(product.harga_beli ? String(Math.round(parseFloat(product.harga_beli))) : '0');
+    setHargaJualOnlineEdit(product.harga_jual_online ? String(Math.round(parseFloat(product.harga_jual_online))) : '0');
+    setHargaJualTokoEdit(product.harga_jual_toko ? String(Math.round(parseFloat(product.harga_jual_toko))) : '0');
+    setKomisiEdit(product.komisi ? String(Math.round(parseFloat(product.komisi))) : '0');
+    setKomisiTipeEdit('nominal');
+    setMinimalPesananEdit(product.minimal_pesanan !== null && product.minimal_pesanan !== undefined ? product.minimal_pesanan : 1);
+    setMaksimalPesananEdit(product.maksimal_pesanan !== null && product.maksimal_pesanan !== undefined ? product.maksimal_pesanan : 0);
+    setEditingSection('harga');
+  };
+
+  const saveHarga = async () => {
+    if (savingSection) return;
+    setSavingSection(true);
+    try {
+      const payload = {
+        harga_dinamis: hargaDinamisEdit,
+        minimal_pesanan: parseInt(minimalPesananEdit, 10) || 1,
+        maksimal_pesanan: parseInt(maksimalPesananEdit, 10) || 0,
+      };
+
+      if (!hasVariant) {
+        payload.harga_pasar = parseFloat(hargaPasarEdit) || 0;
+        payload.harga_beli = parseFloat(hargaBeliEdit) || 0;
+        payload.harga_jual_online = parseFloat(hargaJualOnlineEdit) || 0;
+        payload.harga_jual_toko = parseFloat(hargaJualTokoEdit) || 0;
+        payload.komisi = parseFloat(komisiEdit) || 0;
+      }
+
+      await apiClient.patch(`/products/${product.id}/`, payload);
+      const fresh = await apiClient.get(`/products/${product.id}/`);
+      alert('Harga berhasil diperbarui!');
+      onUpdated?.(fresh.data);
+      setEditingSection(null);
+    } catch (err) {
+      console.error('[ProductDetailPage] saveHarga error:', err);
+      alert('Gagal memperbarui harga.');
     } finally {
       setSavingSection(false);
     }
@@ -874,28 +929,245 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
             )}
           </Section>
 
-          <Section title="Harga" headerRight={<EditButton onClick={() => {}} />}>
-            <Row label="Harga jual di toko bersifat dinamis" value={yaTidak(product.harga_dinamis || hasVariant)} />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, padding: '14px 0' }}>
-              {hasVariant ? (
-                <>
-                  <ReferVarianCard label="Harga Pasar" aggregate={formatCurrency(firstVariant.harga_pasar)} />
-                  <ReferVarianCard label="Harga Beli" aggregate={formatCurrency(firstVariant.harga_beli)} />
-                  <ReferVarianCard label="Harga Jual Online" aggregate={formatCurrency(firstVariant.harga_jual_online)} />
-                  <ReferVarianCard label="Harga Jual di Toko" aggregate={formatCurrency(firstVariant.harga_jual_toko)} />
-                </>
+          <Section
+            title="Harga"
+            headerRight={
+              editingSection === 'harga' ? (
+                <SaveCancelHeader
+                  storeName={storeName}
+                  onCancel={cancelEdit}
+                  onSave={saveHarga}
+                  saving={savingSection}
+                />
               ) : (
-                <>
-                  <PlainCard label="Harga Pasar" value={formatCurrency(product.harga_pasar)} />
-                  <PlainCard label="Harga Beli" value={formatCurrency(product.harga_beli)} />
-                  <PlainCard label="Harga Jual Online" value={formatCurrency(product.harga_jual_online)} />
-                  <PlainCard label="Harga Jual di Toko" value={formatCurrency(product.harga_jual_toko)} />
-                </>
-              )}
-            </div>
-            <Row label="Komisi" value={formatCurrency(product.komisi)} />
-            <Row label="Minimal Pesanan" value={product.minimal_pesanan} />
-            <Row label="Maksimal Pesanan" value={product.maksimal_pesanan} />
+                <EditButton onClick={startEditHarga} />
+              )
+            }
+          >
+            {editingSection === 'harga' ? (
+              <>
+                <Row label="Harga jual di toko bersifat dinamis">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '6px 0' }}>
+                    <label className="pi-switch">
+                      <input
+                        type="checkbox"
+                        checked={hargaDinamisEdit}
+                        onChange={(e) => setHargaDinamisEdit(e.target.checked)}
+                      />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{hargaDinamisEdit ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+                      {hargaDinamisEdit ? 'Ya' : 'Tidak'}
+                    </span>
+                  </div>
+                </Row>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, padding: '14px 0' }}>
+                  {/* Card 1: Harga Pasar */}
+                  {hasVariant ? (
+                    <ReferVarianCard label="Harga Pasar" aggregate={formatCurrency(firstVariant.harga_pasar)} />
+                  ) : (
+                    <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
+                      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6 }}>Harga Pasar</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px' }}>
+                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>IDR</span>
+                        <input
+                          type="number"
+                          value={hargaPasarEdit}
+                          onChange={(e) => setHargaPasarEdit(e.target.value)}
+                          style={{ border: 0, background: 'transparent', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', outline: 'none', padding: 0 }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Card 2: Harga Beli */}
+                  {hasVariant ? (
+                    <ReferVarianCard
+                      label={
+                        <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                          <span>Harga Beli</span>
+                          <span style={{ cursor: 'pointer', color: '#64748b' }}>👁️</span>
+                        </span>
+                      }
+                      aggregate={formatCurrency(firstVariant.harga_beli)}
+                    />
+                  ) : (
+                    <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
+                      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>Harga Beli</span>
+                        <span style={{ cursor: 'pointer', color: '#64748b' }}>👁️</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px' }}>
+                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>IDR</span>
+                        <input
+                          type="number"
+                          value={hargaBeliEdit}
+                          onChange={(e) => setHargaBeliEdit(e.target.value)}
+                          style={{ border: 0, background: 'transparent', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', outline: 'none', padding: 0 }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Card 3: Harga Jual Online */}
+                  {hasVariant ? (
+                    <ReferVarianCard label="Harga Jual Online" aggregate={formatCurrency(firstVariant.harga_jual_online)} />
+                  ) : (
+                    <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
+                      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6 }}>Harga Jual Online</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px' }}>
+                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>IDR</span>
+                        <input
+                          type="number"
+                          value={hargaJualOnlineEdit}
+                          onChange={(e) => setHargaJualOnlineEdit(e.target.value)}
+                          style={{ border: 0, background: 'transparent', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', outline: 'none', padding: 0 }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Card 4: Harga Jual di Toko */}
+                  {hasVariant ? (
+                    <ReferVarianCard label="Harga Jual di Toko" aggregate={formatCurrency(firstVariant.harga_jual_toko)} />
+                  ) : (
+                    <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
+                      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6 }}>Harga Jual di Toko</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px' }}>
+                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>IDR</span>
+                        <input
+                          type="number"
+                          value={hargaJualTokoEdit}
+                          onChange={(e) => setHargaJualTokoEdit(e.target.value)}
+                          style={{ border: 0, background: 'transparent', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', outline: 'none', padding: 0 }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Card 5: Komisi */}
+                  {hasVariant ? (
+                    <ReferVarianCard label="Komisi" aggregate={formatCurrency(firstVariant.komisi || 0)} />
+                  ) : (
+                    <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
+                      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6 }}>Komisi</div>
+                      {/* IDR vs % Button Group */}
+                      <div style={{ display: 'flex', border: '1px solid #cbd5e1', borderRadius: 6, overflow: 'hidden', marginBottom: 6, width: 'fit-content' }}>
+                        <button
+                          type="button"
+                          onClick={() => setKomisiTipeEdit('nominal')}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: 11,
+                            fontWeight: komisiTipeEdit === 'nominal' ? 700 : 500,
+                            background: komisiTipeEdit === 'nominal' ? '#0284c7' : '#fff',
+                            color: komisiTipeEdit === 'nominal' ? '#fff' : '#64748b',
+                            border: 0,
+                            cursor: 'pointer',
+                            borderRight: '1px solid #cbd5e1',
+                          }}
+                        >
+                          IDR
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setKomisiTipeEdit('persen')}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: 11,
+                            fontWeight: komisiTipeEdit === 'persen' ? 700 : 500,
+                            background: komisiTipeEdit === 'persen' ? '#0284c7' : '#fff',
+                            color: komisiTipeEdit === 'persen' ? '#fff' : '#64748b',
+                            border: 0,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          %
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px' }}>
+                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+                          {komisiTipeEdit === 'nominal' ? 'IDR' : '%'}
+                        </span>
+                        <input
+                          type="number"
+                          value={komisiEdit}
+                          onChange={(e) => setKomisiEdit(e.target.value)}
+                          style={{ border: 0, background: 'transparent', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', outline: 'none', padding: 0 }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Card 6: Minimal Pesanan */}
+                  <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
+                    <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6 }}>Minimal Pesanan</div>
+                    <input
+                      type="number"
+                      value={minimalPesananEdit}
+                      onChange={(e) => setMinimalPesananEdit(e.target.value)}
+                      style={{ border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', background: '#f8fafc', outline: 'none' }}
+                    />
+                  </div>
+
+                  {/* Card 7: Maksimal Pesanan */}
+                  <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
+                    <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6 }}>Maksimal Pesanan</div>
+                    <input
+                      type="number"
+                      value={maksimalPesananEdit}
+                      onChange={(e) => setMaksimalPesananEdit(e.target.value)}
+                      style={{ border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', background: '#f8fafc', outline: 'none' }}
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <Row label="Harga jual di toko bersifat dinamis" value={yaTidak(product.harga_dinamis)} />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, padding: '14px 0' }}>
+                  {hasVariant ? (
+                    <>
+                      <ReferVarianCard label="Harga Pasar" aggregate={formatCurrency(firstVariant.harga_pasar)} />
+                      <ReferVarianCard
+                        label={
+                          <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                            <span>Harga Beli</span>
+                            <span style={{ cursor: 'pointer', color: '#64748b' }}>👁️</span>
+                          </span>
+                        }
+                        aggregate={formatCurrency(firstVariant.harga_beli)}
+                      />
+                      <ReferVarianCard label="Harga Jual Online" aggregate={formatCurrency(firstVariant.harga_jual_online)} />
+                      <ReferVarianCard label="Harga Jual di Toko" aggregate={formatCurrency(firstVariant.harga_jual_toko)} />
+                      <ReferVarianCard label="Komisi" aggregate={formatCurrency(firstVariant.komisi || 0)} />
+                      <PlainCard label="Minimal Pesanan" value={product.minimal_pesanan} />
+                      <PlainCard label="Maksimal Pesanan" value={product.maksimal_pesanan} />
+                    </>
+                  ) : (
+                    <>
+                      <PlainCard label="Harga Pasar" value={formatCurrency(product.harga_pasar)} />
+                      <PlainCard
+                        label={
+                          <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                            <span>Harga Beli</span>
+                            <span style={{ cursor: 'pointer', color: '#64748b' }}>👁️</span>
+                          </span>
+                        }
+                        value={formatCurrency(product.harga_beli)}
+                      />
+                      <PlainCard label="Harga Jual Online" value={formatCurrency(product.harga_jual_online)} />
+                      <PlainCard label="Harga Jual di Toko" value={formatCurrency(product.harga_jual_toko)} />
+                      <PlainCard label="Komisi" value={formatCurrency(product.komisi)} />
+                      <PlainCard label="Minimal Pesanan" value={product.minimal_pesanan} />
+                      <PlainCard label="Maksimal Pesanan" value={product.maksimal_pesanan} />
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </Section>
 
           <Section title="Inventori" headerRight={<EditButton onClick={() => {}} />}>
