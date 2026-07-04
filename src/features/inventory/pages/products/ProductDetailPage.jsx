@@ -50,18 +50,54 @@ function EditButton({ onClick }) {
 
 function SaveCancelHeader({ storeName, onCancel, onSave, saving }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
       <div>
         <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>Simpan di:</div>
-        <select disabled style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '6px 10px', fontSize: 12, color: '#334155', background: '#f8fafc' }}>
-          <option>{storeName}</option>
-        </select>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          background: '#fff',
+          border: '1px solid #cbd5e1',
+          borderRadius: '6px',
+          padding: '4px 10px',
+          height: '36px',
+          minWidth: '180px',
+        }}>
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: '#f1f5f9',
+            color: '#475569',
+            fontSize: '12px',
+            fontWeight: 600,
+            padding: '2px 8px',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+          }}>
+            {storeName}
+            <span style={{ cursor: 'pointer', color: '#94a3b8', fontSize: '12px', fontWeight: 'bold', marginLeft: 2 }}>&times;</span>
+          </span>
+        </div>
       </div>
       <button
         type="button"
         onClick={onSave}
         disabled={saving}
-        style={{ background: '#16a34a', color: '#fff', border: 0, borderRadius: 6, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: saving ? 'default' : 'pointer' }}
+        style={{
+          background: '#72b13c',
+          color: '#fff',
+          border: 0,
+          borderRadius: 6,
+          padding: '8px 24px',
+          fontSize: 13,
+          fontWeight: 700,
+          cursor: saving ? 'default' : 'pointer',
+          height: '36px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
       >
         {saving ? 'Menyimpan...' : 'Simpan'}
       </button>
@@ -69,7 +105,21 @@ function SaveCancelHeader({ storeName, onCancel, onSave, saving }) {
         type="button"
         onClick={onCancel}
         disabled={saving}
-        style={{ background: '#fff', color: '#334155', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: saving ? 'default' : 'pointer' }}
+        style={{
+          background: '#fff',
+          color: '#334155',
+          border: '1px solid #e2e8f0',
+          borderRadius: 6,
+          padding: '8px 24px',
+          fontSize: 13,
+          fontWeight: 700,
+          cursor: saving ? 'default' : 'pointer',
+          height: '36px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+        }}
       >
         Batal
       </button>
@@ -86,15 +136,26 @@ function Row({ label, value }) {
   );
 }
 
-function ReferVarianCard({ label, aggregate }) {
+const formatIDRCurrency = (val) => {
+  const num = parseFloat(val) || 0;
+  const formatted = Math.round(num).toLocaleString('id-ID');
+  return `IDR ${formatted}`;
+};
+
+function ReferVarianCard({ label, aggregate, showEye, onEyeClick }) {
   return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px' }}>
-      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 4 }}>{label}</div>
-      <div style={{ background: '#eff6ff', color: '#0284c7', fontSize: 11, padding: '4px 8px', borderRadius: 6, marginBottom: aggregate === undefined ? 0 : 6 }}>
+    <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 90 }}>
+      <div style={{ fontSize: 11, color: '#334155', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>{label}</span>
+        {showEye && (
+          <span style={{ cursor: 'pointer', color: '#94a3b8', fontSize: 13 }} onClick={onEyeClick}>👁️</span>
+        )}
+      </div>
+      <div style={{ background: '#eff6ff', color: '#0284c7', fontSize: 11, padding: '4px 8px', borderRadius: 4, border: '1px solid #bfdbfe', fontWeight: 600, textAlign: 'center' }}>
         Refer Ke varian
       </div>
       {aggregate !== undefined && (
-        <div style={{ background: '#f1f5f9', color: '#334155', fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 6 }}>
+        <div style={{ background: '#e2e8f0', color: '#475569', fontSize: 13, fontWeight: 500, padding: '6px 8px', borderRadius: 6, border: '1px solid #cbd5e1' }}>
           {aggregate}
         </div>
       )}
@@ -102,11 +163,16 @@ function ReferVarianCard({ label, aggregate }) {
   );
 }
 
-function PlainCard({ label, value }) {
+function PlainCard({ label, value, showEye, onEyeClick }) {
   return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px' }}>
-      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 4 }}>{label}</div>
-      <div style={{ background: '#f1f5f9', color: '#334155', fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 6 }}>
+    <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 90 }}>
+      <div style={{ fontSize: 11, color: '#334155', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>{label}</span>
+        {showEye && (
+          <span style={{ cursor: 'pointer', color: '#94a3b8', fontSize: 13 }} onClick={onEyeClick}>👁️</span>
+        )}
+      </div>
+      <div style={{ background: '#e2e8f0', color: '#475569', fontSize: 13, fontWeight: 500, padding: '6px 8px', borderRadius: 6, border: '1px solid #cbd5e1' }}>
         {value}
       </div>
     </div>
@@ -1026,65 +1092,61 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, padding: '14px 0' }}>
                   {/* Card 1: Harga Pasar */}
                   {hasVariant ? (
-                    <ReferVarianCard label="Harga Pasar" aggregate={formatCurrency(firstVariant.harga_pasar)} />
+                    <ReferVarianCard label="Harga Pasar" aggregate={formatIDRCurrency(firstVariant.harga_pasar)} />
                   ) : (
-                    <PlainCard label="Harga Pasar" value={formatCurrency(product.harga_pasar)} />
+                    <PlainCard label="Harga Pasar" value={formatIDRCurrency(product.harga_pasar)} />
                   )}
 
                   {/* Card 2: Harga Beli */}
                   {hasVariant ? (
                     <ReferVarianCard
-                      label={
-                        <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                          <span>Harga Beli</span>
-                          <span style={{ cursor: 'pointer', color: '#0284c7' }} onClick={() => setShowStockInModal(true)}>👁️</span>
-                        </span>
-                      }
-                      aggregate={formatCurrency(firstVariant.harga_beli)}
+                      label="Harga Beli"
+                      aggregate={formatIDRCurrency(firstVariant.harga_beli)}
+                      showEye={true}
+                      onEyeClick={() => setShowStockInModal(true)}
                     />
                   ) : (
-                    <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
-                      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span>Harga Beli</span>
-                        <span style={{ cursor: 'pointer', color: '#0284c7' }} onClick={() => setShowStockInModal(true)}>👁️</span>
-                      </div>
-                      <div style={{ background: '#f1f5f9', color: '#64748b', fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 6 }}>
-                        {formatCurrency(product.harga_beli)}
-                      </div>
-                    </div>
+                    <PlainCard
+                      label="Harga Beli"
+                      value={formatIDRCurrency(product.harga_beli)}
+                      showEye={true}
+                      onEyeClick={() => setShowStockInModal(true)}
+                    />
                   )}
 
                   {/* Card 3: Harga Jual Online */}
                   {hasVariant ? (
-                    <ReferVarianCard label="Harga Jual Online" aggregate={formatCurrency(firstVariant.harga_jual_online)} />
+                    <ReferVarianCard label="Harga Jual Online" aggregate={formatIDRCurrency(firstVariant.harga_jual_online)} />
                   ) : (
-                    <PlainCard label="Harga Jual Online" value={formatCurrency(product.harga_jual_online)} />
+                    <PlainCard label="Harga Jual Online" value={formatIDRCurrency(product.harga_jual_online)} />
                   )}
 
                   {/* Card 4: Harga Jual di Toko */}
                   {hasVariant ? (
-                    <ReferVarianCard label="Harga Jual di Toko" aggregate={formatCurrency(firstVariant.harga_jual_toko)} />
+                    <ReferVarianCard label="Harga Jual di Toko" aggregate={formatIDRCurrency(firstVariant.harga_jual_toko)} />
                   ) : (
-                    <PlainCard label="Harga Jual di Toko" value={formatCurrency(product.harga_jual_toko)} />
+                    <PlainCard label="Harga Jual di Toko" value={formatIDRCurrency(product.harga_jual_toko)} />
                   )}
 
                   {/* Card 5: Komisi */}
                   {hasVariant ? (
-                    <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
-                      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6 }}>Komisi</div>
+                    <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 90 }}>
+                      <div style={{ fontSize: 11, color: '#334155', fontWeight: 600 }}>Komisi</div>
+                      <div style={{ background: '#eff6ff', color: '#0284c7', fontSize: 11, padding: '4px 8px', borderRadius: 4, border: '1px solid #bfdbfe', fontWeight: 600, textAlign: 'center' }}>
+                        Refer Ke varian
+                      </div>
                       {/* IDR vs % Button Group */}
-                      <div style={{ display: 'flex', border: '1px solid #cbd5e1', borderRadius: 6, overflow: 'hidden', marginBottom: 6, width: 'fit-content' }}>
+                      <div style={{ display: 'flex', border: '1px solid #cbd5e1', borderRadius: 6, overflow: 'hidden', width: 'fit-content' }}>
                         <button
                           type="button"
-                          onClick={() => setKomisiTipeEdit('nominal')}
+                          disabled
                           style={{
                             padding: '4px 10px',
                             fontSize: 11,
-                            fontWeight: komisiTipeEdit === 'nominal' ? 700 : 500,
-                            background: komisiTipeEdit === 'nominal' ? '#0284c7' : '#fff',
-                            color: komisiTipeEdit === 'nominal' ? '#fff' : '#64748b',
+                            fontWeight: (firstVariant.komisi_tipe || 'nominal') === 'nominal' ? 700 : 500,
+                            background: (firstVariant.komisi_tipe || 'nominal') === 'nominal' ? '#3b82f6' : '#fff',
+                            color: (firstVariant.komisi_tipe || 'nominal') === 'nominal' ? '#fff' : '#64748b',
                             border: 0,
-                            cursor: 'pointer',
                             borderRight: '1px solid #cbd5e1',
                           }}
                         >
@@ -1092,32 +1154,25 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                         </button>
                         <button
                           type="button"
-                          onClick={() => setKomisiTipeEdit('persen')}
+                          disabled
                           style={{
                             padding: '4px 10px',
                             fontSize: 11,
-                            fontWeight: komisiTipeEdit === 'persen' ? 700 : 500,
-                            background: komisiTipeEdit === 'persen' ? '#0284c7' : '#fff',
-                            color: komisiTipeEdit === 'persen' ? '#fff' : '#64748b',
+                            fontWeight: (firstVariant.komisi_tipe || 'nominal') === 'persen' ? 700 : 500,
+                            background: (firstVariant.komisi_tipe || 'nominal') === 'persen' ? '#3b82f6' : '#fff',
+                            color: (firstVariant.komisi_tipe || 'nominal') === 'persen' ? '#fff' : '#64748b',
                             border: 0,
-                            cursor: 'pointer',
                           }}
                         >
                           %
                         </button>
-                      </div>
-                      <div style={{ background: '#eff6ff', color: '#0284c7', fontSize: 11, padding: '4px 8px', borderRadius: 6, marginBottom: 6 }}>
-                        Refer Ke varian
-                      </div>
-                      <div style={{ background: '#f1f5f9', color: '#64748b', fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 6 }}>
-                        {formatCurrency(firstVariant.komisi || 0)}
                       </div>
                     </div>
                   ) : (
-                    <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
-                      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6 }}>Komisi</div>
+                    <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 90 }}>
+                      <div style={{ fontSize: 11, color: '#334155', fontWeight: 600 }}>Komisi</div>
                       {/* IDR vs % Button Group */}
-                      <div style={{ display: 'flex', border: '1px solid #cbd5e1', borderRadius: 6, overflow: 'hidden', marginBottom: 6, width: 'fit-content' }}>
+                      <div style={{ display: 'flex', border: '1px solid #cbd5e1', borderRadius: 6, overflow: 'hidden', width: 'fit-content' }}>
                         <button
                           type="button"
                           onClick={() => setKomisiTipeEdit('nominal')}
@@ -1125,7 +1180,7 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                             padding: '4px 10px',
                             fontSize: 11,
                             fontWeight: komisiTipeEdit === 'nominal' ? 700 : 500,
-                            background: komisiTipeEdit === 'nominal' ? '#0284c7' : '#fff',
+                            background: komisiTipeEdit === 'nominal' ? '#3b82f6' : '#fff',
                             color: komisiTipeEdit === 'nominal' ? '#fff' : '#64748b',
                             border: 0,
                             cursor: 'pointer',
@@ -1141,7 +1196,7 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                             padding: '4px 10px',
                             fontSize: 11,
                             fontWeight: komisiTipeEdit === 'persen' ? 700 : 500,
-                            background: komisiTipeEdit === 'persen' ? '#0284c7' : '#fff',
+                            background: komisiTipeEdit === 'persen' ? '#3b82f6' : '#fff',
                             color: komisiTipeEdit === 'persen' ? '#fff' : '#64748b',
                             border: 0,
                             cursor: 'pointer',
@@ -1150,39 +1205,31 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                           %
                         </button>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px' }}>
-                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
-                          {komisiTipeEdit === 'nominal' ? 'IDR' : '%'}
-                        </span>
-                        <input
-                          type="text"
-                          value={formatCurrency(product.komisi || 0).replace('Rp. ', '')}
-                          disabled
-                          style={{ border: 0, background: 'transparent', fontSize: 13, fontWeight: 700, color: '#64748b', width: '100%', outline: 'none', padding: 0 }}
-                        />
+                      <div style={{ background: '#e2e8f0', color: '#475569', fontSize: 13, fontWeight: 500, padding: '6px 8px', borderRadius: 6, border: '1px solid #cbd5e1', width: '100%', minHeight: '30px', display: 'flex', alignItems: 'center' }}>
+                        {formatIDRCurrency(product.komisi || 0).replace('IDR ', '')}
                       </div>
                     </div>
                   )}
 
                   {/* Card 6: Minimal Pesanan */}
-                  <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
-                    <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6 }}>Minimal Pesanan</div>
+                  <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 90 }}>
+                    <div style={{ fontSize: 11, color: '#334155', fontWeight: 600 }}>Minimal Pesanan</div>
                     <input
                       type="number"
                       value={minimalPesananEdit}
                       onChange={(e) => setMinimalPesananEdit(e.target.value)}
-                      style={{ border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', background: '#fff', outline: 'none' }}
+                      style={{ border: '1px solid #cbd5e1', borderRadius: 6, padding: '6px 8px', fontSize: 13, fontWeight: 500, color: '#334155', width: '100%', background: '#fff', outline: 'none' }}
                     />
                   </div>
 
                   {/* Card 7: Maksimal Pesanan */}
-                  <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
-                    <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6 }}>Maksimal Pesanan</div>
+                  <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 90 }}>
+                    <div style={{ fontSize: 11, color: '#334155', fontWeight: 600 }}>Maksimal Pesanan</div>
                     <input
                       type="number"
                       value={maksimalPesananEdit}
                       onChange={(e) => setMaksimalPesananEdit(e.target.value)}
-                      style={{ border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', background: '#fff', outline: 'none' }}
+                      style={{ border: '1px solid #cbd5e1', borderRadius: 6, padding: '6px 8px', fontSize: 13, fontWeight: 500, color: '#334155', width: '100%', background: '#fff', outline: 'none' }}
                     />
                   </div>
                 </div>
@@ -1194,39 +1241,33 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, padding: '14px 0' }}>
                   {hasVariant ? (
                     <>
-                      <ReferVarianCard label="Harga Pasar" aggregate={formatCurrency(firstVariant.harga_pasar)} />
+                      <ReferVarianCard label="Harga Pasar" aggregate={formatIDRCurrency(firstVariant.harga_pasar)} />
                       <ReferVarianCard
-                        label={
-                          <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                            <span>Harga Beli</span>
-                            <span style={{ cursor: 'pointer', color: '#0284c7' }} onClick={() => setShowStockInModal(true)}>👁️</span>
-                          </span>
-                        }
-                        aggregate={formatCurrency(firstVariant.harga_beli)}
+                        label="Harga Beli"
+                        aggregate={formatIDRCurrency(firstVariant.harga_beli)}
+                        showEye={true}
+                        onEyeClick={() => setShowStockInModal(true)}
                       />
-                      <ReferVarianCard label="Harga Jual Online" aggregate={formatCurrency(firstVariant.harga_jual_online)} />
-                      <ReferVarianCard label="Harga Jual di Toko" aggregate={formatCurrency(firstVariant.harga_jual_toko)} />
-                      <ReferVarianCard label="Komisi" aggregate={formatCurrency(firstVariant.komisi || 0)} />
+                      <ReferVarianCard label="Harga Jual Online" aggregate={formatIDRCurrency(firstVariant.harga_jual_online)} />
+                      <ReferVarianCard label="Harga Jual di Toko" aggregate={formatIDRCurrency(firstVariant.harga_jual_toko)} />
+                      <ReferVarianCard label="Komisi" aggregate={(firstVariant.komisi_tipe || 'nominal') === 'persen' ? `${firstVariant.komisi || 0}%` : formatIDRCurrency(firstVariant.komisi || 0)} />
                       <PlainCard label="Minimal Pesanan" value={product.minimal_pesanan} />
-                      <PlainCard label="Maksimal Pesanan" value={product.maksimal_pesanan} />
+                      <PlainCard label="Maksimal Pesanan" value={product.maksimal_pesanan || 'Tidak dibatasi'} />
                     </>
                   ) : (
                     <>
-                      <PlainCard label="Harga Pasar" value={formatCurrency(product.harga_pasar)} />
+                      <PlainCard label="Harga Pasar" value={formatIDRCurrency(product.harga_pasar)} />
                       <PlainCard
-                        label={
-                          <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                            <span>Harga Beli</span>
-                            <span style={{ cursor: 'pointer', color: '#0284c7' }} onClick={() => setShowStockInModal(true)}>👁️</span>
-                          </span>
-                        }
-                        value={formatCurrency(product.harga_beli)}
+                        label="Harga Beli"
+                        value={formatIDRCurrency(product.harga_beli)}
+                        showEye={true}
+                        onEyeClick={() => setShowStockInModal(true)}
                       />
-                      <PlainCard label="Harga Jual Online" value={formatCurrency(product.harga_jual_online)} />
-                      <PlainCard label="Harga Jual di Toko" value={formatCurrency(product.harga_jual_toko)} />
-                      <PlainCard label="Komisi" value={formatCurrency(product.komisi)} />
+                      <PlainCard label="Harga Jual Online" value={formatIDRCurrency(product.harga_jual_online)} />
+                      <PlainCard label="Harga Jual di Toko" value={formatIDRCurrency(product.harga_jual_toko)} />
+                      <PlainCard label="Komisi" value={product.komisi_tipe === 'persen' ? `${product.komisi || 0}%` : formatIDRCurrency(product.komisi || 0)} />
                       <PlainCard label="Minimal Pesanan" value={product.minimal_pesanan} />
-                      <PlainCard label="Maksimal Pesanan" value={product.maksimal_pesanan} />
+                      <PlainCard label="Maksimal Pesanan" value={product.maksimal_pesanan || 'Tidak dibatasi'} />
                     </>
                   )}
                 </div>
