@@ -187,6 +187,46 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
   const [minimalPesananEdit, setMinimalPesananEdit] = useState(1);
   const [maksimalPesananEdit, setMaksimalPesananEdit] = useState(0);
 
+  // Stok Masuk modal states
+  const [showStockInModal, setShowStockInModal] = useState(false);
+  const [stockInHistory, setStockInHistory] = useState([]);
+  const [loadingStockIn, setLoadingStockIn] = useState(false);
+  const [stockInSearch, setStockInSearch] = useState('');
+  const [stockInRowsPerPage, setStockInRowsPerPage] = useState(10);
+  const [stockInPage, setStockInPage] = useState(1);
+
+  useEffect(() => {
+    if (showStockInModal && product?.id) {
+      const fetchStockInHistory = async () => {
+        setLoadingStockIn(true);
+        try {
+          const res = await apiClient.get(`/products/${product.id}/stock-in-history/`);
+          setStockInHistory(res.data || []);
+        } catch (err) {
+          console.error('Error fetching stock in history:', err);
+        } finally {
+          setLoadingStockIn(false);
+        }
+      };
+      fetchStockInHistory();
+    }
+  }, [showStockInModal, product?.id]);
+
+  // Filtered and paginated Stok Masuk
+  const filteredStockIn = stockInHistory.filter(item => {
+    const searchLower = stockInSearch.toLowerCase();
+    return (
+      (item.nomor || '').toLowerCase().includes(searchLower) ||
+      (item.supplier || '').toLowerCase().includes(searchLower) ||
+      (item.variant_nama || '').toLowerCase().includes(searchLower)
+    );
+  });
+
+  const totalItems = filteredStockIn.length;
+  const totalPages = Math.ceil(totalItems / stockInRowsPerPage) || 1;
+  const startIndex = (stockInPage - 1) * stockInRowsPerPage;
+  const paginatedStockIn = filteredStockIn.slice(startIndex, startIndex + stockInRowsPerPage);
+
   const refreshDropdowns = async () => {
     try {
       const [catRes, brandRes, collRes] = await Promise.all([
@@ -968,18 +1008,7 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                   {hasVariant ? (
                     <ReferVarianCard label="Harga Pasar" aggregate={formatCurrency(firstVariant.harga_pasar)} />
                   ) : (
-                    <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
-                      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6 }}>Harga Pasar</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px' }}>
-                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>IDR</span>
-                        <input
-                          type="number"
-                          value={hargaPasarEdit}
-                          onChange={(e) => setHargaPasarEdit(e.target.value)}
-                          style={{ border: 0, background: 'transparent', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', outline: 'none', padding: 0 }}
-                        />
-                      </div>
-                    </div>
+                    <PlainCard label="Harga Pasar" value={formatCurrency(product.harga_pasar)} />
                   )}
 
                   {/* Card 2: Harga Beli */}
@@ -988,7 +1017,7 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                       label={
                         <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                           <span>Harga Beli</span>
-                          <span style={{ cursor: 'pointer', color: '#64748b' }}>👁️</span>
+                          <span style={{ cursor: 'pointer', color: '#0284c7' }} onClick={() => setShowStockInModal(true)}>👁️</span>
                         </span>
                       }
                       aggregate={formatCurrency(firstVariant.harga_beli)}
@@ -997,16 +1026,10 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                     <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
                       <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>Harga Beli</span>
-                        <span style={{ cursor: 'pointer', color: '#64748b' }}>👁️</span>
+                        <span style={{ cursor: 'pointer', color: '#0284c7' }} onClick={() => setShowStockInModal(true)}>👁️</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px' }}>
-                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>IDR</span>
-                        <input
-                          type="number"
-                          value={hargaBeliEdit}
-                          onChange={(e) => setHargaBeliEdit(e.target.value)}
-                          style={{ border: 0, background: 'transparent', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', outline: 'none', padding: 0 }}
-                        />
+                      <div style={{ background: '#f1f5f9', color: '#64748b', fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 6 }}>
+                        {formatCurrency(product.harga_beli)}
                       </div>
                     </div>
                   )}
@@ -1015,41 +1038,61 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                   {hasVariant ? (
                     <ReferVarianCard label="Harga Jual Online" aggregate={formatCurrency(firstVariant.harga_jual_online)} />
                   ) : (
-                    <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
-                      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6 }}>Harga Jual Online</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px' }}>
-                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>IDR</span>
-                        <input
-                          type="number"
-                          value={hargaJualOnlineEdit}
-                          onChange={(e) => setHargaJualOnlineEdit(e.target.value)}
-                          style={{ border: 0, background: 'transparent', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', outline: 'none', padding: 0 }}
-                        />
-                      </div>
-                    </div>
+                    <PlainCard label="Harga Jual Online" value={formatCurrency(product.harga_jual_online)} />
                   )}
 
                   {/* Card 4: Harga Jual di Toko */}
                   {hasVariant ? (
                     <ReferVarianCard label="Harga Jual di Toko" aggregate={formatCurrency(firstVariant.harga_jual_toko)} />
                   ) : (
-                    <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
-                      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6 }}>Harga Jual di Toko</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px' }}>
-                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>IDR</span>
-                        <input
-                          type="number"
-                          value={hargaJualTokoEdit}
-                          onChange={(e) => setHargaJualTokoEdit(e.target.value)}
-                          style={{ border: 0, background: 'transparent', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', outline: 'none', padding: 0 }}
-                        />
-                      </div>
-                    </div>
+                    <PlainCard label="Harga Jual di Toko" value={formatCurrency(product.harga_jual_toko)} />
                   )}
 
                   {/* Card 5: Komisi */}
                   {hasVariant ? (
-                    <ReferVarianCard label="Komisi" aggregate={formatCurrency(firstVariant.komisi || 0)} />
+                    <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
+                      <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6 }}>Komisi</div>
+                      {/* IDR vs % Button Group */}
+                      <div style={{ display: 'flex', border: '1px solid #cbd5e1', borderRadius: 6, overflow: 'hidden', marginBottom: 6, width: 'fit-content' }}>
+                        <button
+                          type="button"
+                          onClick={() => setKomisiTipeEdit('nominal')}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: 11,
+                            fontWeight: komisiTipeEdit === 'nominal' ? 700 : 500,
+                            background: komisiTipeEdit === 'nominal' ? '#0284c7' : '#fff',
+                            color: komisiTipeEdit === 'nominal' ? '#fff' : '#64748b',
+                            border: 0,
+                            cursor: 'pointer',
+                            borderRight: '1px solid #cbd5e1',
+                          }}
+                        >
+                          IDR
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setKomisiTipeEdit('persen')}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: 11,
+                            fontWeight: komisiTipeEdit === 'persen' ? 700 : 500,
+                            background: komisiTipeEdit === 'persen' ? '#0284c7' : '#fff',
+                            color: komisiTipeEdit === 'persen' ? '#fff' : '#64748b',
+                            border: 0,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          %
+                        </button>
+                      </div>
+                      <div style={{ background: '#eff6ff', color: '#0284c7', fontSize: 11, padding: '4px 8px', borderRadius: 6, marginBottom: 6 }}>
+                        Refer Ke varian
+                      </div>
+                      <div style={{ background: '#f1f5f9', color: '#64748b', fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 6 }}>
+                        {formatCurrency(firstVariant.komisi || 0)}
+                      </div>
+                    </div>
                   ) : (
                     <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 10px', background: '#fff' }}>
                       <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 6 }}>Komisi</div>
@@ -1087,15 +1130,15 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                           %
                         </button>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px' }}>
                         <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
                           {komisiTipeEdit === 'nominal' ? 'IDR' : '%'}
                         </span>
                         <input
-                          type="number"
-                          value={komisiEdit}
-                          onChange={(e) => setKomisiEdit(e.target.value)}
-                          style={{ border: 0, background: 'transparent', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', outline: 'none', padding: 0 }}
+                          type="text"
+                          value={formatCurrency(product.komisi || 0).replace('Rp. ', '')}
+                          disabled
+                          style={{ border: 0, background: 'transparent', fontSize: 13, fontWeight: 700, color: '#64748b', width: '100%', outline: 'none', padding: 0 }}
                         />
                       </div>
                     </div>
@@ -1108,7 +1151,7 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                       type="number"
                       value={minimalPesananEdit}
                       onChange={(e) => setMinimalPesananEdit(e.target.value)}
-                      style={{ border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', background: '#f8fafc', outline: 'none' }}
+                      style={{ border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', background: '#fff', outline: 'none' }}
                     />
                   </div>
 
@@ -1119,7 +1162,7 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                       type="number"
                       value={maksimalPesananEdit}
                       onChange={(e) => setMaksimalPesananEdit(e.target.value)}
-                      style={{ border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', background: '#f8fafc', outline: 'none' }}
+                      style={{ border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 700, color: '#334155', width: '100%', background: '#fff', outline: 'none' }}
                     />
                   </div>
                 </div>
@@ -1135,7 +1178,7 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                         label={
                           <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                             <span>Harga Beli</span>
-                            <span style={{ cursor: 'pointer', color: '#64748b' }}>👁️</span>
+                            <span style={{ cursor: 'pointer', color: '#0284c7' }} onClick={() => setShowStockInModal(true)}>👁️</span>
                           </span>
                         }
                         aggregate={formatCurrency(firstVariant.harga_beli)}
@@ -1153,7 +1196,7 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                         label={
                           <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                             <span>Harga Beli</span>
-                            <span style={{ cursor: 'pointer', color: '#64748b' }}>👁️</span>
+                            <span style={{ cursor: 'pointer', color: '#0284c7' }} onClick={() => setShowStockInModal(true)}>👁️</span>
                           </span>
                         }
                         value={formatCurrency(product.harga_beli)}
@@ -1227,6 +1270,248 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
             <Row label="Catatan tambahan untuk produk ini" value={product.catatan || '-'} />
           </Section>
         </>
+      )}
+
+      {/* Stok Masuk Popup Modal */}
+      {showStockInModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 99999,
+          padding: '20px',
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '850px',
+            maxHeight: '90vh',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 24px',
+              borderBottom: '1px solid #e2e8f0',
+            }}>
+              <span style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b' }}>Stok Masuk</span>
+              <button
+                type="button"
+                onClick={() => setShowStockInModal(false)}
+                style={{
+                  border: 0,
+                  background: 'transparent',
+                  fontSize: '22px',
+                  lineHeight: 1,
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  padding: '4px',
+                }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Modal Filters */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 24px',
+              background: '#f8fafc',
+              gap: '16px',
+              flexWrap: 'wrap',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <select
+                  value={stockInRowsPerPage}
+                  onChange={(e) => {
+                    setStockInRowsPerPage(Number(e.target.value));
+                    setStockInPage(1);
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '13px',
+                    color: '#334155',
+                    background: '#fff',
+                    outline: 'none',
+                  }}
+                >
+                  <option value={10}>10 Baris</option>
+                  <option value={25}>25 Baris</option>
+                  <option value={50}>50 Baris</option>
+                </select>
+              </div>
+              <div style={{ position: 'relative', width: '260px' }}>
+                <input
+                  type="text"
+                  placeholder="Produk/SKU/Barcode/Supplier"
+                  value={stockInSearch}
+                  onChange={(e) => {
+                    setStockInSearch(e.target.value);
+                    setStockInPage(1);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '13px',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Modal Body & Table */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                    <th style={{ padding: '12px 8px', fontWeight: 600, color: '#475569' }}>Stok Masuk</th>
+                    <th style={{ padding: '12px 8px', fontWeight: 600, color: '#475569' }}>Waktu Pembuatan</th>
+                    <th style={{ padding: '12px 8px', fontWeight: 600, color: '#475569' }}>Supplier</th>
+                    <th style={{ padding: '12px 8px', fontWeight: 600, color: '#475569' }}>Variant</th>
+                    <th style={{ padding: '12px 8px', fontWeight: 600, color: '#475569', textAlign: 'right' }}>Qty</th>
+                    <th style={{ padding: '12px 8px', fontWeight: 600, color: '#475569', textAlign: 'right' }}>Harga Beli</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingStockIn ? (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                        Memuat data...
+                      </td>
+                    </tr>
+                  ) : paginatedStockIn.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '50px 0', color: '#94a3b8', fontSize: '14px' }}>
+                        No Data
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedStockIn.map((item) => (
+                      <tr key={item.id} style={{ borderBottom: '1px solid #e2e8f0', color: '#334155' }}>
+                        <td style={{ padding: '12px 8px', fontWeight: 600, color: '#0284c7' }}>{item.nomor}</td>
+                        <td style={{ padding: '12px 8px' }}>
+                          {item.created_at ? new Date(item.created_at).toLocaleString('id-ID', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          }) : '-'}
+                        </td>
+                        <td style={{ padding: '12px 8px' }}>{item.supplier || '-'}</td>
+                        <td style={{ padding: '12px 8px' }}>
+                          {item.variant_nama ? (
+                            <span style={{ background: '#eff6ff', color: '#1e40af', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                              {item.variant_nama}
+                            </span>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 8px', textAlign: 'right', fontWeight: 600 }}>{item.qty}</td>
+                        <td style={{ padding: '12px 8px', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(item.harga_beli)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Modal Footer (Pagination) */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 24px',
+              borderTop: '1px solid #e2e8f0',
+              background: '#f8fafc',
+            }}>
+              <span style={{ fontSize: '13px', color: '#64748b' }}>
+                Total {totalItems}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <button
+                  type="button"
+                  disabled={stockInPage <= 1}
+                  onClick={() => setStockInPage(p => Math.max(1, p - 1))}
+                  style={{
+                    padding: '4px 8px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    background: stockInPage <= 1 ? '#f1f5f9' : '#fff',
+                    cursor: stockInPage <= 1 ? 'not-allowed' : 'pointer',
+                    fontSize: '13px',
+                    color: '#475569',
+                  }}
+                >
+                  &lt;
+                </button>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
+                  {stockInPage}
+                </span>
+                <button
+                  type="button"
+                  disabled={stockInPage >= totalPages}
+                  onClick={() => setStockInPage(p => Math.min(totalPages, p + 1))}
+                  style={{
+                    padding: '4px 8px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    background: stockInPage >= totalPages ? '#f1f5f9' : '#fff',
+                    cursor: stockInPage >= totalPages ? 'not-allowed' : 'pointer',
+                    fontSize: '13px',
+                    color: '#475569',
+                  }}
+                >
+                  &gt;
+                </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748b' }}>
+                <span>Go to</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={stockInPage}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (val >= 1 && val <= totalPages) {
+                      setStockInPage(val);
+                    }
+                  }}
+                  style={{
+                    width: '45px',
+                    padding: '3px 6px',
+                    borderRadius: '4px',
+                    border: '1px solid #cbd5e1',
+                    textAlign: 'center',
+                    fontWeight: 600,
+                    color: '#334155',
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
