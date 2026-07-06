@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, ChevronDown, Calendar, Printer, X, Plus, CloudUpload, Download, Check, ChevronsUpDown, ArrowLeft, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { PolarBearSvg } from './_shared';
 import apiClient from '../../../../api/apiClient';
 import { useAuth } from '../../../../context/AuthContext';
 
@@ -21,6 +20,18 @@ const formatDisplayDate = (isoStr) => {
   if (isNaN(d.getTime())) return '-';
   const day = String(d.getDate()).padStart(2, '0');
   return `${day}-${MONTHS_ID[d.getMonth()]}-${d.getFullYear()}`;
+};
+
+const getFileSizeStr = (size) => {
+  if (!size) return '0.0 KB';
+  const kb = size / 1024;
+  return `${kb.toFixed(1)} KB`;
+};
+
+const truncateFilename = (name) => {
+  if (!name) return '';
+  if (name.length <= 25) return name;
+  return name.slice(0, 18) + '...';
 };
 
 const mapDocToRow = (doc) => ({
@@ -1124,8 +1135,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                       <tr>
                         <td colSpan={7} style={{ padding: '40px 20px', textAlign: 'center', borderBottom: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <PolarBearSvg />
-                            <span style={{ fontSize: '14px', color: '#64748b', marginTop: '16px', fontWeight: 'bold' }}>{listLoading ? 'Memuat...' : 'No Data'}</span>
+                            <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 'bold' }}>{listLoading ? 'Memuat...' : 'No Data'}</span>
                           </div>
                         </td>
                       </tr>
@@ -1181,49 +1191,6 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                     )}
                   </tbody>
                 </table>
-              </div>
-
-              {/* Horizontal Scroll Controls at the bottom of the table */}
-              <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', border: '1px solid #cbd5e1', borderTop: 0, borderRadius: '0 0 6px 6px', padding: '6px 12px', gap: '8px', marginBottom: '16px' }}>
-                <button 
-                  type="button"
-                  onClick={() => scrollTable('left')}
-                  style={{
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    borderRadius: '4px',
-                    width: '26px',
-                    height: '26px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    fontSize: '10px',
-                    color: '#64748b'
-                  }}
-                >
-                  ◀
-                </button>
-                <div style={{ flex: 1, height: '4px', background: '#e2e8f0', borderRadius: '2px' }} />
-                <button 
-                  type="button"
-                  onClick={() => scrollTable('right')}
-                  style={{
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    borderRadius: '4px',
-                    width: '26px',
-                    height: '26px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    fontSize: '10px',
-                    color: '#64748b'
-                  }}
-                >
-                  ▶
-                </button>
               </div>
 
               {/* Pagination Footer */}
@@ -1389,47 +1356,208 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
       {/* MODAL: Import Stok Masuk via CSV */}
       {showImportModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#ffffff', borderRadius: '8px', width: '90%', maxWidth: '520px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+          <div style={{ background: '#ffffff', borderRadius: '8px', width: '90%', maxWidth: '680px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+            {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>Import Stok Masuk (CSV)</h3>
+              <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>PerbaruiStatus</h3>
               <button
                 onClick={() => setShowImportModal(false)}
-                style={{ background: '#f1f5f9', border: 0, padding: '6px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#475569' }}
+                style={{ background: 'transparent', border: 0, padding: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}
               >
-                Tutup
+                <X size={18} />
               </button>
             </div>
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
-                Kolom CSV: <strong>product, variant, sku, supplier, qty, new_buy_price, rack</strong>. Hanya 1 supplier per file import.
-                Produk dicocokkan berdasarkan SKU, lalu nama produk bila SKU kosong.
-              </p>
-              <a
-                href="/templates/stok-masuk-template.csv"
-                download
-                style={{ fontSize: '12px', color: '#0d9488', fontWeight: 'bold', textDecoration: 'underline', width: 'fit-content' }}
-              >
-                Download Template CSV
-              </a>
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(e) => setImportFile(e.target.files[0] || null)}
-                style={{ fontSize: '13px' }}
-              />
-              {importResult && (
-                <div style={{ fontSize: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '10px 12px' }}>
-                  <div style={{ color: '#16a34a', fontWeight: 'bold', marginBottom: importResult.errors.length ? 6 : 0 }}>
-                    {importResult.createdCount} baris berhasil ditambahkan.
-                  </div>
-                  {importResult.errors.length > 0 && (
-                    <ul style={{ margin: 0, paddingLeft: 18, color: '#dc2626' }}>
-                      {importResult.errors.map((e, i) => <li key={i}>{e}</li>)}
-                    </ul>
+            
+            {/* Modal Body */}
+            <div style={{ padding: '24px', display: 'flex', gap: '24px' }}>
+              {/* Left Panel */}
+              <div style={{ width: '160px', display: 'flex', flexDirection: 'column' }}>
+                <a
+                  href="/templates/stok-masuk-template.csv"
+                  download
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    color: '#334155',
+                    fontWeight: 'bold',
+                    textDecoration: 'none',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseOut={(e) => e.currentTarget.style.background = '#ffffff'}
+                >
+                  Download Template
+                </a>
+              </div>
+
+              {/* Right Panel */}
+              <div style={{ flex: 1, borderLeft: '1px solid #e2e8f0', paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Import dari CSV (max. 200 baris)</span>
+                
+                {/* Upload Container Box */}
+                <div style={{
+                  width: '100%',
+                  minHeight: '240px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  padding: '16px',
+                  boxSizing: 'border-box'
+                }}>
+                  {!importFile ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                      <CloudUpload size={32} style={{ color: '#94a3b8' }} />
+                      <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '500' }}>Pilih atau seret file ke sini</span>
+                      <input
+                        type="file"
+                        accept=".csv,text/csv"
+                        onChange={(e) => {
+                          setImportFile(e.target.files[0] || null);
+                          setImportResult(null);
+                        }}
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          opacity: 0,
+                          cursor: 'pointer',
+                          width: '100%',
+                          height: '100%'
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    /* Blue status card exactly matching the screenshot */
+                    <div style={{
+                      width: '160px',
+                      height: '160px',
+                      background: '#3b82f6',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      position: 'relative',
+                      color: '#ffffff',
+                      overflow: 'hidden',
+                      boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+                      padding: '12px',
+                      boxSizing: 'border-box'
+                    }}>
+                      {/* Top Left: file size */}
+                      <span style={{ fontSize: '11px', fontWeight: 'bold' }}>{getFileSizeStr(importFile.size)}</span>
+                      
+                      {/* Center: white X in blue circle */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImportFile(null);
+                          setImportResult(null);
+                        }}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          background: '#ffffff',
+                          color: '#3b82f6',
+                          border: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          alignSelf: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 4px 0 rgba(0,0,0,0.1)'
+                        }}
+                      >
+                        <X size={16} />
+                      </button>
+
+                      {/* Bottom: filename */}
+                      <span style={{ fontSize: '10px', textAlign: 'center', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', width: '100%', display: 'block' }}>
+                        {truncateFilename(importFile.name)}
+                      </span>
+
+                      {/* Error banner overlay if any error */}
+                      {importResult && importResult.errors && importResult.errors.length > 0 && (
+                        <div style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          background: '#dc2626',
+                          color: '#ffffff',
+                          padding: '6px 8px',
+                          fontSize: '10px',
+                          textAlign: 'center',
+                          fontWeight: 'bold',
+                          lineHeight: '1.2',
+                          maxHeight: '80px',
+                          overflowY: 'auto',
+                          boxSizing: 'border-box'
+                        }}>
+                          {importResult.errors[0]}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
+
+                {importFile && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImportFile(null);
+                      setImportResult(null);
+                    }}
+                    style={{
+                      alignSelf: 'flex-start',
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '4px',
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      color: '#475569',
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)',
+                      marginTop: '4px'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                    onMouseOut={(e) => e.currentTarget.style.background = '#ffffff'}
+                  >
+                    Hapus semua file
+                  </button>
+                )}
+
+                {/* Import success count banner */}
+                {importResult && importResult.createdCount > 0 && (
+                  <div style={{
+                    fontSize: '12px',
+                    color: '#16a34a',
+                    fontWeight: 'bold',
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '4px',
+                    padding: '8px 12px',
+                    marginTop: '8px'
+                  }}>
+                    {importResult.createdCount} baris berhasil ditambahkan!
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Modal Actions Footer */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '16px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
               <button
                 onClick={() => setShowImportModal(false)}
@@ -2125,8 +2253,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', borderTop: '1px solid #f1f5f9' }}>
-                  <PolarBearSvg />
-                  <span style={{ fontSize: '14px', color: '#64748b', marginTop: '16px', fontWeight: 'bold' }}>Belum ada produk</span>
+                  <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 'bold' }}>Belum ada produk</span>
                 </div>
               )}
             </div>

@@ -84,7 +84,30 @@ export default function TransaksiTopbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const label = LABELS[location.pathname] || 'Transaksi';
+  let label = LABELS[location.pathname];
+  if (!label) {
+    if (location.pathname.startsWith('/product-inventory/product')) {
+      label = 'Katalog Produk';
+    } else if (location.pathname.startsWith('/product-inventory/inventory')) {
+      label = 'Inventori';
+    } else if (location.pathname.startsWith('/product-inventory/price-label')) {
+      label = 'Cetak Label Harga';
+    } else if (location.pathname.startsWith('/product-inventory/special-type')) {
+      label = 'Special Type';
+    } else if (location.pathname.startsWith('/product-inventory/barcode')) {
+      label = 'Print Barcode Product';
+    } else if (location.pathname.startsWith('/product-inventory/deposit')) {
+      label = 'Deposit';
+    } else if (location.pathname.startsWith('/product-inventory/pos-stock-mode')) {
+      label = 'Mode Stok POS';
+    } else if (location.pathname.startsWith('/product-inventory/merge-stocks')) {
+      label = 'Gabung Stok';
+    } else if (location.pathname.startsWith('/customer-supplier')) {
+      label = 'Pelanggan & Supplier';
+    } else {
+      label = 'Inventori';
+    }
+  }
   const avatarUrl = getAvatarUrl(user?.foto_profil);
 
   return (

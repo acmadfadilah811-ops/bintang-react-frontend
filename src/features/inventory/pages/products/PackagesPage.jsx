@@ -1,10 +1,25 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search, Copy, Download, ChevronRight, Calendar, GripVertical, Trash2, ArrowLeft, X } from 'lucide-react';
+import { Plus, Search, Copy, Download, ChevronRight, Calendar, GripVertical, Trash2, ArrowLeft, X, CloudUpload } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import DataTable from '../components/DataTable';
 import { StatusBadge } from '../components/PageShell';
 import { formatCurrency } from '../productInventoryData';
 import { useAuth } from '../../../../context/AuthContext';
 import apiClient from '../../../../api/apiClient';
+
+const getFileSizeStr = (bytes) => {
+  if (!bytes) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+const truncateFilename = (name) => {
+  if (!name) return '';
+  if (name.length <= 18) return name;
+  return name.slice(0, 10) + '...' + name.slice(-5);
+};
 
 const formatToRupiahInput = (num) => {
   if (num === null || num === undefined) return 'Rp. 0,00';
@@ -94,9 +109,12 @@ export function PackagesPage({ onToggleCreate }) {
 
   // Import CSV states
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [copySourceId, setCopySourceId] = useState('');
   const [importFile, setImportFile] = useState(null);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [parsedRows, setParsedRows] = useState([]);
 
   const fetchPackages = async () => {
     setLoading(true);
@@ -119,6 +137,61 @@ export function PackagesPage({ onToggleCreate }) {
     } catch (err) {
       console.error('Error fetching available products:', err);
     }
+  };
+
+  const handleCopyPackage = async (pkg) => {
+    if (!window.confirm(`Salin paket produk "${pkg.nama}"?`)) return;
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append('nama', `${pkg.nama} (Salinan)`);
+      if (pkg.sku) fd.append('sku', `${pkg.sku}_copy`);
+      if (pkg.deskripsi) fd.append('deskripsi', pkg.deskripsi);
+      fd.append('harga_beli', String(pkg.harga_beli || 0));
+      fd.append('harga_pasar', String(pkg.harga_pasar || 0));
+      fd.append('harga_jual_offline', String(pkg.harga_jual_offline || 0));
+      fd.append('harga_jual_online', String(pkg.harga_jual_online || 0));
+      fd.append('komisi', String(pkg.komisi || 0));
+      fd.append('minimal_pesanan', String(pkg.minimal_pesanan || 1));
+      fd.append('maksimal_pesanan', String(pkg.maksimal_pesanan || 0));
+      fd.append('harga_dinamis', String(pkg.harga_dinamis || false));
+      fd.append('publikasi', String(pkg.publikasi || false));
+      if (pkg.periode_mulai) fd.append('periode_mulai', pkg.periode_mulai);
+      fd.append('butuh_pengiriman', String(pkg.butuh_pengiriman ?? true));
+      fd.append('bebas_pajak', String(pkg.bebas_pajak ?? false));
+      fd.append('bebas_biaya_layanan', String(pkg.bebas_biaya_layanan ?? false));
+      fd.append('tampil_pos', String(pkg.tampil_pos ?? true));
+      fd.append('habis_stok', String(pkg.habis_stok ?? false));
+      if (pkg.seo_keywords) fd.append('seo_keywords', pkg.seo_keywords);
+      if (pkg.seo_description) fd.append('seo_description', pkg.seo_description);
+      fd.append('loyalty_points', String(pkg.loyalty_points || 0));
+
+      const itemsPayload = (pkg.items || []).map(item => ({
+        product: item.product || item.product_id,
+        variant: item.variant || item.variant_id || null,
+        qty: item.qty
+      }));
+      fd.append('items', JSON.stringify(itemsPayload));
+
+      await apiClient.post('/product-packages/', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      alert('Paket produk berhasil disalin!');
+      await fetchPackages();
+    } catch (err) {
+      console.error('[PackagesPage] copy error:', err);
+      alert('Gagal menyalin paket produk.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePerformCopyPackage = async () => {
+    if (!copySourceId) return;
+    const pkg = packages.find(p => p.id === parseInt(copySourceId) || p.id === copySourceId);
+    if (!pkg) return;
+    setShowCopyModal(false);
+    await handleCopyPackage(pkg);
   };
 
   useEffect(() => {
@@ -359,6 +432,49 @@ export function PackagesPage({ onToggleCreate }) {
     }
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) {
+      setImportFile(null);
+      setParsedRows([]);
+      return;
+    }
+    setImportFile(file);
+    setImportResult(null);
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const rawData = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        
+        if (rawData.length > 0) {
+          const headers = rawData[0].map(h => String(h || '').trim());
+          const rows = [];
+          for (let i = 1; i < rawData.length; i++) {
+            const rowData = rawData[i];
+            if (!rowData || rowData.length === 0 || rowData.every(cell => cell === null || cell === '')) continue;
+            const obj = {};
+            headers.forEach((header, index) => {
+              if (header) {
+                obj[header] = rowData[index] !== undefined && rowData[index] !== null ? String(rowData[index]).trim() : '';
+              }
+            });
+            rows.push(obj);
+          }
+          setParsedRows(rows);
+        }
+      } catch (err) {
+        console.error('Error parsing file:', err);
+        setImportResult({ errors: ['Format file tidak didukung atau rusak.'], createdCount: 0 });
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const handleImportCsv = async () => {
     if (!importFile || importing) return;
     setImporting(true);
@@ -371,6 +487,7 @@ export function PackagesPage({ onToggleCreate }) {
       });
       setImportResult({ errors: res.data.errors || [], createdCount: res.data.created?.length || 0 });
       setImportFile(null);
+      setParsedRows([]);
       await fetchPackages();
     } catch (err) {
       console.error('[PackagesPage] import csv error:', err);
@@ -1545,17 +1662,23 @@ export function PackagesPage({ onToggleCreate }) {
           {error && <p style={{ color: '#dc2626', fontSize: 12, margin: '4px 0 0' }}>{error}</p>}
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="pi-btn" style={{ background: '#0284c7', color: '#ffffff', border: 0, borderRadius: '4px', padding: '8px 14px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+          <button 
+            type="button"
+            onClick={() => { setCopySourceId(''); setShowCopyModal(true); }}
+            className="pi-btn" 
+            style={{ background: '#0284c7', color: '#ffffff', border: 0, borderRadius: '4px', padding: '8px 14px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+          >
             <Copy size={14} /> Salin Paket Produk
           </button>
           <button
             type="button"
-            onClick={() => { setImportResult(null); setImportFile(null); setShowImportModal(true); }}
+            onClick={() => { setImportResult(null); setImportFile(null); setParsedRows([]); setShowImportModal(true); }}
             className="pi-btn"
             style={{ background: '#0284c7', color: '#ffffff', border: 0, borderRadius: '4px', padding: '8px 14px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
           >
             <Download size={14} /> Import
           </button>
+
           <button 
             type="button"
             className="pi-btn" 
@@ -1601,13 +1724,23 @@ export function PackagesPage({ onToggleCreate }) {
             key: 'nama', 
             label: renderHeaderLabel('nama', 'Nama Produk'),
             render: (row) => (
-              <span 
-                className="package-name-link"
-                onClick={() => handleViewDetail(row)}
-                style={{ color: '#0284c7', fontWeight: '700', cursor: 'pointer' }}
-              >
-                {row.nama}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span 
+                  className="package-name-link"
+                  onClick={() => handleViewDetail(row)}
+                  style={{ color: '#0284c7', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  {row.nama}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleCopyPackage(row); }}
+                  title="Salin Paket Produk"
+                  style={{ border: 0, background: 'transparent', color: '#0284c7', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                >
+                  <Copy size={13} />
+                </button>
+              </div>
             )
           },
           { 
@@ -1651,53 +1784,275 @@ export function PackagesPage({ onToggleCreate }) {
         </div>
       </div>
 
+      {/* MODAL: Salin Paket Produk */}
+      {showCopyModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: '#ffffff', borderRadius: '8px', width: '90%', maxWidth: '480px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>Salin Paket Produk</h3>
+              <button
+                type="button"
+                onClick={() => setShowCopyModal(false)}
+                style={{ background: 'transparent', border: 0, padding: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div style={{ padding: '20px' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', color: '#334155', display: 'block', marginBottom: '8px' }}>
+                Pilih paket produk sumber yang ingin disalin:
+              </label>
+              <select
+                value={copySourceId}
+                onChange={(e) => setCopySourceId(e.target.value)}
+                style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '8px 12px', fontSize: '13px', outline: 'none', background: '#ffffff', marginBottom: '20px' }}
+              >
+                <option value="">-- Pilih Paket Produk --</option>
+                {packages.map(pkg => (
+                  <option key={pkg.id} value={pkg.id}>
+                    {pkg.nama} {pkg.sku ? `(${pkg.sku})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '12px 20px', background: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+              <button
+                type="button"
+                onClick={() => setShowCopyModal(false)}
+                style={{ border: '1px solid #cbd5e1', background: '#ffffff', borderRadius: '4px', padding: '6px 12px', fontSize: '13px', color: '#475569', cursor: 'pointer', fontWeight: '600' }}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={!copySourceId}
+                onClick={handlePerformCopyPackage}
+                style={{ border: 0, background: copySourceId ? '#0284c7' : '#94a3b8', color: '#ffffff', borderRadius: '4px', padding: '6px 12px', fontSize: '13px', cursor: copySourceId ? 'pointer' : 'not-allowed', fontWeight: '600' }}
+              >
+                Salin Paket
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: Import Paket Produk via CSV */}
       {showImportModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#ffffff', borderRadius: '8px', width: '90%', maxWidth: '520px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+          <div style={{ background: '#ffffff', borderRadius: '8px', width: '90%', maxWidth: '680px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+            {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
               <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>Import Paket Produk (CSV)</h3>
               <button
                 onClick={() => setShowImportModal(false)}
-                style={{ background: '#f1f5f9', border: 0, padding: '6px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#475569' }}
+                style={{ background: 'transparent', border: 0, padding: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}
               >
-                Tutup
+                <X size={18} />
               </button>
             </div>
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
-                Kolom CSV: <strong>product_combo_name, product_name, product_variant_name, sku, description, purchase_price, market_price, online_selling_price, store_selling_price, commission, minimum_order, maximum_order, selling_prices_stores_are_dynamic, ready_publish_sale, sale_start_date, loyalty_points, uom</strong>.
-                Baris dengan <strong>product_combo_name</strong> sama akan digabung jadi 1 paket berisi banyak produk. Produk dicocokkan berdasarkan SKU, lalu nama produk bila SKU kosong.
-              </p>
-              <a
-                href="/templates/paket-produk-template.csv"
-                download
-                style={{ fontSize: '12px', color: '#0284c7', fontWeight: 'bold', textDecoration: 'underline', width: 'fit-content' }}
-              >
-                Download Template CSV
-              </a>
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(e) => setImportFile(e.target.files[0] || null)}
-                style={{ fontSize: '13px' }}
-              />
-              {importResult && (
-                <div style={{ fontSize: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '10px 12px' }}>
-                  <div style={{ color: '#16a34a', fontWeight: 'bold', marginBottom: importResult.errors.length ? 6 : 0 }}>
-                    {importResult.createdCount} paket berhasil dibuat.
-                  </div>
-                  {importResult.errors.length > 0 && (
-                    <ul style={{ margin: 0, paddingLeft: 18, color: '#dc2626' }}>
-                      {importResult.errors.map((e, i) => <li key={i}>{e}</li>)}
-                    </ul>
+            
+            {/* Modal Body */}
+            <div style={{ padding: '24px', display: 'flex', gap: '24px' }}>
+              {/* Left Panel */}
+              <div style={{ width: '160px', display: 'flex', flexDirection: 'column' }}>
+                <a
+                  href="/templates/paket-produk-template.csv"
+                  download
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    color: '#334155',
+                    fontWeight: 'bold',
+                    textDecoration: 'none',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseOut={(e) => e.currentTarget.style.background = '#ffffff'}
+                >
+                  Download Template
+                </a>
+              </div>
+
+              {/* Right Panel */}
+              <div style={{ flex: 1, borderLeft: '1px solid #e2e8f0', paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Import dari CSV (max. 200 baris)</span>
+                
+                {/* Upload Container Box / Preview Table */}
+                <div style={{
+                  width: '100%',
+                  minHeight: '240px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: parsedRows.length === 0 ? 'center' : 'stretch',
+                  justifyContent: parsedRows.length === 0 ? 'center' : 'flex-start',
+                  position: 'relative',
+                  padding: '16px',
+                  boxSizing: 'border-box'
+                }}>
+                  {parsedRows.length === 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                      <CloudUpload size={32} style={{ color: '#94a3b8' }} />
+                      <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '500' }}>Pilih atau seret file ke sini</span>
+                      <input
+                        type="file"
+                        accept=".csv,text/csv"
+                        onChange={handleFileChange}
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          opacity: 0,
+                          cursor: 'pointer',
+                          width: '100%',
+                          height: '100%'
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    /* Show Preview Table */
+                    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a', marginBottom: '8px' }}>Preview Data Impor ({parsedRows.length} baris)</div>
+                      <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '4px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'left' }}>
+                          <thead>
+                            <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1' }}>
+                              <th style={{ padding: '6px 8px', fontWeight: 'bold', color: '#475569' }}>Nama Paket</th>
+                              <th style={{ padding: '6px 8px', fontWeight: 'bold', color: '#475569' }}>Nama Produk</th>
+                              <th style={{ padding: '6px 8px', fontWeight: 'bold', color: '#475569' }}>SKU</th>
+                              <th style={{ padding: '6px 8px', fontWeight: 'bold', color: '#475569' }}>Harga Jual</th>
+                              <th style={{ padding: '6px 8px', fontWeight: 'bold', color: '#475569' }}>UOM</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {parsedRows.map((row, idx) => (
+                              <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <td style={{ padding: '6px 8px', color: '#334155', fontWeight: '600' }}>{row.product_combo_name || '-'}</td>
+                                <td style={{ padding: '6px 8px', color: '#475569' }}>{row.product_name || '-'}</td>
+                                <td style={{ padding: '6px 8px', color: '#475569' }}>{row.sku || '-'}</td>
+                                <td style={{ padding: '6px 8px', color: '#475569' }}>{row.online_selling_price || '0'}</td>
+                                <td style={{ padding: '6px 8px', color: '#475569' }}>{row.uom || '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   )}
                 </div>
-              )}
+
+                {importFile && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+                    {/* Blue status card for file info */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: '#eff6ff',
+                      border: '1px solid #bfdbfe',
+                      padding: '4px 12px',
+                      borderRadius: '4px'
+                    }}>
+                      <span style={{ fontSize: '11px', color: '#1e40af', fontWeight: 'bold' }}>{truncateFilename(importFile.name)} ({getFileSizeStr(importFile.size)})</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImportFile(null);
+                          setParsedRows([]);
+                          setImportResult(null);
+                        }}
+                        style={{ background: 'none', border: 0, color: '#ef4444', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImportFile(null);
+                        setParsedRows([]);
+                        setImportResult(null);
+                      }}
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        padding: '4px 10px',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        color: '#475569',
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                      onMouseOut={(e) => e.currentTarget.style.background = '#ffffff'}
+                    >
+                      Hapus file
+                    </button>
+                  </div>
+                )}
+
+                {/* Success/Error Banner */}
+                {importResult && importResult.createdCount > 0 && (
+                  <div style={{
+                    fontSize: '12px',
+                    color: '#16a34a',
+                    fontWeight: 'bold',
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '4px',
+                    padding: '8px 12px',
+                    marginTop: '8px'
+                  }}>
+                    {importResult.createdCount} paket berhasil diimpor.
+                  </div>
+                )}
+
+                {importResult && importResult.errors && importResult.errors.length > 0 && (
+                  <div style={{
+                    fontSize: '12px',
+                    color: '#b91c1c',
+                    fontWeight: 'bold',
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '4px',
+                    padding: '8px 12px',
+                    marginTop: '8px',
+                    maxHeight: '100px',
+                    overflowY: 'auto'
+                  }}>
+                    <ul style={{ margin: 0, paddingLeft: '16px' }}>
+                      {importResult.errors.map((err, i) => <li key={i}>{err}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Modal Footer with Batal & Proses */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '16px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
               <button
-                onClick={() => setShowImportModal(false)}
+                onClick={() => {
+                  setImportFile(null);
+                  setParsedRows([]);
+                  setImportResult(null);
+                  setShowImportModal(false);
+                }}
                 style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '8px 20px', fontSize: '13px', fontWeight: 'bold', color: '#475569', cursor: 'pointer' }}
               >
                 Batal
@@ -1716,7 +2071,7 @@ export function PackagesPage({ onToggleCreate }) {
                   cursor: (!importFile || importing) ? 'not-allowed' : 'pointer',
                 }}
               >
-                {importing ? 'Memproses...' : 'Post Sekarang'}
+                {importing ? 'Memproses...' : 'Proses'}
               </button>
             </div>
           </div>

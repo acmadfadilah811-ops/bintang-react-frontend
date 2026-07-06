@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import TransaksiTopbar from '../../transaksi/components/TransaksiTopbar';
+import { TransaksiProvider, useTransaksiCrumb } from '../../transaksi/components/TransaksiContext';
 import {
   Plus, Trash2, Filter,
   Download, Upload, Search, Star, ThumbsUp,
@@ -96,7 +98,7 @@ const PolarBearEmptyState = ({ title, desc }) => (
 const inputSm = { border: '1px solid #cbd5e1', borderRadius: '6px', height: '36px', padding: '0 10px', fontSize: '13px', width: '100%', boxSizing: 'border-box' };
 const labelSm = { fontSize: '11px', fontWeight: 'bold', color: '#475569' };
 
-export default function CustomerSupplierApp() {
+function CustomerSupplierInner() {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -113,6 +115,12 @@ export default function CustomerSupplierApp() {
   ];
 
   const activeTabDetails = tabs.find(t => t.id === activeTab) || tabs[0];
+
+  const { setSubtitle } = useTransaksiCrumb();
+
+  useEffect(() => {
+    setSubtitle(activeTabDetails?.label || '');
+  }, [activeTabDetails, setSubtitle]);
 
   // ── Data umum (dipakai lintas tab) ──────────────────────────────
   const [customers, setCustomers] = useState([]);
@@ -513,26 +521,35 @@ export default function CustomerSupplierApp() {
   };
 
   return (
-    <div className="pi-module pi-module-full">
-      <div className="pi-content-topbar">
-        <h1>Pelanggan dan Supplier / {activeTabDetails.label}</h1>
-      </div>
-
-      <section className="pi-full-panel">
-        <nav className="pi-top-tabs pi-top-tabs-full" aria-label="Menu Pelanggan dan Supplier">
-          {tabs.map((tab) => (
+    <div className="flex flex-col min-h-screen bg-white">
+      <TransaksiTopbar />
+      
+      {/* Tab atas — sama persis dengan Laporan.jsx, tanpa space */}
+      <div className="flex border-b border-slate-200 shrink-0 bg-white">
+        {tabs.map((tab) => {
+          const isActive = tab.id === activeTab;
+          return (
             <button
               key={tab.id}
               type="button"
               onClick={() => handleTabChange(tab.id)}
-              className={tab.id === activeTab ? 'is-active' : ''}
+              className={`flex-1 px-3 py-4 text-sm font-semibold text-center whitespace-nowrap transition-colors cursor-pointer border-b-2 ${
+                isActive
+                  ? 'text-blue-600 border-blue-600 bg-white'
+                  : 'text-slate-500 border-transparent hover:text-slate-700 hover:bg-slate-50/40 bg-white'
+              }`}
             >
               {tab.label}
             </button>
-          ))}
-        </nav>
+          );
+        })}
+      </div>
 
-        <div className="pi-page-body">
+      {/* Area Konten */}
+      <div className="flex-1 flex flex-col p-4 md:p-6 bg-slate-50 overflow-y-auto">
+        <div className="pi-module pi-module-full">
+          <section className="pi-full-panel" style={{ borderTop: 0 }}>
+            <div className="pi-page-body" style={{ padding: 0 }}>
           {error && (
             <div style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: '8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', fontSize: '13px' }}>
               {error}
@@ -1017,6 +1034,16 @@ export default function CustomerSupplierApp() {
           )}
         </div>
       </section>
+        </div>
+      </div>
     </div>
+  );
+}
+
+export default function CustomerSupplierApp() {
+  return (
+    <TransaksiProvider>
+      <CustomerSupplierInner />
+    </TransaksiProvider>
   );
 }
