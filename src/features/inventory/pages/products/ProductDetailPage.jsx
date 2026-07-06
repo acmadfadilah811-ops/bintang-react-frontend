@@ -3,6 +3,13 @@ import { Plus } from 'lucide-react';
 import { formatCurrency } from '../productInventoryData';
 import apiClient from '../../../../api/apiClient';
 import { PriceInput } from './VariantModal';
+import ProductVariantTab from './ProductVariantTab';
+import ProductBahanResepTab from './ProductBahanResepTab';
+import ProductTingkatanHargaTab from './ProductTingkatanHargaTab';
+import ProductTerkaitTab from './ProductTerkaitTab';
+import ProductSeriTab from './ProductSeriTab';
+import ProductSpesifikasiTab from './ProductSpesifikasiTab';
+import ProductSatuanTab from './ProductSatuanTab';
 
 const DETAIL_TABS = [
   { id: 'profil', label: 'Profil' },
@@ -41,6 +48,7 @@ function EditButton({ onClick }) {
     <button
       type="button"
       onClick={onClick}
+      className="detail-btn-primary"
       style={{ background: '#026da7', color: '#fff', border: 0, borderRadius: 6, padding: '7px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
     >
       Ubah
@@ -84,6 +92,7 @@ function SaveCancelHeader({ storeName, onCancel, onSave, saving }) {
         type="button"
         onClick={onSave}
         disabled={saving}
+        className="detail-btn-success"
         style={{
           background: '#72b13c',
           color: '#fff',
@@ -105,6 +114,7 @@ function SaveCancelHeader({ storeName, onCancel, onSave, saving }) {
         type="button"
         onClick={onCancel}
         disabled={saving}
+        className="detail-btn-secondary"
         style={{
           background: '#fff',
           color: '#334155',
@@ -179,6 +189,26 @@ function PlainCard({ label, value, showEye, onEyeClick }) {
   );
 }
 
+function InfoBox({ text }) {
+  return (
+    <div style={{
+      background: '#eff6ff',
+      border: '1px solid #bfdbfe',
+      color: '#0284c7',
+      fontSize: 13,
+      fontWeight: 500,
+      padding: '8px 12px',
+      borderRadius: 6,
+      width: '100%',
+      boxSizing: 'border-box',
+      marginTop: 4,
+      marginBottom: 10
+    }}>
+      {text}
+    </div>
+  );
+}
+
 function FormRow({ label, desc, children }) {
   return (
     <div className="pi-create-row">
@@ -191,7 +221,7 @@ function FormRow({ label, desc, children }) {
   );
 }
 
-export default function ProductDetailPage({ product, onBack, onUpdated, categories = [], brands = [], storeName = 'Bintang Advertising' }) {
+export default function ProductDetailPage({ product, onBack, onUpdated, categories = [], brands = [], storeName = 'Bintang Advertising', initialCopyMode = false }) {
   const [activeTab, setActiveTab] = useState('profil');
   const [editingSection, setEditingSection] = useState(null);
   const [savingSection, setSavingSection] = useState(false);
@@ -253,6 +283,42 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
   const [komisiTipeEdit, setKomisiTipeEdit] = useState('nominal'); // 'nominal' or 'persen'
   const [minimalPesananEdit, setMinimalPesananEdit] = useState(1);
   const [maksimalPesananEdit, setMaksimalPesananEdit] = useState(0);
+
+  // Inventori section edit states
+  const [lacakInventoriEdit, setLacakInventoriEdit] = useState(false);
+  const [stokMinimumEdit, setStokMinimumEdit] = useState(5);
+  const [satuanEdit, setSatuanEdit] = useState('pcs');
+  const [stokKosongEdit, setStokKosongEdit] = useState(false);
+
+  // Pengiriman section edit states
+  const [butuhPengirimanEdit, setButuhPengirimanEdit] = useState(true);
+  const [beratEdit, setBeratEdit] = useState('0.2');
+
+  // Penjualan section edit states
+  const [pesananNoSeriEdit, setPesananNoSeriEdit] = useState(false);
+
+  // Kategori Tambahan section edit states
+  const [kategoriUnggulanEdit, setKategoriUnggulanEdit] = useState(false);
+  const [kategoriSaleEdit, setKategoriSaleEdit] = useState(false);
+  const [kategoriPreorderEdit, setKategoriPreorderEdit] = useState(false);
+  const [kategoriRilisTerbaruEdit, setKategoriRilisTerbaruEdit] = useState(false);
+  const [kategoriPopulerEdit, setKategoriPopulerEdit] = useState(false);
+  const [kategoriBahanMentahEdit, setKategoriBahanMentahEdit] = useState(false);
+
+  // Deskripsi section edit states
+  const [deskripsiEdit, setDeskripsiEdit] = useState('');
+
+  // SEO section edit states
+  const [metaKeywordsEdit, setMetaKeywordsEdit] = useState('');
+  const [metaDescriptionEdit, setMetaDescriptionEdit] = useState('');
+
+  // Ketersediaan section edit states
+  const [tersediaOnlineEdit, setTersediaOnlineEdit] = useState(true);
+  const [tanggalTersediaOnlineEdit, setTanggalTersediaOnlineEdit] = useState('');
+  const [tidakTersediaOfflinePosEdit, setTidakTersediaOfflinePosEdit] = useState(false);
+
+  // Catatan section edit states
+  const [catatanEdit, setCatatanEdit] = useState('');
 
   // Stok Masuk modal states
   const [showStockInModal, setShowStockInModal] = useState(false);
@@ -431,6 +497,12 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
       .catch((err) => console.error('[ProductDetailPage] fetch collections error:', err));
   }, []);
 
+  useEffect(() => {
+    if (initialCopyMode) {
+      startCopyProduct();
+    }
+  }, [initialCopyMode]);
+
   if (!product) return null;
 
   const hasVariant = product.has_variant && product.variants?.length > 0;
@@ -543,6 +615,256 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
       alert('Gagal memperbarui harga.');
     } finally {
       setSavingSection(false);
+    }
+  };
+
+  const startEditInventori = () => {
+    setLacakInventoriEdit(!!product.lacak_inventori);
+    setStokMinimumEdit(product.stok_minimum !== null && product.stok_minimum !== undefined ? product.stok_minimum : 5);
+    setSatuanEdit(product.satuan || 'pcs');
+    setStokKosongEdit(!!stokKosong);
+    setEditingSection('inventori');
+  };
+
+  const saveInventori = async () => {
+    if (savingSection) return;
+    setSavingSection(true);
+    try {
+      const payload = {
+        lacak_inventori: lacakInventoriEdit,
+        stok_minimum: parseFloat(stokMinimumEdit) || 0,
+        satuan: satuanEdit,
+      };
+
+      if (!hasVariant) {
+        if (stokKosongEdit) {
+          payload.qty_stok = 0;
+        }
+      }
+
+      await apiClient.patch(`/products/${product.id}/`, payload);
+      const fresh = await apiClient.get(`/products/${product.id}/`);
+      alert('Inventori berhasil diperbarui!');
+      onUpdated?.(fresh.data);
+      setEditingSection(null);
+    } catch (err) {
+      console.error('[ProductDetailPage] saveInventori error:', err);
+      alert('Gagal memperbarui inventori.');
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  const startEditPengiriman = () => {
+    setButuhPengirimanEdit(!!product.butuh_pengiriman);
+    setBeratEdit(product.berat !== null && product.berat !== undefined ? String(product.berat) : '0.2');
+    setEditingSection('pengiriman');
+  };
+
+  const savePengiriman = async () => {
+    if (savingSection) return;
+    setSavingSection(true);
+    try {
+      const payload = {
+        butuh_pengiriman: butuhPengirimanEdit,
+        berat: parseFloat(beratEdit) || 0,
+      };
+
+      await apiClient.patch(`/products/${product.id}/`, payload);
+      const fresh = await apiClient.get(`/products/${product.id}/`);
+      alert('Pengiriman berhasil diperbarui!');
+      onUpdated?.(fresh.data);
+      setEditingSection(null);
+    } catch (err) {
+      console.error('[ProductDetailPage] savePengiriman error:', err);
+      alert('Gagal memperbarui pengiriman.');
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  const startEditPenjualan = () => {
+    setPesananNoSeriEdit(!!product.pesanan_no_seri);
+    setEditingSection('penjualan');
+  };
+
+  const savePenjualan = async () => {
+    if (savingSection) return;
+    setSavingSection(true);
+    try {
+      const payload = {
+        pesanan_no_seri: pesananNoSeriEdit,
+      };
+
+      await apiClient.patch(`/products/${product.id}/`, payload);
+      const fresh = await apiClient.get(`/products/${product.id}/`);
+      alert('Penjualan berhasil diperbarui!');
+      onUpdated?.(fresh.data);
+      setEditingSection(null);
+    } catch (err) {
+      console.error('[ProductDetailPage] savePenjualan error:', err);
+      alert('Gagal memperbarui penjualan.');
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  const startEditKategoriTambahan = () => {
+    setKategoriUnggulanEdit(!!product.kategori_unggulan);
+    setKategoriSaleEdit(!!product.kategori_sale);
+    setKategoriPreorderEdit(!!product.kategori_preorder);
+    setKategoriRilisTerbaruEdit(!!product.kategori_rilis_terbaru);
+    setKategoriPopulerEdit(!!product.kategori_populer);
+    setKategoriBahanMentahEdit(!!product.kategori_bahan_mentah);
+    setEditingSection('kategori_tambahan');
+  };
+
+  const saveKategoriTambahan = async () => {
+    if (savingSection) return;
+    setSavingSection(true);
+    try {
+      const payload = {
+        kategori_unggulan: kategoriUnggulanEdit,
+        kategori_sale: kategoriSaleEdit,
+        kategori_preorder: kategoriPreorderEdit,
+        kategori_rilis_terbaru: kategoriRilisTerbaruEdit,
+        kategori_populer: kategoriPopulerEdit,
+        kategori_bahan_mentah: kategoriBahanMentahEdit,
+      };
+
+      await apiClient.patch(`/products/${product.id}/`, payload);
+      const fresh = await apiClient.get(`/products/${product.id}/`);
+      alert('Kategori tambahan berhasil diperbarui!');
+      onUpdated?.(fresh.data);
+      setEditingSection(null);
+    } catch (err) {
+      console.error('[ProductDetailPage] saveKategoriTambahan error:', err);
+      alert('Gagal memperbarui kategori tambahan.');
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  const startEditDeskripsi = () => {
+    setDeskripsiEdit(product.deskripsi || '');
+    setEditingSection('deskripsi');
+  };
+
+  const saveDeskripsi = async () => {
+    if (savingSection) return;
+    setSavingSection(true);
+    try {
+      const payload = {
+        deskripsi: deskripsiEdit,
+      };
+
+      await apiClient.patch(`/products/${product.id}/`, payload);
+      const fresh = await apiClient.get(`/products/${product.id}/`);
+      alert('Deskripsi berhasil diperbarui!');
+      onUpdated?.(fresh.data);
+      setEditingSection(null);
+    } catch (err) {
+      console.error('[ProductDetailPage] saveDeskripsi error:', err);
+      alert('Gagal memperbarui deskripsi.');
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  const startEditSEO = () => {
+    setMetaKeywordsEdit(product.meta_keywords || '');
+    setMetaDescriptionEdit(product.meta_description || '');
+    setEditingSection('seo');
+  };
+
+  const saveSEO = async () => {
+    if (savingSection) return;
+    setSavingSection(true);
+    try {
+      const payload = {
+        meta_keywords: metaKeywordsEdit,
+        meta_description: metaDescriptionEdit,
+      };
+
+      await apiClient.patch(`/products/${product.id}/`, payload);
+      const fresh = await apiClient.get(`/products/${product.id}/`);
+      alert('SEO berhasil diperbarui!');
+      onUpdated?.(fresh.data);
+      setEditingSection(null);
+    } catch (err) {
+      console.error('[ProductDetailPage] saveSEO error:', err);
+      alert('Gagal memperbarui SEO.');
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  const startEditKetersediaan = () => {
+    setTersediaOnlineEdit(!!product.tersedia_online);
+    const today = new Date().toISOString().split('T')[0];
+    setTanggalTersediaOnlineEdit(product.tanggal_tersedia_online || today);
+    setTidakTersediaOfflinePosEdit(!!product.tidak_tersedia_offline_pos);
+    setEditingSection('ketersediaan');
+  };
+
+  const saveKetersediaan = async () => {
+    if (savingSection) return;
+    setSavingSection(true);
+    try {
+      const payload = {
+        tersedia_online: tersediaOnlineEdit,
+        tanggal_tersedia_online: tanggalTersediaOnlineEdit || null,
+        tidak_tersedia_offline_pos: tidakTersediaOfflinePosEdit,
+      };
+
+      await apiClient.patch(`/products/${product.id}/`, payload);
+      const fresh = await apiClient.get(`/products/${product.id}/`);
+      alert('Ketersediaan berhasil diperbarui!');
+      onUpdated?.(fresh.data);
+      setEditingSection(null);
+    } catch (err) {
+      console.error('[ProductDetailPage] saveKetersediaan error:', err);
+      alert('Gagal memperbarui ketersediaan.');
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  const startEditCatatan = () => {
+    setCatatanEdit(product.catatan || '');
+    setEditingSection('catatan');
+  };
+
+  const saveCatatan = async () => {
+    if (savingSection) return;
+    setSavingSection(true);
+    try {
+      const payload = {
+        catatan: catatanEdit,
+      };
+
+      await apiClient.patch(`/products/${product.id}/`, payload);
+      const fresh = await apiClient.get(`/products/${product.id}/`);
+      alert('Catatan berhasil diperbarui!');
+      onUpdated?.(fresh.data);
+      setEditingSection(null);
+    } catch (err) {
+      console.error('[ProductDetailPage] saveCatatan error:', err);
+      alert('Gagal memperbarui catatan.');
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus produk ini?')) return;
+    try {
+      await apiClient.delete(`/products/${product.id}/`);
+      alert('Produk berhasil dihapus!');
+      onBack?.();
+    } catch (err) {
+      console.error('[ProductDetailPage] handleDeleteProduct error:', err);
+      alert('Gagal menghapus produk.');
     }
   };
 
@@ -896,10 +1218,88 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 16, borderBottom: '1px solid #e2e8f0', paddingBottom: 4 }}>
+      <style>{`
+        /* Hover styles for interactive elements in ProductDetailPage */
+        .detail-btn-primary {
+          transition: background-color 0.15s, transform 0.1s;
+        }
+        .detail-btn-primary:hover {
+          background-color: #025887 !important;
+        }
+        .detail-btn-primary:active {
+          transform: scale(0.97);
+        }
+
+        .detail-btn-success {
+          transition: background-color 0.15s, transform 0.1s;
+        }
+        .detail-btn-success:hover {
+          background-color: #5d9430 !important;
+        }
+        .detail-btn-success:active {
+          transform: scale(0.97);
+        }
+
+        .detail-btn-secondary {
+          transition: background-color 0.15s, border-color 0.15s, transform 0.1s;
+        }
+        .detail-btn-secondary:hover {
+          background-color: #f8fafc !important;
+          border-color: #cbd5e1 !important;
+        }
+        .detail-btn-secondary:active {
+          transform: scale(0.97);
+        }
+
+        .detail-btn-back {
+          transition: background-color 0.15s, transform 0.1s;
+        }
+        .detail-btn-back:hover {
+          background-color: #e2e8f0 !important;
+        }
+        .detail-btn-back:active {
+          transform: scale(0.97);
+        }
+
+        .detail-tab-btn {
+          transition: color 0.15s, border-bottom-color 0.15s;
+        }
+        .detail-tab-btn:hover {
+          color: #026da7 !important;
+        }
+        
+        /* General button / link / clickable elements in tabs */
+        button:not([disabled]):hover,
+        .pi-btn:not([disabled]):hover {
+          opacity: 0.9;
+        }
+        
+        /* Make sure all eye icons / custom action spans have hover feedback */
+        span[style*="cursor: pointer"]:hover,
+        span[style*="cursor:pointer"]:hover {
+          opacity: 0.8;
+          color: #026da7 !important;
+        }
+      `}</style>
+      <div style={{
+        position: 'sticky',
+        top: 72,
+        zIndex: 25,
+        background: 'rgba(248, 250, 252, 0.9)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        paddingTop: 12,
+        paddingBottom: 8,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 20,
+        marginBottom: 16,
+        borderBottom: '1px solid #e2e8f0'
+      }}>
         <button
           type="button"
           onClick={onBack}
+          className="detail-btn-back"
           style={{
             background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer',
             fontSize: 13, fontWeight: 700, color: '#026da7', padding: '8px 16px',
@@ -912,6 +1312,7 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
+            className="detail-tab-btn"
             style={{
               background: 'none',
               border: 0,
@@ -928,7 +1329,49 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
         ))}
       </div>
 
-      {activeTab !== 'profil' ? (
+      {activeTab === 'variant' ? (
+        <ProductVariantTab
+          product={product}
+          onUpdated={onUpdated}
+          storeName={storeName}
+        />
+      ) : activeTab === 'bahan-resep' ? (
+        <ProductBahanResepTab
+          product={product}
+          onUpdated={onUpdated}
+          storeName={storeName}
+        />
+      ) : activeTab === 'tingkatan-harga' ? (
+        <ProductTingkatanHargaTab
+          product={product}
+          onUpdated={onUpdated}
+          storeName={storeName}
+        />
+      ) : activeTab === 'terkait' ? (
+        <ProductTerkaitTab
+          product={product}
+          onUpdated={onUpdated}
+          storeName={storeName}
+        />
+      ) : activeTab === 'seri' ? (
+        <ProductSeriTab
+          product={product}
+          onUpdated={onUpdated}
+          storeName={storeName}
+        />
+      ) : activeTab === 'spesifikasi' ? (
+        <ProductSpesifikasiTab
+          product={product}
+          onUpdated={onUpdated}
+          storeName={storeName}
+        />
+      ) : activeTab === 'satuan' ? (
+        <ProductSatuanTab
+          product={product}
+          onUpdated={onUpdated}
+          storeName={storeName}
+        />
+      ) : activeTab !== 'profil' ? (
         <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
           Tab ini belum dibangun — kirim contoh tampilannya dari Olsera untuk saya bangun berikutnya.
         </div>
@@ -945,6 +1388,7 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                   <button
                     type="button"
                     onClick={startCopyProduct}
+                    className="detail-btn-secondary"
                     style={{ background: '#fff', color: '#334155', border: '1px solid #cbd5e1', borderRadius: 6, padding: '7px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
                   >
                     Salin
@@ -1055,8 +1499,9 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
           >
             {editingSection === 'harga' ? (
               <>
-                <Row label="Harga jual di toko bersifat dinamis">
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '6px 0' }}>
+                <div style={{ padding: '8px 0 14px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>Harga jual di toko bersifat dinamis</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <label className="pi-switch">
                       <input
                         type="checkbox"
@@ -1071,24 +1516,7 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
                       {hargaDinamisEdit ? 'Ya' : 'Tidak'}
                     </span>
                   </div>
-                </Row>
-                <Row label="Harga jual online sama dengan harga jual toko">
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '6px 0' }}>
-                    <label className="pi-switch">
-                      <input
-                        type="checkbox"
-                        checked={hargaOnlineSamaEdit}
-                        onChange={(e) => setHargaOnlineSamaEdit(e.target.checked)}
-                      />
-                      <span className="pi-slider">
-                        <span className="pi-slider-text">{hargaOnlineSamaEdit ? 'Ya' : 'Tidak'}</span>
-                      </span>
-                    </label>
-                    <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
-                      {hargaOnlineSamaEdit ? 'Ya' : 'Tidak'}
-                    </span>
-                  </div>
-                </Row>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, padding: '14px 0' }}>
                   {/* Card 1: Harga Pasar */}
                   {hasVariant ? (
@@ -1236,8 +1664,10 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
               </>
             ) : (
               <>
-                <Row label="Harga jual di toko bersifat dinamis" value={yaTidak(product.harga_dinamis)} />
-                <Row label="Harga jual online sama dengan harga jual toko" value={yaTidak(product.harga_online_sama)} />
+                <div style={{ padding: '8px 0 14px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Harga jual di toko bersifat dinamis</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{yaTidak(product.harga_dinamis)}</div>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, padding: '14px 0' }}>
                   {hasVariant ? (
                     <>
@@ -1275,62 +1705,815 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
             )}
           </Section>
 
-          <Section title="Inventori" headerRight={<EditButton onClick={() => {}} />}>
-            <Row label="Lacak Inventori" value={yaTidak(product.lacak_inventori)} />
-            <div style={{ padding: '13px 0', borderBottom: '1px solid #f1f5f9' }}>
-              <ReferVarianCard label="On hold qty" />
-            </div>
-            <Row label="Peringatan jika stock sisa" value={product.stok_minimum} />
-            <div style={{ padding: '13px 0', borderBottom: '1px solid #f1f5f9' }}>
-              {hasVariant ? (
-                <ReferVarianCard label="Qty Stok" aggregate={firstVariant.qty_stok} />
+          <Section
+            title="Inventori"
+            headerRight={
+              editingSection === 'inventori' ? (
+                <SaveCancelHeader
+                  storeName={storeName}
+                  onCancel={cancelEdit}
+                  onSave={saveInventori}
+                  saving={savingSection}
+                />
               ) : (
-                <Row label="Qty Stok" value={product.qty_stok} />
-              )}
-            </div>
-            <div style={{ padding: '13px 0', borderBottom: '1px solid #f1f5f9' }}>
-              <ReferVarianCard label="Qty Fast Moving" />
-            </div>
-            <Row label="Unit Pengukuran" value={product.satuan} />
-            <Row label="Stok kosong" value={yaTidak(stokKosong)} />
+                <EditButton onClick={startEditInventori} />
+              )
+            }
+          >
+            {editingSection === 'inventori' ? (
+              <>
+                {/* Lacak Inventori */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>Lacak Inventori</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label className="pi-switch">
+                      <input
+                        type="checkbox"
+                        checked={lacakInventoriEdit}
+                        onChange={(e) => setLacakInventoriEdit(e.target.checked)}
+                      />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{lacakInventoriEdit ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+                      {lacakInventoriEdit ? 'Ya' : 'Tidak'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* On hold qty */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 6 }}>On hold qty</div>
+                  {hasVariant ? (
+                    <InfoBox text="Refer Ke varian" />
+                  ) : (
+                    <InfoBox text={String(product.on_hold_qty || 0)} />
+                  )}
+                </div>
+
+                {/* Peringatan jika stock sisa */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 6 }}>Peringatan jika stock sisa</div>
+                  <input
+                    type="number"
+                    value={stokMinimumEdit}
+                    onChange={(e) => setStokMinimumEdit(e.target.value)}
+                    style={{
+                      width: '100%',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: 6,
+                      padding: '8px 12px',
+                      fontSize: 13,
+                      color: '#334155',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                      background: '#fff'
+                    }}
+                  />
+                </div>
+
+                {/* Qty Fast Moving */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 6 }}>Qty Fast Moving</div>
+                  {hasVariant ? (
+                    <InfoBox text="Refer Ke varian" />
+                  ) : (
+                    <InfoBox text={String(product.qty_fast_moving || 0)} />
+                  )}
+                </div>
+
+                {/* Unit Pengukuran */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 6 }}>Unit Pengukuran</div>
+                  <select
+                    value={satuanEdit}
+                    onChange={(e) => setSatuanEdit(e.target.value)}
+                    style={{
+                      width: '100%',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: 6,
+                      padding: '8px 12px',
+                      fontSize: 13,
+                      color: '#334155',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                      background: '#fff'
+                    }}
+                  >
+                    <option value="pcs">pcs</option>
+                    <option value="box">box</option>
+                    <option value="pack">pack</option>
+                    <option value="kg">kg</option>
+                    <option value="meter">meter</option>
+                    <option value="lembar">lembar</option>
+                  </select>
+                </div>
+
+                {/* Stok kosong */}
+                <div style={{ padding: '8px 0 14px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>Stok kosong</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label className="pi-switch">
+                      <input
+                        type="checkbox"
+                        checked={stokKosongEdit}
+                        onChange={(e) => setStokKosongEdit(e.target.checked)}
+                      />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{stokKosongEdit ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+                      {stokKosongEdit ? 'Ya' : 'Tidak'}
+                    </span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Lacak Inventori */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Lacak Inventori</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{yaTidak(product.lacak_inventori)}</div>
+                </div>
+
+                {/* On hold qty */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 6 }}>On hold qty</div>
+                  {hasVariant ? (
+                    <InfoBox text="Refer Ke varian" />
+                  ) : (
+                    <InfoBox text={String(product.on_hold_qty || 0)} />
+                  )}
+                </div>
+
+                {/* Peringatan jika stock sisa */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 6 }}>Peringatan jika stock sisa</div>
+                  <InfoBox text={String(product.stok_minimum || 5)} />
+                </div>
+
+                {/* Qty Stok */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 6 }}>Qty Stok</div>
+                  {hasVariant ? (
+                    <InfoBox text="Refer Ke varian" />
+                  ) : (
+                    <InfoBox text={String(product.qty_stok || 0)} />
+                  )}
+                </div>
+
+                {/* Qty Fast Moving */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 6 }}>Qty Fast Moving</div>
+                  {hasVariant ? (
+                    <InfoBox text="Refer Ke varian" />
+                  ) : (
+                    <InfoBox text={String(product.qty_fast_moving || 0)} />
+                  )}
+                </div>
+
+                {/* Unit Pengukuran */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Unit Pengukuran</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{product.satuan || 'pcs'}</div>
+                </div>
+
+                {/* Stok kosong */}
+                <div style={{ padding: '8px 0 14px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Stok kosong</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{yaTidak(stokKosong)}</div>
+                </div>
+              </>
+            )}
           </Section>
 
-          <Section title="Pengiriman" headerRight={<EditButton onClick={() => {}} />}>
-            <Row label="Butuh Pengiriman" value={yaTidak(product.butuh_pengiriman)} />
-            <Row label="Berat Produk" value={product.berat ? `${product.berat} kg` : '-'} />
+          <Section
+            title="Pengiriman"
+            headerRight={
+              editingSection === 'pengiriman' ? (
+                <SaveCancelHeader
+                  storeName={storeName}
+                  onCancel={cancelEdit}
+                  onSave={savePengiriman}
+                  saving={savingSection}
+                />
+              ) : (
+                <EditButton onClick={startEditPengiriman} />
+              )
+            }
+          >
+            {editingSection === 'pengiriman' ? (
+              <>
+                {/* Butuh Pengiriman */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>Butuh Pengiriman</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label className="pi-switch">
+                      <input
+                        type="checkbox"
+                        checked={butuhPengirimanEdit}
+                        onChange={(e) => setButuhPengirimanEdit(e.target.checked)}
+                      />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{butuhPengirimanEdit ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+                      {butuhPengirimanEdit ? 'Ya' : 'Tidak'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Berat Produk */}
+                <div style={{ padding: '8px 0 14px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 6 }}>Berat Produk</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginTop: 4 }}>
+                    <button
+                      type="button"
+                      onClick={() => setBeratEdit(prev => Math.max(0, parseFloat((parseFloat(prev) - 0.1).toFixed(4))))}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px 0 0 6px',
+                        background: '#f8fafc',
+                        fontSize: 18,
+                        color: '#64748b',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        outline: 'none'
+                      }}
+                    >
+                      -
+                    </button>
+                    <input
+                      type="text"
+                      value={beratEdit}
+                      onChange={(e) => setBeratEdit(e.target.value)}
+                      style={{
+                        width: 80,
+                        height: 36,
+                        borderTop: '1px solid #cbd5e1',
+                        borderBottom: '1px solid #cbd5e1',
+                        borderLeft: 'none',
+                        borderRight: 'none',
+                        textAlign: 'center',
+                        fontSize: 13,
+                        color: '#334155',
+                        outline: 'none',
+                        background: '#fff'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setBeratEdit(prev => parseFloat((parseFloat(prev) + 0.1).toFixed(4)))}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '0 6px 6px 0',
+                        background: '#f8fafc',
+                        fontSize: 18,
+                        color: '#64748b',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        outline: 'none'
+                      }}
+                    >
+                      +
+                    </button>
+                    <span style={{ fontSize: 13, color: '#475569', marginLeft: 12 }}>Kg</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Butuh Pengiriman */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Butuh Pengiriman</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{yaTidak(product.butuh_pengiriman)}</div>
+                </div>
+
+                {/* Berat Produk */}
+                <div style={{ padding: '8px 0 14px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Berat Produk</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{product.berat ? `${product.berat} kg` : '-'}</div>
+                </div>
+              </>
+            )}
           </Section>
 
-          <Section title="Penjualan" headerRight={<EditButton onClick={() => {}} />}>
-            <Row label="Pesanan disertai pengisian No Seri." value={yaTidak(product.pesanan_no_seri)} />
+          <Section
+            title="Penjualan"
+            headerRight={
+              editingSection === 'penjualan' ? (
+                <SaveCancelHeader
+                  storeName={storeName}
+                  onCancel={cancelEdit}
+                  onSave={savePenjualan}
+                  saving={savingSection}
+                />
+              ) : (
+                <EditButton onClick={startEditPenjualan} />
+              )
+            }
+          >
+            {editingSection === 'penjualan' ? (
+              <>
+                {/* Pesanan disertai pengisian No Seri. */}
+                <div style={{ padding: '8px 0 14px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>Pesanan disertai pengisian No Seri.</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label className="pi-switch">
+                      <input
+                        type="checkbox"
+                        checked={pesananNoSeriEdit}
+                        onChange={(e) => setPesananNoSeriEdit(e.target.checked)}
+                      />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{pesananNoSeriEdit ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+                      {pesananNoSeriEdit ? 'Ya' : 'Tidak'}
+                    </span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Pesanan disertai pengisian No Seri. */}
+                <div style={{ padding: '8px 0 14px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Pesanan disertai pengisian No Seri.</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{yaTidak(product.pesanan_no_seri)}</div>
+                </div>
+              </>
+            )}
           </Section>
 
-          <Section title="Kategori Tambahan" headerRight={<EditButton onClick={() => {}} />}>
-            <Row label="Kategorikan sebagai Unggulan" value={yaTidak(product.kategori_unggulan)} />
-            <Row label="Kategorikan sebagai Sale" value={yaTidak(product.kategori_sale)} />
-            <Row label="Kategorikan sebagai Pre-order" value={yaTidak(product.kategori_preorder)} />
-            <Row label="Kategorikan sebagai Rilis terbaru" value={yaTidak(product.kategori_rilis_terbaru)} />
-            <Row label="Kategorikan sebagai Populer" value={yaTidak(product.kategori_populer)} />
-            <Row label="Kategorikan sebagai Bahan Mentah" value={yaTidak(product.kategori_bahan_mentah)} />
+          <Section
+            title="Kategori Tambahan"
+            headerRight={
+              editingSection === 'kategori_tambahan' ? (
+                <SaveCancelHeader
+                  storeName={storeName}
+                  onCancel={cancelEdit}
+                  onSave={saveKategoriTambahan}
+                  saving={savingSection}
+                />
+              ) : (
+                <EditButton onClick={startEditKategoriTambahan} />
+              )
+            }
+          >
+            {editingSection === 'kategori_tambahan' ? (
+              <>
+                {/* Unggulan */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>Kategorikan sebagai Unggulan</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                    <label className="pi-switch" style={{ margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={kategoriUnggulanEdit}
+                        onChange={(e) => setKategoriUnggulanEdit(e.target.checked)}
+                      />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{kategoriUnggulanEdit ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>
+                      {kategoriUnggulanEdit ? 'Ya' : 'Tidak'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Sale */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>Kategorikan sebagai Sale</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                    <label className="pi-switch" style={{ margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={kategoriSaleEdit}
+                        onChange={(e) => setKategoriSaleEdit(e.target.checked)}
+                      />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{kategoriSaleEdit ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>
+                      {kategoriSaleEdit ? 'Ya' : 'Tidak'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Pre-order */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>Kategorikan sebagai Pre-order</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                    <label className="pi-switch" style={{ margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={kategoriPreorderEdit}
+                        onChange={(e) => setKategoriPreorderEdit(e.target.checked)}
+                      />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{kategoriPreorderEdit ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>
+                      {kategoriPreorderEdit ? 'Ya' : 'Tidak'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Rilis terbaru */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>Kategorikan sebagai Rilis terbaru</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                    <label className="pi-switch" style={{ margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={kategoriRilisTerbaruEdit}
+                        onChange={(e) => setKategoriRilisTerbaruEdit(e.target.checked)}
+                      />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{kategoriRilisTerbaruEdit ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>
+                      {kategoriRilisTerbaruEdit ? 'Ya' : 'Tidak'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Populer */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>Kategorikan sebagai Populer</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                    <label className="pi-switch" style={{ margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={kategoriPopulerEdit}
+                        onChange={(e) => setKategoriPopulerEdit(e.target.checked)}
+                      />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{kategoriPopulerEdit ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>
+                      {kategoriPopulerEdit ? 'Ya' : 'Tidak'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Bahan Mentah */}
+                <div style={{ padding: '8px 0 14px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>Kategorikan sebagai Bahan Mentah</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                    <label className="pi-switch" style={{ margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={kategoriBahanMentahEdit}
+                        onChange={(e) => setKategoriBahanMentahEdit(e.target.checked)}
+                      />
+                      <span className="pi-slider">
+                        <span className="pi-slider-text">{kategoriBahanMentahEdit ? 'Ya' : 'Tidak'}</span>
+                      </span>
+                    </label>
+                    <span style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>
+                      {kategoriBahanMentahEdit ? 'Ya' : 'Tidak'}
+                    </span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Kategorikan sebagai Unggulan</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{yaTidak(product.kategori_unggulan)}</div>
+                </div>
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Kategorikan sebagai Sale</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{yaTidak(product.kategori_sale)}</div>
+                </div>
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Kategorikan sebagai Pre-order</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{yaTidak(product.kategori_preorder)}</div>
+                </div>
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Kategorikan sebagai Rilis terbaru</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{yaTidak(product.kategori_rilis_terbaru)}</div>
+                </div>
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Kategorikan sebagai Populer</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{yaTidak(product.kategori_populer)}</div>
+                </div>
+                <div style={{ padding: '8px 0 14px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Kategorikan sebagai Bahan Mentah</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{yaTidak(product.kategori_bahan_mentah)}</div>
+                </div>
+              </>
+            )}
           </Section>
 
-          <Section title="Deskripsi" headerRight={<EditButton onClick={() => {}} />}>
-            <Row label="Deskripsi" value={product.deskripsi || '-'} />
+          <Section
+            title="Deskripsi"
+            headerRight={
+              editingSection === 'deskripsi' ? (
+                <SaveCancelHeader
+                  storeName={storeName}
+                  onCancel={cancelEdit}
+                  onSave={saveDeskripsi}
+                  saving={savingSection}
+                />
+              ) : (
+                <EditButton onClick={startEditDeskripsi} />
+              )
+            }
+          >
+            {editingSection === 'deskripsi' ? (
+              <div style={{ padding: '8px 0 14px 0' }}>
+                <textarea
+                  value={deskripsiEdit}
+                  onChange={(e) => setDeskripsiEdit(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: 38,
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 6,
+                    padding: '8px 12px',
+                    fontSize: 13,
+                    color: '#334155',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                    background: '#fff',
+                    fontFamily: 'inherit',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+            ) : (
+              <div style={{ padding: '8px 0 14px 0', fontSize: 13, color: '#334155', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                {product.deskripsi || '-'}
+              </div>
+            )}
           </Section>
 
-          <Section title="SEO (Search Engine Optimization)" headerRight={<EditButton onClick={() => {}} />}>
-            <Row label="Meta Keywords" value={product.meta_keywords || '-'} />
-            <Row label="Meta Description" value={product.meta_description || '-'} />
+          <Section
+            title="SEO (Search Engine Optimization)"
+            headerRight={
+              editingSection === 'seo' ? (
+                <SaveCancelHeader
+                  storeName={storeName}
+                  onCancel={cancelEdit}
+                  onSave={saveSEO}
+                  saving={savingSection}
+                />
+              ) : (
+                <EditButton onClick={startEditSEO} />
+              )
+            }
+          >
+            {editingSection === 'seo' ? (
+              <>
+                {/* Meta Keywords */}
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 6 }}>Meta Keywords</div>
+                  <input
+                    type="text"
+                    value={metaKeywordsEdit}
+                    onChange={(e) => setMetaKeywordsEdit(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: 38,
+                      border: '1px solid #cbd5e1',
+                      borderRadius: 6,
+                      padding: '0 12px',
+                      fontSize: 13,
+                      color: '#334155',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                      background: '#fff'
+                    }}
+                  />
+                </div>
+
+                {/* Meta Description */}
+                <div style={{ padding: '8px 0 14px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 6 }}>Meta Description</div>
+                  <textarea
+                    value={metaDescriptionEdit}
+                    onChange={(e) => setMetaDescriptionEdit(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: 60,
+                      border: '1px solid #cbd5e1',
+                      borderRadius: 6,
+                      padding: '8px 12px',
+                      fontSize: 13,
+                      color: '#334155',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                      background: '#fff',
+                      fontFamily: 'inherit',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Meta Keywords</div>
+                  <div style={{ fontSize: 13, color: '#1e293b' }}>{product.meta_keywords || '-'}</div>
+                </div>
+                <div style={{ padding: '8px 0 14px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Meta Description</div>
+                  <div style={{ fontSize: 13, color: '#1e293b' }}>{product.meta_description || '-'}</div>
+                </div>
+              </>
+            )}
           </Section>
 
-          <Section title="Ketersediaan" headerRight={<EditButton onClick={() => {}} />}>
-            <Row label="Tersedia Online" value={yaTidak(product.tersedia_online)} />
-            <Row label="Tanggal tersedia Online" value={formatTanggal(product.tanggal_tersedia_online)} />
-            <Row label="Tidak tersedia Offline (di POS)" value={yaTidak(product.tidak_tersedia_offline_pos)} />
+          <Section
+            title="Ketersediaan"
+            headerRight={
+              editingSection === 'ketersediaan' ? (
+                <SaveCancelHeader
+                  storeName={storeName}
+                  onCancel={cancelEdit}
+                  onSave={saveKetersediaan}
+                  saving={savingSection}
+                />
+              ) : (
+                <EditButton onClick={startEditKetersediaan} />
+              )
+            }
+          >
+            {editingSection === 'ketersediaan' ? (
+              <>
+                {/* Tersedia Online */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 0 10px 0' }}>
+                  <input
+                    type="checkbox"
+                    checked={tersediaOnlineEdit}
+                    onChange={(e) => setTersediaOnlineEdit(e.target.checked)}
+                    style={{ width: 16, height: 16, marginTop: 2, cursor: 'pointer' }}
+                  />
+                  <div>
+                    <div style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>Tersedia Online</div>
+                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                      Produk ini tersedia di kanal Online seperti Toko Online dan Online Order
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tanggal Tersedia Online */}
+                <div style={{ padding: '8px 0 10px 0', marginLeft: 26 }}>
+                  <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>Tanggal tersedia Online</div>
+                  <input
+                    type="date"
+                    value={tanggalTersediaOnlineEdit}
+                    onChange={(e) => setTanggalTersediaOnlineEdit(e.target.value)}
+                    style={{
+                      width: 220,
+                      height: 38,
+                      border: '1px solid #cbd5e1',
+                      borderRadius: 6,
+                      padding: '0 12px',
+                      fontSize: 13,
+                      color: '#334155',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                      background: '#fff'
+                    }}
+                  />
+                </div>
+
+                {/* Tidak tersedia Offline (di POS) */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 0 14px 0' }}>
+                  <input
+                    type="checkbox"
+                    checked={tidakTersediaOfflinePosEdit}
+                    onChange={(e) => setTidakTersediaOfflinePosEdit(e.target.checked)}
+                    style={{ width: 16, height: 16, marginTop: 2, cursor: 'pointer' }}
+                  />
+                  <div>
+                    <div style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>Tidak tersedia Offline (di POS)</div>
+                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                      Produk ini tidak tersedia di kasir Point Of Sale toko Anda
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Tersedia Online</div>
+                  <div style={{ fontSize: 13, color: '#1e293b' }}>{yaTidak(product.tersedia_online)}</div>
+                </div>
+                <div style={{ padding: '8px 0 10px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Tanggal tersedia Online</div>
+                  <div style={{ fontSize: 13, color: '#1e293b' }}>{formatTanggal(product.tanggal_tersedia_online)}</div>
+                </div>
+                <div style={{ padding: '8px 0 14px 0' }}>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Tidak tersedia Offline (di POS)</div>
+                  <div style={{ fontSize: 13, color: '#1e293b' }}>{yaTidak(product.tidak_tersedia_offline_pos)}</div>
+                </div>
+              </>
+            )}
           </Section>
 
-          <Section title="Catatan" headerRight={<EditButton onClick={() => {}} />}>
-            <Row label="Catatan tambahan untuk produk ini" value={product.catatan || '-'} />
+          <Section
+            title="Catatan"
+            headerRight={
+              editingSection === 'catatan' ? (
+                <SaveCancelHeader
+                  storeName={storeName}
+                  onCancel={cancelEdit}
+                  onSave={saveCatatan}
+                  saving={savingSection}
+                />
+              ) : (
+                <EditButton onClick={startEditCatatan} />
+              )
+            }
+          >
+            {editingSection === 'catatan' ? (
+              <div style={{ padding: '8px 0 14px 0' }}>
+                <textarea
+                  value={catatanEdit}
+                  onChange={(e) => setCatatanEdit(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: 38,
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 6,
+                    padding: '8px 12px',
+                    fontSize: 13,
+                    color: '#334155',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                    background: '#fff',
+                    fontFamily: 'inherit',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+            ) : (
+              <div style={{ padding: '8px 0 14px 0' }}>
+                <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Catatan tambahan untuk produk ini</div>
+                <div style={{ fontSize: 13, color: '#1e293b' }}>
+                  {product.catatan || '-'}
+                </div>
+              </div>
+            )}
           </Section>
+
+          {/* Hapus Produk Button */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24, marginBottom: 16 }}>
+            <button
+              type="button"
+              onClick={handleDeleteProduct}
+              style={{
+                background: '#f87171',
+                color: '#fff',
+                border: 0,
+                borderRadius: 8,
+                padding: '10px 20px',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                boxShadow: '0 2px 4px rgba(248, 113, 113, 0.2)',
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#ef4444';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#f87171';
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+              Hapus Produk
+            </button>
+          </div>
         </>
       )}
 

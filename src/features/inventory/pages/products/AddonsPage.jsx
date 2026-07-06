@@ -1,12 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Trash2, ArrowLeft } from 'lucide-react';
 import DataTable from '../components/DataTable';
-import { formatCurrency } from '../productInventoryData';
 import apiClient from '../../../../api/apiClient';
 
-const parseRupiah = (raw) => {
-  const cleaned = String(raw ?? '').replace(/\./g, '').replace(',', '.').replace(/[^0-9.]/g, '');
-  const value = parseFloat(cleaned);
+const formatToIDR = (num) => {
+  if (num === null || num === undefined) return 'IDR 0';
+  const val = parseFloat(num);
+  const formatted = new Intl.NumberFormat('id-ID').format(Math.floor(val));
+  return `IDR ${formatted}`;
+};
+
+const parseIDR = (raw) => {
+  if (!raw) return 0;
+  let clean = String(raw).replace(/IDR/g, '').replace(/\s/g, '').replace(/\./g, '');
+  const value = parseFloat(clean);
   return Number.isNaN(value) ? 0 : value;
 };
 
@@ -20,13 +27,22 @@ export function AddonsPage({ onToggleCreate }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [rowsPerPage, setRowsPerPage] = useState('10');
 
+  // Available products & categories for links
+  const [availableProducts, setAvailableProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+
   // Form states
   const [namaAddon, setNamaAddon] = useState('');
-  const [hargaAddon, setHargaAddon] = useState('0,00');
-  const [hubungkanProduk, setHubungkanProduk] = useState('');
+  const [hargaAddon, setHargaAddon] = useState('IDR 0');
+  const [linkedProductId, setLinkedProductId] = useState('');
+  const [linkedVariantId, setLinkedVariantId] = useState('');
   const [qtyAddon, setQtyAddon] = useState('1.00');
-  const [grupBerlaku, setGrupBerlaku] = useState('');
-  const [produkBerlaku, setProdukBerlaku] = useState('');
+  const [appliesToCategories, setAppliesToCategories] = useState([]);
+  const [appliesToProducts, setAppliesToProducts] = useState([]);
+
+  // Viewing detail state
+  const [viewingAddon, setViewingAddon] = useState(null);
+  const [isEditingDetail, setIsEditingDetail] = useState(false);
 
   const fetchAddons = async () => {
     setLoading(true);
@@ -42,8 +58,28 @@ export function AddonsPage({ onToggleCreate }) {
     }
   };
 
+  const fetchProducts = async () => {
+    try {
+      const res = await apiClient.get('/products/');
+      setAvailableProducts(Array.isArray(res.data) ? res.data : res.data?.results || []);
+    } catch (err) {
+      console.error('Error fetching available products:', err);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const res = await apiClient.get('/categories/');
+      setCategories(Array.isArray(res.data) ? res.data : res.data?.results || []);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+    }
+  };
+
   useEffect(() => {
     fetchAddons();
+    fetchProducts();
+    fetchCategories();
   }, []);
 
   const handleSetIsCreating = (val) => {
@@ -51,6 +87,27 @@ export function AddonsPage({ onToggleCreate }) {
     if (onToggleCreate) {
       onToggleCreate(val);
     }
+    if (val) {
+      setNamaAddon('');
+      setHargaAddon('IDR 0');
+      setLinkedProductId('');
+      setLinkedVariantId('');
+      setQtyAddon('1.00');
+      setAppliesToCategories([]);
+      setAppliesToProducts([]);
+    }
+  };
+
+  const handleViewDetail = (addon) => {
+    setViewingAddon(addon);
+    setNamaAddon(addon.nama || '');
+    setHargaAddon(formatToIDR(addon.harga));
+    setLinkedProductId(addon.linked_product || '');
+    setLinkedVariantId(addon.linked_variant || '');
+    setQtyAddon(parseFloat(addon.linked_qty || 1.00).toFixed(2));
+    setAppliesToCategories(addon.applies_to_categories || []);
+    setAppliesToProducts(addon.applies_to || []);
+    setIsEditingDetail(false);
   };
 
   const canSave = namaAddon.trim() && !saving;
@@ -61,15 +118,14 @@ export function AddonsPage({ onToggleCreate }) {
     try {
       await apiClient.post('/addons/', {
         nama: namaAddon,
-        harga: parseRupiah(hargaAddon),
+        harga: parseIDR(hargaAddon),
+        linked_product: linkedProductId || null,
+        linked_variant: linkedVariantId || null,
+        linked_qty: parseFloat(qtyAddon) || 1.00,
+        applies_to: appliesToProducts,
+        applies_to_categories: appliesToCategories,
         is_active: true,
       });
-      setNamaAddon('');
-      setHargaAddon('0,00');
-      setHubungkanProduk('');
-      setQtyAddon('1.00');
-      setGrupBerlaku('');
-      setProdukBerlaku('');
       handleSetIsCreating(false);
       await fetchAddons();
     } catch (err) {
@@ -80,10 +136,331 @@ export function AddonsPage({ onToggleCreate }) {
     }
   };
 
+  const handleUpdateDetail = async () => {
+    if (!namaAddon.trim() || saving) return;
+    setSaving(true);
+    try {
+      const res = await apiClient.put(`/addons/${viewingAddon.id}/`, {
+        nama: namaAddon,
+        harga: parseIDR(hargaAddon),
+        linked_product: linkedProductId || null,
+        linked_variant: linkedVariantId || null,
+        linked_qty: parseFloat(qtyAddon) || 1.00,
+        applies_to: appliesToProducts,
+        applies_to_categories: appliesToCategories,
+        is_active: true
+      });
+      setViewingAddon(res.data);
+      setIsEditingDetail(false);
+      await fetchAddons();
+    } catch (err) {
+      console.error('[AddonsPage] update error:', err);
+      setError('Gagal memperbarui add-on.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteAddon = async () => {
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus add-on "${viewingAddon.nama}"?`)) return;
+    setSaving(true);
+    try {
+      await apiClient.delete(`/addons/${viewingAddon.id}/`);
+      setViewingAddon(null);
+      await fetchAddons();
+    } catch (err) {
+      console.error('[AddonsPage] delete error:', err);
+      setError('Gagal menghapus add-on.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const filteredAddons = addons.filter(addon =>
     addon.nama.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // ----------------------------------------------------
+  // RENDER DETAIL VIEW
+  // ----------------------------------------------------
+  if (viewingAddon) {
+    const isEditing = isEditingDetail;
+    return (
+      <div style={{ padding: '24px', background: '#f8fafc', minHeight: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+          <button 
+            type="button" 
+            onClick={() => setViewingAddon(null)} 
+            style={{ background: 'none', border: 0, color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#1e293b' }}>Katalog Produk / Rincian Produk Tambahan</h2>
+        </div>
+
+        <div className="pi-category-card" style={{ padding: '24px' }}>
+          {/* Header Area */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px', marginBottom: '24px' }}>
+            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#0f172a' }}>
+              {isEditing ? 'Ubah Add-On' : viewingAddon.nama}
+            </h3>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <button 
+                type="button" 
+                style={{ background: 'transparent', border: 0, color: '#0284c7', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}
+                onClick={() => {
+                  if (isEditing) {
+                    setIsEditingDetail(false);
+                  } else {
+                    setViewingAddon(null);
+                  }
+                }}
+              >
+                Batal
+              </button>
+              <button 
+                type="button" 
+                style={{ background: '#0284c7', color: '#fff', border: 0, borderRadius: '6px', padding: '8px 20px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
+                onClick={() => {
+                  if (isEditing) {
+                    handleUpdateDetail();
+                  } else {
+                    setIsEditingDetail(true);
+                  }
+                }}
+              >
+                {isEditing ? 'Simpan' : 'Ubah'}
+              </button>
+            </div>
+          </div>
+
+          {/* Two-Column Form/Detail */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '32px' }}>
+            {/* Left Column */}
+            <div>
+              {isEditing ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '4px' }}>Nama</label>
+                    <input 
+                      type="text" 
+                      className="pi-input-text w-full" 
+                      value={namaAddon} 
+                      onChange={(e) => setNamaAddon(e.target.value)} 
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '4px' }}>Harga</label>
+                    <input 
+                      type="text" 
+                      className="pi-input-text w-full" 
+                      value={hargaAddon} 
+                      onChange={(e) => {
+                        let clean = e.target.value.replace(/[^0-9]/g, '');
+                        if (!clean) {
+                          setHargaAddon('IDR 0');
+                          return;
+                        }
+                        setHargaAddon(`IDR ${new Intl.NumberFormat('id-ID').format(parseInt(clean))}`);
+                      }} 
+                    />
+                  </div>
+
+                  {/* Hubungkan ke Produk */}
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '8px' }}>Hubungkan ke Produk (Stok)</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '2px' }}>Produk</span>
+                        <select 
+                          className="pi-store-select w-full"
+                          value={linkedProductId}
+                          onChange={(e) => {
+                            const pid = e.target.value;
+                            setLinkedProductId(pid);
+                            const prod = availableProducts.find(p => String(p.id) === String(pid));
+                            if (prod?.variants?.length > 0) {
+                              setLinkedVariantId(prod.variants[0].id);
+                            } else {
+                              setLinkedVariantId('');
+                            }
+                          }}
+                        >
+                          <option value="">Pilih Produk</option>
+                          {availableProducts.map(p => (
+                            <option key={p.id} value={p.id}>{p.nama}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '2px' }}>Varian</span>
+                        <select 
+                          className="pi-store-select w-full"
+                          value={linkedVariantId}
+                          onChange={(e) => setLinkedVariantId(e.target.value)}
+                          disabled={!linkedProductId}
+                        >
+                          <option value="">Pilih Varian</option>
+                          {availableProducts.find(p => String(p.id) === String(linkedProductId))?.variants?.map(v => (
+                            <option key={v.id} value={v.id}>{v.nama_varian}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: '12px' }}>
+                      <span style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '2px' }}>Qty</span>
+                      <input 
+                        type="text" 
+                        className="pi-input-text w-full" 
+                        value={qtyAddon} 
+                        onChange={(e) => setQtyAddon(e.target.value)} 
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // VIEW MODE - Left Column
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div>
+                    <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', display: 'block', marginBottom: '4px' }}>Nama</span>
+                    <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#0f172a' }}>{viewingAddon.nama}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', display: 'block', marginBottom: '4px' }}>Harga</span>
+                    <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#0f172a' }}>{formatToIDR(viewingAddon.harga)}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', display: 'block', marginBottom: '4px' }}>Hubungkan ke Produk (Stok)</span>
+                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#0284c7' }}>
+                      {viewingAddon.linked_product ? (
+                        `${parseFloat(viewingAddon.linked_qty || 1.00).toFixed(2)} x ${viewingAddon.linked_product_nama}${viewingAddon.linked_variant_nama ? ` (${viewingAddon.linked_variant_nama})` : ''}`
+                      ) : (
+                        'Tidak terhubung ke stok'
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Hapus Button */}
+              <div style={{ marginTop: '32px' }}>
+                <button
+                  type="button"
+                  onClick={handleDeleteAddon}
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #ef4444',
+                    color: '#ef4444',
+                    borderRadius: '6px',
+                    padding: '8px 16px',
+                    fontSize: '13px',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Trash2 size={16} /> Hapus
+                </button>
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div>
+              {isEditing ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Category Selection */}
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '8px' }}>Berlaku untuk grup produk</label>
+                    <div style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '12px', background: '#fff', maxHeight: '150px', overflowY: 'auto' }}>
+                      {categories.map(cat => (
+                        <label key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={appliesToCategories.includes(cat.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setAppliesToCategories([...appliesToCategories, cat.id]);
+                              } else {
+                                setAppliesToCategories(appliesToCategories.filter(id => id !== cat.id));
+                              }
+                            }}
+                          />
+                          {cat.nama}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Product Selection */}
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '8px' }}>Berlaku untuk produk</label>
+                    <div style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '12px', background: '#fff', maxHeight: '150px', overflowY: 'auto' }}>
+                      {availableProducts.map(p => (
+                        <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={appliesToProducts.includes(p.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setAppliesToProducts([...appliesToProducts, p.id]);
+                              } else {
+                                setAppliesToProducts(appliesToProducts.filter(id => id !== p.id));
+                              }
+                            }}
+                          />
+                          {p.nama}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // VIEW MODE - Right Column
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div>
+                    <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', display: 'block', marginBottom: '8px' }}>Berlaku untuk grup produk</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {viewingAddon.applies_to_category_names && viewingAddon.applies_to_category_names.length > 0 ? (
+                        viewingAddon.applies_to_category_names.map((name, i) => (
+                          <span key={i} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '4px 10px', fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>
+                            {name}
+                          </span>
+                        ))
+                      ) : (
+                        <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>Semua grup produk</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', display: 'block', marginBottom: '8px' }}>Berlaku untuk produk</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {viewingAddon.applies_to_names && viewingAddon.applies_to_names.length > 0 ? (
+                        viewingAddon.applies_to_names.map((name, i) => (
+                          <span key={i} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '4px 10px', fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>
+                            {name}
+                          </span>
+                        ))
+                      ) : (
+                        <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>Semua produk</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ----------------------------------------------------
+  // RENDER CREATE VIEW
+  // ----------------------------------------------------
   if (isCreating) {
     return (
       <div style={{ padding: '24px', background: '#f8fafc', minHeight: '100%' }}>
@@ -123,16 +500,20 @@ export function AddonsPage({ onToggleCreate }) {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b' }}>Harga</label>
-                <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: '#64748b', fontWeight: '600' }}>Rp.</span>
-                  <input 
-                    type="text" 
-                    className="pi-input-text w-full" 
-                    value={hargaAddon}
-                    onChange={(e) => setHargaAddon(e.target.value)}
-                    style={{ width: '100%', paddingLeft: '40px', boxSizing: 'border-box' }}
-                  />
-                </div>
+                <input 
+                  type="text" 
+                  className="pi-input-text w-full" 
+                  value={hargaAddon}
+                  onChange={(e) => {
+                    let clean = e.target.value.replace(/[^0-9]/g, '');
+                    if (!clean) {
+                      setHargaAddon('IDR 0');
+                      return;
+                    }
+                    setHargaAddon(`IDR ${new Intl.NumberFormat('id-ID').format(parseInt(clean))}`);
+                  }}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
               </div>
             </div>
 
@@ -144,26 +525,50 @@ export function AddonsPage({ onToggleCreate }) {
                   <label style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Produk</label>
                   <select 
                     className="pi-store-select" 
-                    value={hubungkanProduk}
-                    onChange={(e) => setHubungkanProduk(e.target.value)}
+                    value={linkedProductId}
+                    onChange={(e) => {
+                      const pid = e.target.value;
+                      setLinkedProductId(pid);
+                      const prod = availableProducts.find(p => String(p.id) === String(pid));
+                      if (prod?.variants?.length > 0) {
+                        setLinkedVariantId(prod.variants[0].id);
+                      } else {
+                        setLinkedVariantId('');
+                      }
+                    }}
                     style={{ width: '100%' }}
                   >
-                    <option value="">Select</option>
-                    <option value="laminasi-doff">Laminasi Doff</option>
-                    <option value="laminasi-glossy">Laminasi Glossy</option>
-                    <option value="finishing-cutting">Finishing Cutting</option>
+                    <option value="">Pilih Produk</option>
+                    {availableProducts.map(p => (
+                      <option key={p.id} value={p.id}>{p.nama}</option>
+                    ))}
                   </select>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Qty</label>
-                  <input 
-                    type="text" 
-                    className="pi-input-text w-full" 
-                    value={qtyAddon}
-                    onChange={(e) => setQtyAddon(e.target.value)}
-                    style={{ width: '100%', boxSizing: 'border-box' }}
-                  />
+                  <label style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Varian</label>
+                  <select 
+                    className="pi-store-select" 
+                    value={linkedVariantId}
+                    onChange={(e) => setLinkedVariantId(e.target.value)}
+                    disabled={!linkedProductId}
+                    style={{ width: '100%' }}
+                  >
+                    <option value="">Pilih Varian</option>
+                    {availableProducts.find(p => String(p.id) === String(linkedProductId))?.variants?.map(v => (
+                      <option key={v.id} value={v.id}>{v.nama_varian}</option>
+                    ))}
+                  </select>
                 </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '12px' }}>
+                <label style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Qty</label>
+                <input 
+                  type="text" 
+                  className="pi-input-text w-full" 
+                  value={qtyAddon}
+                  onChange={(e) => setQtyAddon(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
               </div>
             </div>
 
@@ -171,36 +576,48 @@ export function AddonsPage({ onToggleCreate }) {
             <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 'bold', color: '#1e293b' }}>Berlaku untuk produk</h4>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Berlaku untuk grup produk</label>
-                <div style={{ position: 'relative' }}>
-                  <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                  <input 
-                    type="text" 
-                    className="pi-input-text w-full" 
-                    placeholder="Cari"
-                    value={grupBerlaku}
-                    onChange={(e) => setGrupBerlaku(e.target.value)}
-                    style={{ width: '100%', paddingLeft: '36px', boxSizing: 'border-box' }}
-                  />
+                <div style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '12px', background: '#fff', maxHeight: '120px', overflowY: 'auto' }}>
+                  {categories.map(cat => (
+                    <label key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={appliesToCategories.includes(cat.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setAppliesToCategories([...appliesToCategories, cat.id]);
+                          } else {
+                            setAppliesToCategories(appliesToCategories.filter(id => id !== cat.id));
+                          }
+                        }}
+                      />
+                      {cat.nama}
+                    </label>
+                  ))}
                 </div>
-                <span style={{ fontSize: '11px', color: '#94a3b8' }}>pilih grup grup produk yang menggunakan add-on ini, atau kosongkan dan isi berdasarkan produk di bagian bawah</span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Berlaku untuk produk</label>
-                <div style={{ position: 'relative' }}>
-                  <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                  <input 
-                    type="text" 
-                    className="pi-input-text w-full" 
-                    placeholder="Cari"
-                    value={produkBerlaku}
-                    onChange={(e) => setProdukBerlaku(e.target.value)}
-                    style={{ width: '100%', paddingLeft: '36px', boxSizing: 'border-box' }}
-                  />
+                <div style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '12px', background: '#fff', maxHeight: '120px', overflowY: 'auto' }}>
+                  {availableProducts.map(p => (
+                    <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={appliesToProducts.includes(p.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setAppliesToProducts([...appliesToProducts, p.id]);
+                          } else {
+                            setAppliesToProducts(appliesToProducts.filter(id => id !== p.id));
+                          }
+                        }}
+                      />
+                      {p.nama}
+                    </label>
+                  ))}
                 </div>
-                <span style={{ fontSize: '11px', color: '#94a3b8' }}>pilih produk-produk yang menggunakan add-on ini. Boleh dikosongkan jika telah isi grup grup produk di atas</span>
               </div>
             </div>
           </div>
@@ -211,6 +628,8 @@ export function AddonsPage({ onToggleCreate }) {
 
   return (
     <div style={{ padding: '24px', background: '#ffffff' }}>
+      <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', margin: '0 0 16px 0' }}>Katalog Produk / Produk Tambahan</h2>
+      
       {/* Search & Action bar */}
       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px' }}>
         <select 
@@ -235,7 +654,7 @@ export function AddonsPage({ onToggleCreate }) {
         <button 
           type="button" 
           onClick={() => handleSetIsCreating(true)}
-          style={{ background: '#22c55e', color: '#ffffff', border: 0, borderRadius: '4px', padding: '8px 20px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+          style={{ background: '#16a34a', color: '#ffffff', border: 0, borderRadius: '4px', padding: '8px 20px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
         >
           <Plus size={14} /> Tambah
         </button>
@@ -246,8 +665,19 @@ export function AddonsPage({ onToggleCreate }) {
         rows={filteredAddons}
         emptyText={loading ? 'Memuat...' : 'Tidak ada data'}
         columns={[
-          { key: 'nama', label: 'Nama Produk' },
-          { key: 'harga', label: 'Harga', render: (row) => formatCurrency(row.harga) }
+          { 
+            key: 'nama', 
+            label: 'Nama Produk',
+            render: (row) => (
+              <span 
+                onClick={() => handleViewDetail(row)}
+                style={{ color: '#0284c7', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                {row.nama}
+              </span>
+            )
+          },
+          { key: 'harga', label: 'Harga', render: (row) => formatToIDR(row.harga) }
         ]}
       />
 

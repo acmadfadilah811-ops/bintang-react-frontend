@@ -10,17 +10,28 @@ import VariantModal, { PriceInput } from './VariantModal';
 import ImportProductModal from './ImportProductModal';
 import ImportRecipeModal from './ImportRecipeModal';
 import ProductDetailPage from './ProductDetailPage';
+import StockDetailModal from './StockDetailModal';
+import AvailabilityModal from './AvailabilityModal';
+import ProductLogModal from './ProductLogModal';
 
 const rowMenuItemStyle = {
   display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 14px',
   background: 'none', border: 0, textAlign: 'left', fontSize: 13, color: '#334155', cursor: 'pointer',
 };
 
-function RowActionMenu({ rowMenu, product, onDetail, onToggleAvailability, onDelete, onClose }) {
+function RowActionMenu({ rowMenu, product, onDetail, onCopy, onStockDetail, onToggleAvailability, onShowLog, onDelete, onClose }) {
   if (!rowMenu || rowMenu.productId !== product.id) return null;
   const { rect } = rowMenu;
   const menuWidth = 190;
-  const top = rect.bottom + 4;
+  
+  // Calculate if the dropdown would go off the screen at the bottom
+  const menuHeight = 220; // safe height for the 6 buttons
+  const spaceBelow = window.innerHeight - rect.bottom;
+  let top = rect.bottom + 4;
+  if (spaceBelow < menuHeight && rect.top > menuHeight) {
+    top = rect.top - menuHeight - 4;
+  }
+  
   const left = Math.max(8, rect.right - menuWidth);
 
   return createPortal(
@@ -33,22 +44,22 @@ function RowActionMenu({ rowMenu, product, onDetail, onToggleAvailability, onDel
           zIndex: 200, overflow: 'hidden', padding: '4px 0',
         }}
       >
-        <button type="button" style={rowMenuItemStyle} onClick={onClose}>
+        <button type="button" className="row-menu-item" onClick={() => { onClose(); onCopy(); }}>
           <Copy size={14} /> Salin
         </button>
-        <button type="button" style={rowMenuItemStyle} onClick={onDetail}>
+        <button type="button" className="row-menu-item" onClick={onDetail}>
           <Eye size={14} /> Detail
         </button>
-        <button type="button" style={rowMenuItemStyle} onClick={onClose}>
+        <button type="button" className="row-menu-item" onClick={() => { onClose(); onStockDetail(); }}>
           <Boxes size={14} /> Detail Stok
         </button>
-        <button type="button" style={rowMenuItemStyle} onClick={onToggleAvailability}>
+        <button type="button" className="row-menu-item" onClick={() => { onClose(); onToggleAvailability(); }}>
           <CheckCircle2 size={14} /> Ubah ketersediaan
         </button>
-        <button type="button" style={rowMenuItemStyle} onClick={onClose}>
+        <button type="button" className="row-menu-item" onClick={() => { onClose(); onShowLog(); }}>
           <History size={14} /> Log
         </button>
-        <button type="button" style={{ ...rowMenuItemStyle, color: '#dc2626' }} onClick={onDelete}>
+        <button type="button" className="row-menu-item row-menu-item-danger" onClick={onDelete}>
           <Trash2 size={14} /> Hapus
         </button>
       </div>
@@ -62,6 +73,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
+  const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -73,6 +85,20 @@ export default function ProductsPage() {
 
   const [rowMenu, setRowMenu] = useState(null); // { productId, rect }
   const [viewingProduct, setViewingProduct] = useState(null);
+  const [initialCopyMode, setInitialCopyMode] = useState(false);
+  const [stockDetailProduct, setStockDetailProduct] = useState(null);
+  const [availabilityProduct, setAvailabilityProduct] = useState(null);
+  const [logProduct, setLogProduct] = useState(null);
+
+  const openAvailabilityModal = (product) => {
+    setRowMenu(null);
+    setAvailabilityProduct(product);
+  };
+
+  const openLogModal = (product) => {
+    setRowMenu(null);
+    setLogProduct(product);
+  };
 
   const toggleRowMenu = (product, e) => {
     if (rowMenu?.productId === product.id) {
@@ -92,8 +118,30 @@ export default function ProductsPage() {
       setError('Gagal memuat detail produk.');
     }
   };
+  const copyProduct = async (productId) => {
+    setRowMenu(null);
+    try {
+      const res = await apiClient.get(`/products/${productId}/`);
+      setInitialCopyMode(true);
+      setViewingProduct(res.data);
+    } catch (err) {
+      console.error('[ProductsPage] fetch product for copy error:', err);
+      setError('Gagal memuat detail produk untuk disalin.');
+    }
+  };
+  const openStockDetail = async (productId) => {
+    setRowMenu(null);
+    try {
+      const res = await apiClient.get(`/products/${productId}/`);
+      setStockDetailProduct(res.data);
+    } catch (err) {
+      console.error('[ProductsPage] fetch product for stock detail error:', err);
+      setError('Gagal memuat detail stok produk.');
+    }
+  };
   const closeProductDetail = () => {
     setViewingProduct(null);
+    setInitialCopyMode(false);
     fetchProducts();
   };
 
@@ -215,6 +263,7 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
+  const [collectionFilter, setCollectionFilter] = useState('');
 
   // Form states matching screenshot
   const [formNama, setFormNama] = useState('');
@@ -303,7 +352,10 @@ export default function ProductsPage() {
       if (categoryFilter) params.kategori = categoryFilter;
       const res = await apiClient.get('/products/', { params });
       const data = Array.isArray(res.data) ? res.data : res.data?.results || [];
-      const filtered = brandFilter ? data.filter((p) => String(p.brand) === String(brandFilter)) : data;
+      let filtered = brandFilter ? data.filter((p) => String(p.brand) === String(brandFilter)) : data;
+      if (collectionFilter) {
+        filtered = filtered.filter((p) => String(p.koleksi) === String(collectionFilter));
+      }
       setProducts(filtered);
     } catch (err) {
       console.error('[ProductsPage] fetch products error:', err);
@@ -316,14 +368,16 @@ export default function ProductsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [catRes, brandRes] = await Promise.all([
+        const [catRes, brandRes, collRes] = await Promise.all([
           apiClient.get('/product-categories/'),
           apiClient.get('/brands/'),
+          apiClient.get('/collections/'),
         ]);
         setCategories(Array.isArray(catRes.data) ? catRes.data : catRes.data?.results || []);
         setBrands(Array.isArray(brandRes.data) ? brandRes.data : brandRes.data?.results || []);
+        setCollections(Array.isArray(collRes.data) ? collRes.data : collRes.data?.results || []);
       } catch (err) {
-        console.error('[ProductsPage] fetch categories/brands error:', err);
+        console.error('[ProductsPage] fetch categories/brands/collections error:', err);
       }
     })();
   }, []);
@@ -331,7 +385,7 @@ export default function ProductsPage() {
   useEffect(() => {
     fetchProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, categoryFilter, brandFilter]);
+  }, [search, categoryFilter, brandFilter, collectionFilter]);
 
   const toggleSelectAll = (e) => {
     if (e.target.checked) {
@@ -516,7 +570,28 @@ export default function ProductsPage() {
         )
       ),
     },
-    { key: 'nama', label: 'Nama Produk', width: 250 },
+    {
+      key: 'nama',
+      label: 'Nama Produk',
+      width: 250,
+      render: (row) => (
+        <div>
+          <div
+            className="clickable-product-name"
+            onClick={() => openProductDetail(row.id)}
+            style={{ fontWeight: 600, color: '#2563eb', cursor: 'pointer' }}
+          >
+            {row.nama}
+          </div>
+          {row.nama_alternatif && (
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{row.nama_alternatif}</div>
+          )}
+          {row.kategori_nama && (
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{row.kategori_nama}</div>
+          )}
+        </div>
+      ),
+    },
     {
       key: 'variant',
       label: 'Variant',
@@ -553,7 +628,10 @@ export default function ProductsPage() {
             rowMenu={rowMenu}
             product={row}
             onDetail={() => openProductDetail(row.id)}
-            onToggleAvailability={() => handleToggleAvailability(row)}
+            onCopy={() => copyProduct(row.id)}
+            onStockDetail={() => openStockDetail(row.id)}
+            onToggleAvailability={() => openAvailabilityModal(row)}
+            onShowLog={() => openLogModal(row)}
             onDelete={() => handleDeleteRow(row)}
             onClose={() => setRowMenu(null)}
           />
@@ -571,6 +649,7 @@ export default function ProductsPage() {
         categories={categories}
         brands={brands}
         storeName={businessSettings?.nama_bisnis || 'Bintang Advertising'}
+        initialCopyMode={initialCopyMode}
       />
     );
   }
@@ -846,6 +925,43 @@ export default function ProductsPage() {
 
   return (
     <>
+      <style>{`
+        .row-menu-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+          padding: 9px 14px;
+          background: none;
+          border: 0;
+          text-align: left;
+          font-size: 13px;
+          color: #334155;
+          cursor: pointer;
+          transition: background-color 0.15s;
+        }
+        .row-menu-item:hover {
+          background-color: #f1f5f9;
+          color: #0f172a;
+        }
+        .row-menu-item-danger {
+          color: #dc2626;
+        }
+        .row-menu-item-danger:hover {
+          background-color: #fef2f2;
+          color: #991b1b;
+        }
+        .clickable-product-name {
+          color: #2563eb;
+          font-weight: 600;
+          cursor: pointer;
+          transition: color 0.15s, text-decoration 0.15s;
+        }
+        .clickable-product-name:hover {
+          color: #1d4ed8;
+          text-decoration: underline;
+        }
+      `}</style>
       <PageHeader
         title="Produk"
         description="Kelola katalog produk jual, harga, SKU, barcode, varian, dan status online."
@@ -928,6 +1044,12 @@ export default function ProductsPage() {
                 <option key={brand.id} value={brand.id}>{brand.nama}</option>
               ))}
             </select>
+            <select className="pi-select" value={collectionFilter} onChange={(e) => setCollectionFilter(e.target.value)}>
+              <option value="">Koleksi</option>
+              {collections.map((coll) => (
+                <option key={coll.id} value={coll.id}>{coll.nama}</option>
+              ))}
+            </select>
           </>
         }
         right={
@@ -982,6 +1104,25 @@ export default function ProductsPage() {
         open={showImportRecipeModal}
         onClose={() => setShowImportRecipeModal(false)}
         onSuccess={fetchProducts}
+      />
+
+      <StockDetailModal
+        open={!!stockDetailProduct}
+        onClose={() => setStockDetailProduct(null)}
+        product={stockDetailProduct}
+      />
+
+      <AvailabilityModal
+        open={!!availabilityProduct}
+        onClose={() => setAvailabilityProduct(null)}
+        product={availabilityProduct}
+        onSuccess={fetchProducts}
+      />
+
+      <ProductLogModal
+        open={!!logProduct}
+        onClose={() => setLogProduct(null)}
+        product={logProduct}
       />
     </>
   );

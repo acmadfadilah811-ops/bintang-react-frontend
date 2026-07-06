@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search } from 'lucide-react';
-import DataTable from '../components/DataTable';
-import { StatusBadge } from '../components/PageShell';
+import { Plus, Search, ChevronRight, GripVertical, Trash2, X, UploadCloud } from 'lucide-react';
 import apiClient from '../../../../api/apiClient';
 
 export function CategoriesPage() {
@@ -10,6 +8,7 @@ export function CategoriesPage() {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  // Form State - Create
   const [namaGrup, setNamaGrup] = useState('');
   const [klasifikasi, setKlasifikasi] = useState('');
   const [nonAktifkan, setNonAktifkan] = useState(false);
@@ -19,11 +18,29 @@ export function CategoriesPage() {
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null);
 
+  // Modal State - Edit
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [editNama, setEditNama] = useState('');
+  const [editKlasifikasi, setEditKlasifikasi] = useState('');
+  const [editNonAktifkan, setEditNonAktifkan] = useState(false);
+  const [editTidakPos, setEditTidakPos] = useState(false);
+  const [editTidakNavWeb, setEditTidakNavWeb] = useState(false);
+  const [editPhotoFile, setEditPhotoFile] = useState(null);
+  const [editPhotoPreview, setEditPhotoPreview] = useState(null);
+  const [isChangingKlasifikasi, setIsChangingKlasifikasi] = useState(false);
+
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setSelectedPhoto(file);
     setPhotoPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleEditPhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setEditPhotoFile(file);
+    setEditPhotoPreview(URL.createObjectURL(file));
   };
 
   const fetchCategories = async () => {
@@ -75,14 +92,313 @@ export function CategoriesPage() {
     }
   };
 
+  const openEditModal = (cat) => {
+    setEditingCategory(cat);
+    setEditNama(cat.nama || '');
+    setEditKlasifikasi(cat.klasifikasi || '');
+    setEditNonAktifkan(!cat.is_active);
+    setEditTidakPos(!cat.tampil_pos);
+    setEditTidakNavWeb(!cat.tampil_nav_web);
+    setEditPhotoFile(null);
+    setEditPhotoPreview(cat.foto || null);
+    setIsChangingKlasifikasi(false);
+  };
+
+  const handleUpdate = async () => {
+    if (!editNama.trim() || !editKlasifikasi || saving) return;
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append('nama', editNama);
+      fd.append('klasifikasi', editKlasifikasi);
+      fd.append('is_active', String(!editNonAktifkan));
+      fd.append('tampil_pos', String(!editTidakPos));
+      fd.append('tampil_nav_web', String(!editTidakNavWeb));
+      if (editPhotoFile) {
+        fd.append('foto', editPhotoFile);
+      }
+
+      await apiClient.put(`/product-categories/${editingCategory.id}/`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      setEditingCategory(null);
+      await fetchCategories();
+    } catch (err) {
+      console.error('[CategoriesPage] update error:', err);
+      setError('Gagal memperbarui kategori.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus kategori "${editingCategory.nama}"?`)) return;
+    setSaving(true);
+    try {
+      await apiClient.delete(`/product-categories/${editingCategory.id}/`);
+      setEditingCategory(null);
+      await fetchCategories();
+    } catch (err) {
+      console.error('[CategoriesPage] delete error:', err);
+      setError('Gagal menghapus kategori.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const filteredCategories = categories.filter(cat =>
     cat.nama.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const canSave = namaGrup.trim() && klasifikasi && !saving;
 
+  const renderPhotoUploadField = (previewUrl, onChangeHandler) => {
+    return (
+      <label 
+        className="photo-upload-placeholder"
+        style={{
+          cursor: 'pointer',
+          width: '120px',
+          height: '120px',
+          borderRadius: '8px',
+          border: '2px dashed #cbd5e1',
+          background: '#f8fafc',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          color: '#64748b',
+          overflow: 'hidden',
+          position: 'relative',
+          transition: 'border-color 0.15s, background-color 0.15s'
+        }}
+      >
+        {previewUrl ? (
+          <img src={previewUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <>
+            <UploadCloud size={28} style={{ color: '#94a3b8' }} />
+            <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textAlign: 'center', padding: '0 8px' }}>
+              Upload Image
+            </span>
+          </>
+        )}
+        <input type="file" accept="image/*" onChange={onChangeHandler} style={{ display: 'none' }} />
+      </label>
+    );
+  };
+
   return (
     <div className="pi-category-layout">
+      <style>{`
+        .pi-category-layout {
+          display: grid;
+          grid-template-columns: 1.2fr 1fr;
+          gap: 20px;
+        }
+        @media (max-width: 1024px) {
+          .pi-category-layout {
+            grid-template-columns: 1fr;
+          }
+        }
+        .pi-category-card {
+          background: #fff;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+          overflow: hidden;
+        }
+        .pi-category-card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 16px 20px;
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .pi-category-card-header h3 {
+          margin: 0;
+          font-size: 16px;
+          font-weight: 700;
+          color: #1e293b;
+        }
+        .pi-category-card-body {
+          padding: 20px;
+        }
+
+        /* Category list item card styling */
+        .category-item-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          background: #fff;
+          padding: 12px 16px;
+          margin-bottom: 10px;
+          transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
+          cursor: pointer;
+        }
+        .category-item-row:hover {
+          border-color: #cbd5e1;
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+        }
+        .category-item-row:active {
+          transform: scale(0.99);
+        }
+        .category-item-left {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .category-drag-handle {
+          color: #94a3b8;
+          display: flex;
+          align-items: center;
+          cursor: grab;
+        }
+        .category-item-name {
+          font-size: 14px;
+          font-weight: 600;
+          color: #0f172a;
+        }
+        .category-item-count {
+          color: #64748b;
+          font-size: 13px;
+          margin-left: 4px;
+        }
+        
+        .photo-upload-placeholder:hover {
+          border-color: #0284c7 !important;
+          background-color: #f0f9ff !important;
+        }
+
+        /* Switch Styles matching Olsera */
+        .olsera-switch-container {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+        .olsera-switch-label {
+          color: #94a3b8;
+          text-transform: uppercase;
+          transition: color 0.15s;
+        }
+        .olsera-switch-label.active {
+          color: #0284c7;
+        }
+        .pi-simple-switch {
+          position: relative;
+          display: inline-block;
+          width: 44px;
+          height: 22px;
+        }
+        .pi-simple-switch input {
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+        .pi-simple-slider {
+          position: absolute;
+          cursor: pointer;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: #cbd5e1;
+          transition: .2s;
+          border-radius: 22px;
+        }
+        .pi-simple-slider:before {
+          position: absolute;
+          content: "";
+          height: 16px;
+          width: 16px;
+          left: 3px;
+          bottom: 3px;
+          background-color: white;
+          transition: .2s;
+          border-radius: 50%;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+        input:checked + .pi-simple-slider {
+          background-color: #0284c7;
+        }
+        input:checked + .pi-simple-slider:before {
+          transform: translateX(22px);
+        }
+
+        /* Edit Modal Layout */
+        .edit-modal-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.4);
+          backdrop-filter: blur(4px);
+          z-index: 999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .edit-modal-container {
+          background: #fff;
+          border-radius: 16px;
+          width: 100%;
+          max-width: 460px;
+          box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          max-height: 90vh;
+        }
+        .edit-modal-header {
+          padding: 16px 24px;
+          border-bottom: 1px solid #f1f5f9;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .edit-modal-header h3 {
+          margin: 0;
+          font-size: 16px;
+          font-weight: 700;
+          color: #0f172a;
+        }
+        .edit-modal-close-btn {
+          background: none;
+          border: 0;
+          color: #94a3b8;
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: background-color 0.15s, color 0.15s;
+        }
+        .edit-modal-close-btn:hover {
+          background-color: #f1f5f9;
+          color: #475569;
+        }
+        .edit-modal-body {
+          padding: 24px;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+        .edit-modal-footer {
+          padding: 16px 24px;
+          border-top: 1px solid #f1f5f9;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: #f8fafc;
+        }
+      `}</style>
+
       {/* KIRI: Tambah Group/Kategori */}
       <div className="pi-category-card">
         <div className="pi-category-card-header">
@@ -100,7 +416,8 @@ export function CategoriesPage() {
               padding: '6px 16px',
               borderRadius: '4px',
               fontSize: '12px',
-              fontWeight: 'bold'
+              fontWeight: 'bold',
+              transition: 'background-color 0.15s'
             }}
           >
             {saving ? 'Menyimpan...' : 'Simpan'}
@@ -152,14 +469,7 @@ export function CategoriesPage() {
                 <span className="pi-row-label">Product Group Photo <span style={{ color: '#ef4444' }}>*</span></span>
               </div>
               <div className="pi-row-input">
-                <label className="pi-category-photo-upload" style={{ cursor: 'pointer', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {photoPreviewUrl ? (
-                    <img src={photoPreviewUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <Plus size={24} />
-                  )}
-                  <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
-                </label>
+                {renderPhotoUploadField(photoPreviewUrl, handlePhotoChange)}
               </div>
             </div>
 
@@ -170,14 +480,18 @@ export function CategoriesPage() {
                 <span className="pi-row-desc">Item yang dinon-aktifkan tidak akan muncul di website Anda</span>
               </div>
               <div className="pi-row-input">
-                <label className="pi-simple-switch">
-                  <input 
-                    type="checkbox" 
-                    checked={nonAktifkan} 
-                    onChange={(e) => setNonAktifkan(e.target.checked)} 
-                  />
-                  <span className="pi-simple-slider"></span>
-                </label>
+                <div className="olsera-switch-container">
+                  <span className={`olsera-switch-label ${!nonAktifkan ? 'active' : ''}`}>no</span>
+                  <label className="pi-simple-switch">
+                    <input 
+                      type="checkbox" 
+                      checked={nonAktifkan} 
+                      onChange={(e) => setNonAktifkan(e.target.checked)} 
+                    />
+                    <span className="pi-simple-slider"></span>
+                  </label>
+                  <span className={`olsera-switch-label ${nonAktifkan ? 'active' : ''}`}>yes</span>
+                </div>
               </div>
             </div>
 
@@ -187,14 +501,18 @@ export function CategoriesPage() {
                 <span className="pi-row-label">Tidak muncul di Point Of Sale</span>
               </div>
               <div className="pi-row-input">
-                <label className="pi-simple-switch">
-                  <input 
-                    type="checkbox" 
-                    checked={tidakMunculPos} 
-                    onChange={(e) => setTidakMunculPos(e.target.checked)} 
-                  />
-                  <span className="pi-simple-slider"></span>
-                </label>
+                <div className="olsera-switch-container">
+                  <span className={`olsera-switch-label ${!tidakMunculPos ? 'active' : ''}`}>no</span>
+                  <label className="pi-simple-switch">
+                    <input 
+                      type="checkbox" 
+                      checked={tidakMunculPos} 
+                      onChange={(e) => setTidakMunculPos(e.target.checked)} 
+                    />
+                    <span className="pi-simple-slider"></span>
+                  </label>
+                  <span className={`olsera-switch-label ${tidakMunculPos ? 'active' : ''}`}>yes</span>
+                </div>
               </div>
             </div>
 
@@ -204,14 +522,18 @@ export function CategoriesPage() {
                 <span className="pi-row-label">Submenu tidak muncul di Menu/Navigasi website</span>
               </div>
               <div className="pi-row-input">
-                <label className="pi-simple-switch">
-                  <input 
-                    type="checkbox" 
-                    checked={tidakMunculNavWeb} 
-                    onChange={(e) => setTidakMunculNavWeb(e.target.checked)} 
-                  />
-                  <span className="pi-simple-slider"></span>
-                </label>
+                <div className="olsera-switch-container">
+                  <span className={`olsera-switch-label ${!tidakMunculNavWeb ? 'active' : ''}`}>no</span>
+                  <label className="pi-simple-switch">
+                    <input 
+                      type="checkbox" 
+                      checked={tidakMunculNavWeb} 
+                      onChange={(e) => setTidakMunculNavWeb(e.target.checked)} 
+                    />
+                    <span className="pi-simple-slider"></span>
+                  </label>
+                  <span className={`olsera-switch-label ${tidakMunculNavWeb ? 'active' : ''}`}>yes</span>
+                </div>
               </div>
             </div>
           </div>
@@ -236,19 +558,175 @@ export function CategoriesPage() {
             />
           </div>
           {error && <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 8 }}>{error}</p>}
-          <DataTable
-            rows={filteredCategories}
-            emptyText={loading ? 'Memuat...' : 'Tidak ada data'}
-            columns={[
-              { key: 'nama', label: 'Nama Grup' },
-              { key: 'klasifikasi', label: 'Klasifikasi', render: (row) => row.klasifikasi || '-' },
-              { key: 'tampil_pos', label: 'Tampil di POS', render: (row) => <StatusBadge active={row.tampil_pos} label={row.tampil_pos ? 'Ya' : 'Tidak'} /> },
-              { key: 'tampil_nav_web', label: 'Tampil di Web', render: (row) => <StatusBadge active={row.tampil_nav_web} label={row.tampil_nav_web ? 'Ya' : 'Tidak'} /> },
-              { key: 'is_active', label: 'Status', render: (row) => <StatusBadge active={row.is_active} /> },
-            ]}
-          />
+          
+          <div style={{ marginTop: '12px' }}>
+            {loading && <p style={{ textAlign: 'center', color: '#64748b', fontSize: '13px' }}>Memuat...</p>}
+            {!loading && filteredCategories.length === 0 && (
+              <p style={{ textAlign: 'center', color: '#64748b', fontSize: '13px' }}>Tidak ada data</p>
+            )}
+            {!loading && filteredCategories.map((cat) => (
+              <div 
+                key={cat.id} 
+                className="category-item-row"
+                onClick={() => openEditModal(cat)}
+              >
+                <div className="category-item-left">
+                  <div className="category-drag-handle">
+                    <GripVertical size={16} />
+                  </div>
+                  <span className="category-item-name">
+                    {cat.nama} <span className="category-item-count">({cat.products_count || 0})</span>
+                  </span>
+                </div>
+                <div className="category-item-right">
+                  <ChevronRight size={18} style={{ color: '#0284c7' }} />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* EDIT MODAL POPUP */}
+      {editingCategory && (
+        <div className="edit-modal-backdrop" onClick={() => setEditingCategory(null)}>
+          <div className="edit-modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="edit-modal-header">
+              <h3>Edit</h3>
+              <button type="button" className="edit-modal-close-btn" onClick={() => setEditingCategory(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="edit-modal-body">
+              {/* Product Group Image */}
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 8 }}>Product Group Image</div>
+                {renderPhotoUploadField(editPhotoPreview, handleEditPhotoChange)}
+              </div>
+
+              {/* Nama Input */}
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Nama</label>
+                <input 
+                  type="text" 
+                  className="pi-input-text w-full"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  value={editNama} 
+                  onChange={(e) => setEditNama(e.target.value)} 
+                />
+              </div>
+
+              {/* Klasifikasi */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#475569' }}>
+                  <span>Klasifikasi:</span>
+                  <span style={{ fontWeight: 600, color: '#0f172a' }}>{editKlasifikasi || 'Others'}</span>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsChangingKlasifikasi(!isChangingKlasifikasi)}
+                    style={{ background: 'none', border: 0, color: '#0284c7', fontWeight: 600, cursor: 'pointer', fontSize: 13, padding: 0 }}
+                  >
+                    Ubah
+                  </button>
+                </div>
+                {isChangingKlasifikasi && (
+                  <select 
+                    value={editKlasifikasi} 
+                    onChange={(e) => { setEditKlasifikasi(e.target.value); setIsChangingKlasifikasi(false); }}
+                    style={{ marginTop: 6, width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 13 }}
+                  >
+                    <option value="Others">Others</option>
+                    <option value="Jasa Cetak / Printing">Jasa Cetak / Printing</option>
+                    <option value="Advertising & Banner">Advertising & Banner</option>
+                    <option value="Merchandise / Souvenir">Merchandise / Souvenir</option>
+                  </select>
+                )}
+              </div>
+
+              {/* Switches */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+                {/* Non Aktifkan */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 13, color: '#475569' }}>Non Aktifkan</span>
+                  <div className="olsera-switch-container">
+                    <span className={`olsera-switch-label ${!editNonAktifkan ? 'active' : ''}`}>no</span>
+                    <label className="pi-simple-switch">
+                      <input 
+                        type="checkbox" 
+                        checked={editNonAktifkan} 
+                        onChange={(e) => setEditNonAktifkan(e.target.checked)} 
+                      />
+                      <span className="pi-simple-slider"></span>
+                    </label>
+                    <span className={`olsera-switch-label ${editNonAktifkan ? 'active' : ''}`}>yes</span>
+                  </div>
+                </div>
+
+                {/* Tidak muncul di Point Of Sale */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 13, color: '#475569' }}>Tidak muncul di Point Of Sale</span>
+                  <div className="olsera-switch-container">
+                    <span className={`olsera-switch-label ${!editTidakPos ? 'active' : ''}`}>no</span>
+                    <label className="pi-simple-switch">
+                      <input 
+                        type="checkbox" 
+                        checked={editTidakPos} 
+                        onChange={(e) => setEditTidakPos(e.target.checked)} 
+                      />
+                      <span className="pi-simple-slider"></span>
+                    </label>
+                    <span className={`olsera-switch-label ${editTidakPos ? 'active' : ''}`}>yes</span>
+                  </div>
+                </div>
+
+                {/* Submenu tidak muncul di Menu/Navigasi Website */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 13, color: '#475569' }}>Submenu tidak muncul di Menu/Navigasi Website</span>
+                  <div className="olsera-switch-container">
+                    <span className={`olsera-switch-label ${!editTidakNavWeb ? 'active' : ''}`}>no</span>
+                    <label className="pi-simple-switch">
+                      <input 
+                        type="checkbox" 
+                        checked={editTidakNavWeb} 
+                        onChange={(e) => setEditTidakNavWeb(e.target.checked)} 
+                      />
+                      <span className="pi-simple-slider"></span>
+                    </label>
+                    <span className={`olsera-switch-label ${editTidakNavWeb ? 'active' : ''}`}>yes</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="edit-modal-footer">
+              <button 
+                type="button" 
+                onClick={handleDelete}
+                style={{ background: 'none', border: '1px solid #ef4444', color: '#ef4444', borderRadius: 8, padding: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <Trash2 size={16} />
+              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button 
+                  type="button" 
+                  onClick={() => setEditingCategory(null)}
+                  style={{ background: '#fff', border: '1px solid #cbd5e1', color: '#334155', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Batal
+                </button>
+                <button 
+                  type="button" 
+                  onClick={handleUpdate}
+                  style={{ background: '#0284c7', border: 0, color: '#fff', borderRadius: 8, padding: '8px 24px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Simpan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
