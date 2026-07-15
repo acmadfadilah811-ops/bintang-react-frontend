@@ -34,7 +34,18 @@ const formatTanggal = (value) => {
 function Section({ title, headerRight, children }) {
   return (
     <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '14px 18px', borderBottom: '1px solid #e2e8f0' }}>
+      <div style={{
+        position: 'sticky',
+        top: 128,
+        zIndex: 20,
+        background: '#fff',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        padding: '14px 18px',
+        borderBottom: '1px solid #e2e8f0',
+        borderRadius: '9px 9px 0 0'
+      }}>
         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1e293b', paddingTop: 6 }}>{title}</h3>
         {headerRight}
       </div>
