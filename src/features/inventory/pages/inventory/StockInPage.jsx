@@ -14,6 +14,32 @@ const getLogoUrl = (url) => {
 const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const STATUS_LABEL = { draft: 'Draft', selesai: 'Selesai', batal: 'Batal' };
 
+// Tanggal lokal (bukan UTC) — toISOString() menggeser tanggal untuk WIB
+// sehingga dokumen bisa tercatat mundur sehari di jam-jam awal pagi.
+const todayISO = () => {
+  const d = new Date();
+  const bulan = String(d.getMonth() + 1).padStart(2, '0');
+  const tgl = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${bulan}-${tgl}`;
+};
+
+const startOfYearISO = () => `${new Date().getFullYear()}-01-01`;
+
+// Batas baris import CSV — harus sama dengan batas di backend
+// (StockInDocumentViewSet.import_csv) supaya user tidak ditolak server
+// setelah preview terlanjur bilang aman.
+const CSV_MAX_ROWS = 200;
+// Kolom template resmi: product,variant,sku,supplier,qty,new_buy_price,rack
+const CSV_PREVIEW_COLUMNS = [
+  { key: 'product', label: 'Produk' },
+  { key: 'variant', label: 'Varian' },
+  { key: 'sku', label: 'SKU' },
+  { key: 'supplier', label: 'Supplier' },
+  { key: 'qty', label: 'Qty' },
+  { key: 'new_buy_price', label: 'Harga Beli' },
+  { key: 'rack', label: 'Rak' },
+];
+
 const formatDisplayDate = (isoStr) => {
   if (!isoStr) return '-';
   const d = new Date(`${isoStr}T00:00:00`);
@@ -70,6 +96,10 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
   const [importFile, setImportFile] = useState(null);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  // Preview CSV: baris di-parse di browser DULU supaya user bisa memeriksa
+  // datanya sebelum dokumen dibuat di server (mencegah draft sampah).
+  const [previewRows, setPreviewRows] = useState([]);
+  const [previewIssues, setPreviewIssues] = useState([]);
 
   // Stock List State (dari API)
   const [stockList, setStockList] = useState([]);
@@ -93,10 +123,10 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
   }, []);
 
   // Form State
-  const [tanggal, setTanggal] = useState('2026-06-25');
+  // Supplier & nama penerima sengaja tidak ada di form create — diisi lewat
+  // tombol Ubah di halaman detail (dokumen dibuat sebagai draft dulu).
+  const [tanggal, setTanggal] = useState(todayISO());
   const [catatan, setCatatan] = useState('');
-  const [namaPenerima, setNamaPenerima] = useState('');
-  const [supplier, setSupplier] = useState('');
 
   const [searchPembelian, setSearchPembelian] = useState('');
   const [searchProduct, setSearchProduct] = useState('');
@@ -141,6 +171,9 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // Dropdown Cetak (Cetak / Cetak A5)
+  const [cetakMenuOpen, setCetakMenuOpen] = useState(false);
+
   // Inline editing states for Detail Metadata Cards
   const [isEditingTanggal, setIsEditingTanggal] = useState(false);
   const [isEditingCatatan, setIsEditingCatatan] = useState(false);
@@ -154,8 +187,8 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
   const [editSupplierValue, setEditSupplierValue] = useState('');
 
   const [validationError, setValidationError] = useState('');
-  const [startDate, setStartDate] = useState('2026-01-01');
-  const [endDate, setEndDate] = useState('2026-06-25');
+  const [startDate, setStartDate] = useState(startOfYearISO());
+  const [endDate, setEndDate] = useState(todayISO());
   const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState('custom');
 
@@ -224,19 +257,17 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
   // Buat dokumen draft baru di backend, lalu lanjut ke layar staging produk
   const handleStageStock = async () => {
     try {
+      // nama_penerima & supplier tidak dikirim di sini — keduanya opsional di
+      // model (blank, default '') dan diisi lewat Ubah di halaman detail.
       const res = await apiClient.post('/stock-in-documents/', {
         tanggal,
         catatan,
-        nama_penerima: namaPenerima,
-        supplier,
       });
       setActiveDetailDoc(res.data);
       handleStateChange('detail');
 
-      setTanggal('2026-06-25');
+      setTanggal(todayISO());
       setCatatan('');
-      setNamaPenerima('');
-      setSupplier('');
     } catch (err) {
       console.error('[StockInPage] create document error:', err);
       setValidationError('Gagal membuat dokumen stok masuk.');
@@ -244,13 +275,64 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
   };
 
   // Import CSV: buat dokumen draft baru lalu proses file CSV sekaligus
+  // Baca & periksa CSV di browser sebelum apa pun dikirim ke server.
+  // Aturan validasinya sengaja dibuat mengikuti backend (import_csv):
+  // produk dicocokkan lewat sku ATAU nama, qty wajib angka > 0.
+  const parseCsvPreview = async (file) => {
+    try {
+      const text = await file.text();
+      const wb = XLSX.read(text, { type: 'string', raw: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' }).map((row) => {
+        const lower = {};
+        Object.keys(row).forEach((k) => {
+          lower[String(k).trim().toLowerCase()] = String(row[k] ?? '').trim();
+        });
+        return lower;
+      });
+
+      const issues = [];
+      if (rows.length === 0) issues.push('File tidak berisi baris data.');
+      if (rows.length > CSV_MAX_ROWS) {
+        issues.push(`Maksimal ${CSV_MAX_ROWS} baris — file ini berisi ${rows.length} baris.`);
+      }
+      rows.forEach((row, i) => {
+        const baris = i + 2; // baris 1 = header
+        if (!row.sku && !row.product) {
+          issues.push(`Baris ${baris}: kolom "product" atau "sku" wajib diisi.`);
+        }
+        const qty = Number(String(row.qty ?? '').replace(',', '.'));
+        if (!row.qty || Number.isNaN(qty)) {
+          issues.push(`Baris ${baris}: qty "${row.qty || ''}" bukan angka.`);
+        } else if (qty <= 0) {
+          issues.push(`Baris ${baris}: qty harus lebih besar dari 0.`);
+        }
+      });
+
+      setPreviewRows(rows);
+      setPreviewIssues(issues);
+    } catch (err) {
+      console.error('[StockInPage] parse csv preview error:', err);
+      setPreviewRows([]);
+      setPreviewIssues(['Gagal membaca file. Pastikan berformat CSV (UTF-8).']);
+    }
+  };
+
+  const resetImportState = () => {
+    setImportFile(null);
+    setImportResult(null);
+    setPreviewRows([]);
+    setPreviewIssues([]);
+  };
+
   const handleImportCsv = async () => {
     if (!importFile || importing) return;
+    if (previewIssues.length > 0 || previewRows.length === 0) return;
     setImporting(true);
     setImportResult(null);
     try {
       const docRes = await apiClient.post('/stock-in-documents/', {
-        tanggal: new Date().toISOString().split('T')[0],
+        tanggal: todayISO(),
         catatan: 'Import CSV',
       });
       const docId = docRes.data.id;
@@ -264,6 +346,8 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
       setImportResult({ errors: importRes.data.errors || [], createdCount: importRes.data.created?.length || 0 });
       setActiveDetailDoc(importRes.data.document);
       setImportFile(null);
+      setPreviewRows([]);
+      setPreviewIssues([]);
       if ((importRes.data.created?.length || 0) > 0) {
         setShowImportModal(false);
         handleStateChange('detail');
@@ -524,8 +608,9 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
     }
   };
 
-  const handleCetak = () => {
+  const handleCetak = (paper = 'A4') => {
     if (!activeDetailDoc) return;
+    const isA5 = paper === 'A5';
     const doc = activeDetailDoc;
     const esc = (v) => String(v ?? '-').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const fmtRp = (v) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(v) || 0).replace('Rp', 'IDR');
@@ -554,17 +639,18 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
     ].filter(Boolean).join(' &nbsp;·&nbsp; ');
     const html = `<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>${esc(doc.nomor)}</title>
       <style>
-        body { font-family: Arial, sans-serif; font-size: 13px; color: #111; margin: 24px; }
-        .logo-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px; margin-bottom: 16px; min-height: 60px; display: flex; align-items: center; }
-        .logo-box img { max-height: 56px; max-width: 160px; object-fit: contain; }
-        .doc-title { font-size: 15px; margin: 0 0 4px; }
-        .doc-title .biz { font-size: 12px; color: #555; margin-left: 6px; }
+        @page { size: ${paper}; margin: ${isA5 ? '8mm' : '14mm'}; }
+        body { font-family: Arial, sans-serif; font-size: ${isA5 ? '10px' : '13px'}; color: #111; margin: 0; }
+        .logo-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: ${isA5 ? '8px' : '16px'}; margin-bottom: ${isA5 ? '8px' : '16px'}; min-height: ${isA5 ? '34px' : '60px'}; display: flex; align-items: center; }
+        .logo-box img { max-height: ${isA5 ? '30px' : '56px'}; max-width: ${isA5 ? '100px' : '160px'}; object-fit: contain; }
+        .doc-title { font-size: ${isA5 ? '12px' : '15px'}; margin: 0 0 4px; }
+        .doc-title .biz { font-size: ${isA5 ? '10px' : '12px'}; color: #555; margin-left: 6px; }
         .tanggal { margin: 6px 0 4px; }
-        .info-extra { color: #666; font-size: 11px; margin-bottom: 10px; }
-        table.items { border-collapse: collapse; width: 100%; margin-top: 10px; }
-        table.items th, table.items td { border: 1px solid #999; padding: 6px 8px; text-align: left; }
+        .info-extra { color: #666; font-size: ${isA5 ? '9px' : '11px'}; margin-bottom: 10px; }
+        table.items { border-collapse: collapse; width: 100%; margin-top: ${isA5 ? '6px' : '10px'}; }
+        table.items th, table.items td { border: 1px solid #999; padding: ${isA5 ? '3px 5px' : '6px 8px'}; text-align: left; }
         table.items th { background: #f8fafc; }
-        .foot { margin-top: 24px; color: #999; font-size: 10px; }
+        .foot { margin-top: ${isA5 ? '12px' : '24px'}; color: #999; font-size: ${isA5 ? '8px' : '10px'}; }
       </style></head><body>
       <div class="logo-box">${logoUrl ? `<img src="${esc(logoUrl)}" alt="logo">` : ''}</div>
       <p class="doc-title">No. Stok Masuk #${esc(doc.nomor)}<span class="biz">${esc(namaBisnis)}</span></p>
@@ -578,7 +664,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
       <p class="foot">Dicetak ${new Date().toLocaleString('id-ID')}</p>
       <script>window.onload = function () { window.print(); };</script>
       </body></html>`;
-    const win = window.open('', '_blank', 'width=800,height=600');
+    const win = window.open('', '_blank', isA5 ? 'width=600,height=520' : 'width=800,height=600');
     if (!win) {
       setValidationError('Popup diblokir browser. Izinkan popup untuk mencetak.');
       return;
@@ -760,7 +846,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
 
               {/* Import Button - Premium Teal */}
               <button
-                onClick={() => { setImportResult(null); setImportFile(null); setShowImportModal(true); }}
+                onClick={() => { resetImportState(); setShowImportModal(true); }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1359,9 +1445,9 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
           <div style={{ background: '#ffffff', borderRadius: '8px', width: '90%', maxWidth: '680px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>PerbaruiStatus</h3>
+              <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>Import Stok Masuk</h3>
               <button
-                onClick={() => setShowImportModal(false)}
+                onClick={() => { setShowImportModal(false); resetImportState(); }}
                 style={{ background: 'transparent', border: 0, padding: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}
               >
                 <X size={18} />
@@ -1424,8 +1510,10 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                         type="file"
                         accept=".csv,text/csv"
                         onChange={(e) => {
-                          setImportFile(e.target.files[0] || null);
-                          setImportResult(null);
+                          const file = e.target.files[0] || null;
+                          resetImportState();
+                          setImportFile(file);
+                          if (file) parseCsvPreview(file);
                         }}
                         style={{
                           position: 'absolute',
@@ -1460,10 +1548,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                       {/* Center: white X in blue circle */}
                       <button
                         type="button"
-                        onClick={() => {
-                          setImportFile(null);
-                          setImportResult(null);
-                        }}
+                        onClick={resetImportState}
                         style={{
                           width: '32px',
                           height: '32px',
@@ -1515,10 +1600,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                 {importFile && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setImportFile(null);
-                      setImportResult(null);
-                    }}
+                    onClick={resetImportState}
                     style={{
                       alignSelf: 'flex-start',
                       background: '#ffffff',
@@ -1537,6 +1619,65 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                   >
                     Hapus semua file
                   </button>
+                )}
+
+                {/* Preview isi CSV — ditampilkan SEBELUM dikirim ke server */}
+                {importFile && (previewRows.length > 0 || previewIssues.length > 0) && (
+                  <div style={{ marginTop: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#334155' }}>
+                        Pratinjau data ({previewRows.length} baris)
+                      </span>
+                      {previewIssues.length === 0 ? (
+                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#16a34a' }}>Siap diimpor</span>
+                      ) : (
+                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#dc2626' }}>
+                          {previewIssues.length} masalah
+                        </span>
+                      )}
+                    </div>
+
+                    {previewRows.length > 0 && (
+                      <div style={{ maxHeight: '180px', overflow: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                          <thead>
+                            <tr style={{ background: '#f8fafc' }}>
+                              <th style={{ padding: '6px 8px', textAlign: 'left', color: '#64748b', position: 'sticky', top: 0, background: '#f8fafc' }}>#</th>
+                              {CSV_PREVIEW_COLUMNS.map((col) => (
+                                <th key={col.key} style={{ padding: '6px 8px', textAlign: 'left', color: '#64748b', whiteSpace: 'nowrap', position: 'sticky', top: 0, background: '#f8fafc' }}>
+                                  {col.label}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {previewRows.map((row, i) => (
+                              <tr key={i} style={{ borderTop: '1px solid #f1f5f9' }}>
+                                <td style={{ padding: '5px 8px', color: '#94a3b8' }}>{i + 1}</td>
+                                {CSV_PREVIEW_COLUMNS.map((col) => (
+                                  <td key={col.key} style={{ padding: '5px 8px', color: '#334155', whiteSpace: 'nowrap' }}>
+                                    {row[col.key] || '-'}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {previewIssues.length > 0 && (
+                      <div style={{ marginTop: '6px', maxHeight: '90px', overflowY: 'auto', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '8px 10px' }}>
+                        {previewIssues.map((msg, i) => (
+                          <div key={i} style={{ fontSize: '11px', color: '#b91c1c', lineHeight: '1.5' }}>• {msg}</div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '6px' }}>
+                      Produk dicocokkan lewat SKU, atau nama produk bila SKU kosong.
+                    </div>
+                  </div>
                 )}
 
                 {/* Import success count banner */}
@@ -1565,22 +1706,35 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
               >
                 Batal
               </button>
-              <button
-                onClick={handleImportCsv}
-                disabled={!importFile || importing}
-                style={{
-                  background: (!importFile || importing) ? '#99f6e4' : '#0d9488',
-                  border: 0,
-                  borderRadius: '4px',
-                  padding: '8px 24px',
-                  fontSize: '13px',
-                  fontWeight: 'bold',
-                  color: '#ffffff',
-                  cursor: (!importFile || importing) ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {importing ? 'Memproses...' : 'Post Sekarang'}
-              </button>
+              {(() => {
+                // Tombol hanya aktif kalau preview bersih — CSV bermasalah
+                // ditolak di sini, sebelum dokumen dibuat di server.
+                const belumSiap = !importFile || importing
+                  || previewRows.length === 0 || previewIssues.length > 0;
+                return (
+                  <button
+                    onClick={handleImportCsv}
+                    disabled={belumSiap}
+                    title={previewIssues.length > 0 ? 'Perbaiki dulu masalah pada file CSV' : undefined}
+                    style={{
+                      background: belumSiap ? '#99f6e4' : '#0d9488',
+                      border: 0,
+                      borderRadius: '4px',
+                      padding: '8px 24px',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      color: '#ffffff',
+                      cursor: belumSiap ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {importing
+                      ? 'Memproses...'
+                      : previewRows.length > 0 && previewIssues.length === 0
+                        ? `Import ${previewRows.length} baris`
+                        : 'Import'}
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -1642,49 +1796,6 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                   />
                 </div>
 
-                {/* Nama Penerima */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>Nama Penerima <span style={{ color: '#94a3b8', fontWeight: '400' }}>(opsional)</span></label>
-                  <input
-                    type="text"
-                    placeholder="Nama staf yang menerima barang"
-                    value={namaPenerima}
-                    onChange={(e) => setNamaPenerima(e.target.value)}
-                    style={{ 
-                      width: '100%', 
-                      border: '1px solid #cbd5e1', 
-                      borderRadius: '4px', 
-                      padding: '8px 12px', 
-                      fontSize: '13px', 
-                      outline: 'none', 
-                      boxSizing: 'border-box', 
-                      color: '#334155',
-                      height: '36px'
-                    }}
-                  />
-                </div>
-
-                {/* Supplier */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>Supplier <span style={{ color: '#94a3b8', fontWeight: '400' }}>(opsional)</span></label>
-                  <input 
-                    type="text" 
-                    placeholder="Pilih supplier (Autocomplete)"
-                    value={supplier}
-                    onChange={(e) => setSupplier(e.target.value)}
-                    style={{ 
-                      width: '100%', 
-                      border: '1px solid #cbd5e1', 
-                      borderRadius: '4px', 
-                      padding: '8px 12px', 
-                      fontSize: '13px', 
-                      outline: 'none', 
-                      boxSizing: 'border-box', 
-                      color: '#334155',
-                      height: '36px'
-                    }}
-                  />
-                </div>
               </div>
 
               {/* Actions Footer */}
@@ -1736,25 +1847,29 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
           </div>
 
           {/* Draft Info Header Card */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'stretch', 
-            background: '#ffffff', 
-            border: '1px solid #e2e8f0', 
-            borderRadius: '8px', 
+          {/* Catatan: JANGAN pakai overflow:hidden di sini — itu memotong
+              dropdown Cetak yang menjulur ke bawah kartu. Sudut membulat
+              blok status di kiri diatur lewat borderRadius-nya sendiri. */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'stretch',
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '8px',
             marginBottom: '20px',
-            overflow: 'hidden',
             minHeight: '80px',
             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
           }}>
             {/* Left Status Block */}
-            <div style={{ 
-              background: 'linear-gradient(135deg, #fff7ed, #ffedd5)', 
-              borderRight: '1px solid #fed7aa', 
-              padding: '16px 28px', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center', 
+            <div style={{
+              background: 'linear-gradient(135deg, #fff7ed, #ffedd5)',
+              borderRight: '1px solid #fed7aa',
+              borderTopLeftRadius: '8px',
+              borderBottomLeftRadius: '8px',
+              padding: '16px 28px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
               justifyContent: 'center',
               color: '#c2410c',
               gap: '4px',
@@ -1795,30 +1910,85 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
 
             {/* Right Action Buttons */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 24px' }}>
-              <button
-                type="button"
-                onClick={handleCetak}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  padding: '8px 14px',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  color: '#475569',
-                  cursor: 'pointer',
-                  height: '36px',
-                  transition: 'background 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
-                onMouseOut={(e) => e.currentTarget.style.background = '#ffffff'}
-              >
-                <Printer size={14} />
-                <span>Cetak</span>
-              </button>
+              {/* Dropdown Cetak — pilihan A4 / A5 */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => setCetakMenuOpen((open) => !open)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: cetakMenuOpen ? '#f8fafc' : '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    padding: '8px 14px',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: '#475569',
+                    cursor: 'pointer',
+                    height: '36px',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseOut={(e) => e.currentTarget.style.background = cetakMenuOpen ? '#f8fafc' : '#ffffff'}
+                >
+                  <Printer size={14} />
+                  <span>Cetak</span>
+                  <ChevronDown size={14} style={{ transform: cetakMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                </button>
+
+                {cetakMenuOpen && (
+                  <>
+                    {/* Lapisan penutup: klik di mana pun menutup menu */}
+                    <div
+                      onClick={() => setCetakMenuOpen(false)}
+                      style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 4px)',
+                      right: 0,
+                      zIndex: 41,
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                      minWidth: '150px',
+                      overflow: 'hidden'
+                    }}>
+                      {[
+                        { label: 'Cetak', paper: 'A4' },
+                        { label: 'Cetak A5', paper: 'A5' },
+                      ].map((opt) => (
+                        <button
+                          key={opt.paper}
+                          type="button"
+                          onClick={() => { setCetakMenuOpen(false); handleCetak(opt.paper); }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            width: '100%',
+                            border: 0,
+                            background: 'transparent',
+                            padding: '9px 14px',
+                            fontSize: '13px',
+                            color: '#475569',
+                            cursor: 'pointer',
+                            textAlign: 'left'
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                          onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <Printer size={14} />
+                          <span>{opt.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
 
               {activeDetailDoc.status === 'draft' && (
                 <>
@@ -2212,7 +2382,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                 </button>
               </div>
 
-              {/* Daftar produk yang sudah ditambahkan / Bear Illustration jika kosong */}
+              {/* Daftar produk yang sudah ditambahkan */}
               {activeDetailDoc.items && activeDetailDoc.items.length > 0 ? (
                 <div style={{ borderTop: '1px solid #f1f5f9' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
