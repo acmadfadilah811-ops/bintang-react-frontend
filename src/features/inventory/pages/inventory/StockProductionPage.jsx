@@ -784,14 +784,14 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
                   <div>
                     <label style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', marginBottom: '6px', display: 'block' }}>Qty</label>
                     <div style={{ display: 'flex', border: '1px solid #cbd5e1', borderRadius: '4px', overflow: 'hidden', height: '36px' }}>
-                      <button type="button" onClick={() => setQtyValue(prev => Math.max(1, prev - 1))} style={{ border: 0, background: '#f8fafc', width: '44px', fontSize: '16px', cursor: 'pointer', fontWeight: 'bold', color: '#64748b' }}>-</button>
+                      <button type="button" onClick={() => setQtyValue(prev => Math.max(1, prev - 1))} style={{ border: 0, background: '#f8fafc', width: '44px', flexShrink: 0, fontSize: '16px', cursor: 'pointer', fontWeight: 'bold', color: '#64748b' }}>-</button>
                       <input
                         type="text"
                         value={qtyValue}
                         onChange={(e) => setQtyValue(parseInt(e.target.value, 10) || 1)}
-                        style={{ border: 0, borderLeft: '1px solid #cbd5e1', borderRight: '1px solid #cbd5e1', textAlign: 'center', flex: 1, fontSize: '13px', color: '#334155', outline: 'none' }}
+                        style={{ border: 0, borderLeft: '1px solid #cbd5e1', borderRight: '1px solid #cbd5e1', textAlign: 'center', flex: 1, minWidth: 0, fontSize: '13px', color: '#334155', outline: 'none' }}
                       />
-                      <button type="button" onClick={() => setQtyValue(prev => prev + 1)} style={{ border: 0, background: '#f8fafc', width: '44px', fontSize: '16px', cursor: 'pointer', fontWeight: 'bold', color: '#64748b' }}>+</button>
+                      <button type="button" onClick={() => setQtyValue(prev => prev + 1)} style={{ border: 0, background: '#f8fafc', width: '44px', flexShrink: 0, fontSize: '16px', cursor: 'pointer', fontWeight: 'bold', color: '#64748b' }}>+</button>
                     </div>
                   </div>
                   <button

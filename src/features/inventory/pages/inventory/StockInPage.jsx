@@ -2340,7 +2340,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                     borderRadius: '4px', 
                     overflow: 'hidden', 
                     height: '36px', 
-                    width: '120px',
+                    width: '100%',
                     background: '#ffffff',
                     backgroundColor: '#ffffff'
                   }}>
@@ -2348,7 +2348,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                       type="button"
                       onClick={() => setQtyValue(prev => Math.max(1, prev - 1))}
                       disabled={activeDetailDoc.status !== 'draft'}
-                      style={{ border: 0, background: '#f8fafc', width: '44px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', color: '#64748b' }}
+                      style={{ border: 0, background: '#f8fafc', width: '44px', flexShrink: 0, cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', color: '#64748b' }}
                     >
                       -
                     </button>
@@ -2363,6 +2363,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                         borderRight: '1px solid #cbd5e1',
                         textAlign: 'center',
                         flex: 1,
+                        minWidth: 0,
                         fontSize: '13px',
                         color: '#334155',
                         outline: 'none',
@@ -2374,7 +2375,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                       type="button"
                       onClick={() => setQtyValue(prev => prev + 1)}
                       disabled={activeDetailDoc.status !== 'draft'}
-                      style={{ border: 0, background: '#f8fafc', width: '44px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', color: '#64748b' }}
+                      style={{ border: 0, background: '#f8fafc', width: '44px', flexShrink: 0, cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', color: '#64748b' }}
                     >
                       +
                     </button>
