@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, X, Plus, ArrowLeft, ArrowRight, ChevronsUpDown, Trash2, CloudUpload } from 'lucide-react';
 import apiClient from '../../../../api/apiClient';
+import { todayISO } from '../../../../utils/date';
 
 const STATUS_LABEL = { draft: 'Draft', selesai: 'Selesai', batal: 'Batal' };
 const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -42,7 +43,9 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
   const [error, setError] = useState('');
 
   // Form states (create header)
-  const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
+  // Pakai tanggal lokal — toISOString() memundurkan tanggal sehari di WIB
+  // pada dini hari, sehingga dokumen tercatat di tanggal yang salah.
+  const [tanggal, setTanggal] = useState(todayISO());
   const [catatan, setCatatan] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -184,7 +187,7 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
     setImportResult(null);
     try {
       const docRes = await apiClient.post('/stock-production-documents/', {
-        tanggal: new Date().toISOString().split('T')[0],
+        tanggal: todayISO(),
         catatan: 'Import CSV',
       });
       const docId = docRes.data.id;
