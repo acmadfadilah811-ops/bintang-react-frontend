@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Check, Calendar, RefreshCw } from 'lucide-react';
+import { Check, Trash2 } from 'lucide-react';
 import apiClient from '../../../api/apiClient';
-import { useAuth } from '../../../context/AuthContext';
-import { extractApiError, inputCls } from '../format';
-import { FormRow, Toggle, PercentNominalField, ErrorBanner } from './Common';
-import TagPicker from './TagPicker';
+import { extractApiError } from '../format';
+import KuponRulesForm from './KuponRulesForm';
+import KuponFeaturesForm from './KuponFeaturesForm';
+import KuponDetailsForm from './KuponDetailsForm';
 
 const randomKode = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -13,10 +13,8 @@ const randomKode = () => {
   return s;
 };
 
-/** Form "Tambah/Ubah Kupon Diskon" — Rincian Diskon + Kriteria Diskon. */
+/** Form "Tambah/Ubah Kupon Diskon" dengan layout premium split-card matching screenshot */
 export default function TambahKuponForm({ initial, onCancel, onSaved }) {
-  const { user, businessSettings } = useAuth();
-  const accountName = businessSettings?.nama_bisnis || user?.name || user?.email || 'Akun';
   const [kode, setKode] = useState(initial?.kode || randomKode);
   const [judul, setJudul] = useState(initial?.judul || '');
   const [tanggalAktif, setTanggalAktif] = useState(initial?.tanggal_aktif || new Date().toISOString().slice(0, 10));
@@ -26,7 +24,9 @@ export default function TambahKuponForm({ initial, onCancel, onSaved }) {
   const [jumlahDiskon, setJumlahDiskon] = useState(initial ? String(initial.jumlah_diskon) : '');
   const [maksDiskon, setMaksDiskon] = useState(initial ? String(initial.maksimal_jumlah_diskon) : '0');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
+
   const [tg, setTg] = useState({
     noExpiry: initial ? initial.tanpa_kadaluarsa : true,
     unlimitedUsage: initial ? initial.unlimited_usage : true,
@@ -43,22 +43,16 @@ export default function TambahKuponForm({ initial, onCancel, onSaved }) {
     allPackages: initial ? initial.all_packages : true,
     allBrands: initial ? initial.all_brands : true,
   });
+
+  const [tanggalKadaluarsa, setTanggalKadaluarsa] = useState(initial?.tanggal_kadaluarsa || '');
   const [tipePelanggan, setTipePelanggan] = useState(initial?.tipe_pelanggan || '');
   const [pelanggan, setPelanggan] = useState(initial?.pelanggan || '');
   const [grupProduk, setGrupProduk] = useState(initial?.grup_produk || '');
   const [produk, setProduk] = useState(initial?.produk || '');
   const [paketProduk, setPaketProduk] = useState(initial?.paket_produk || '');
   const [brand, setBrand] = useState(initial?.brand || '');
-  const setT = (k) => (v) => setTg((p) => ({ ...p, [k]: v }));
 
-  const toggleRow = (label, k, help) => (
-    <FormRow label={label} help={help}>
-      <div className="flex items-center gap-2">
-        <Toggle on={tg[k]} onChange={setT(k)} />
-        <span className="text-sm text-slate-600">{tg[k] ? 'Ya' : 'Tidak'}</span>
-      </div>
-    </FormRow>
-  );
+  const setT = (k) => (v) => setTg((p) => ({ ...p, [k]: v }));
 
   const handleSave = async () => {
     if (!kode.trim() || !judul.trim()) {
@@ -72,6 +66,7 @@ export default function TambahKuponForm({ initial, onCancel, onSaved }) {
       judul: judul.trim(),
       tanggal_aktif: tanggalAktif || null,
       tanpa_kadaluarsa: tg.noExpiry,
+      tanggal_kadaluarsa: tg.noExpiry ? null : tanggalKadaluarsa || null,
       min_total_pesanan: parseFloat(minTotal) || 0,
       unlimited_usage: tg.unlimitedUsage,
       batas_penggunaan: tg.unlimitedUsage ? null : parseInt(batasPenggunaan, 10) || null,
@@ -112,147 +107,161 @@ export default function TambahKuponForm({ initial, onCancel, onSaved }) {
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm(`Hapus kupon "${kode}"?`)) return;
+    setDeleting(true);
+    try {
+      await apiClient.delete(`/discount-coupons/${initial.id}/`);
+      onSaved();
+    } catch (err) {
+      console.error('[TambahKuponForm] delete error:', err);
+      setError('Gagal menghapus kupon diskon.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-5 border-b border-slate-100">
-        <h2 className="text-slate-800 font-extrabold text-[15px]">{initial ? 'Ubah' : 'Tambah'} Kupon Diskon</h2>
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 animate-in fade-in duration-200">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-slate-100 mb-6">
+        <h2 className="text-slate-800 font-extrabold text-base">Rincian Diskon</h2>
         <div className="flex items-center gap-4">
-          <button type="button" onClick={onCancel} className="text-slate-500 hover:text-slate-700 text-xs font-bold cursor-pointer transition-colors">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-blue-600 hover:text-blue-700 text-xs font-bold cursor-pointer transition-colors"
+          >
             Batal
           </button>
-          <div className="text-right">
-            <div className="text-[10px] font-bold text-slate-400 leading-none mb-1 uppercase tracking-wider">Simpan di:</div>
-            <select className="border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-600 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer">
-              <option>{accountName}</option>
-            </select>
-          </div>
           <button
             type="button"
             disabled={saving}
             onClick={handleSave}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-60 text-white rounded-xl px-4.5 py-2.5 text-xs font-bold cursor-pointer transition-all active:scale-[0.98] shadow-md shadow-emerald-500/10"
+            className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white rounded-xl px-5 py-2.5 text-xs font-bold cursor-pointer transition-all active:scale-[0.98] shadow-md shadow-emerald-500/10"
           >
             <Check size={14} /> {saving ? 'Menyimpan...' : 'Simpan'}
           </button>
         </div>
       </div>
 
-      <ErrorBanner message={error} />
+      {error && (
+        <div className="mb-5 px-4 py-3 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold">
+          {error}
+        </div>
+      )}
 
-      <div className="px-6 pt-5 text-sm font-semibold text-orange-500">Rincian Diskon</div>
-      <div className="divide-y divide-slate-100">
-        <FormRow label="Kode" required help="Harus unik dan max. 12 karakter">
-          <div className="flex items-center gap-2">
-            <input type="text" value={kode} onChange={(e) => setKode(e.target.value)} maxLength={12} className={inputCls} />
-            <button
-              type="button"
-              onClick={() => setKode(randomKode())}
-              title="Buat kode baru"
-              className="shrink-0 p-2.5 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-blue-500 transition-colors cursor-pointer"
-            >
-              <RefreshCw size={14} />
-            </button>
-          </div>
-        </FormRow>
-
-        <FormRow label="Judul" required>
-          <input type="text" placeholder="Masukkan Judul" value={judul} onChange={(e) => setJudul(e.target.value)} className={inputCls} />
-        </FormRow>
-
-        <FormRow label="Tanggal Aktif">
-          <div className="relative">
-            <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="date" value={tanggalAktif} onChange={(e) => setTanggalAktif(e.target.value)} className={`${inputCls} pl-9`} />
-          </div>
-        </FormRow>
-
-        {toggleRow('Tanpa Kadaluarsa', 'noExpiry')}
-
-        <FormRow label="Min. Total Harga Pesanan" help="Minimal jumlah pembelian untuk mendapatkan diskon ini">
-          <input type="number" min="0" value={minTotal} onChange={(e) => setMinTotal(e.target.value)} className={inputCls} />
-        </FormRow>
-
-        {toggleRow('Penggunaan Tidak Terbatas?', 'unlimitedUsage')}
-
-        <FormRow label="Batas Penggunaan">
-          <input
-            type="number"
-            min="0"
-            placeholder="Batas Penggunaan"
-            value={batasPenggunaan}
-            onChange={(e) => setBatasPenggunaan(e.target.value)}
-            disabled={tg.unlimitedUsage}
-            className={`${inputCls} ${tg.unlimitedUsage ? 'bg-slate-50 cursor-not-allowed' : ''}`}
-          />
-        </FormRow>
-
-        {toggleRow('Tampilkan di POS?', 'showPos')}
-        {toggleRow('Tampilkan di Online Order?', 'showOnline')}
-        {toggleRow('Digunakan sekali per pelanggan', 'oncePerCustomer')}
-        {toggleRow('Penggunaan Ulang Harian', 'dailyReuse')}
-        {toggleRow('Gunakan untuk Dine-in', 'dineIn')}
-        {toggleRow('Gunakan untuk Delivery', 'delivery')}
-        {toggleRow('Gunakan untuk Take Away', 'takeAway')}
-        {toggleRow('Gunakan untuk Reservasi', 'reservasi')}
-
-        <FormRow label="Jumlah Diskon" required help="Cukup hanya masukkan angka saja, tanpa simbol persen (%), minimal: 0 dan maksimal: 100">
-          <div className="space-y-2">
-            <PercentNominalField value={discountType} onChange={setDiscountType} />
-            <input
-              type="number"
-              min="0"
-              placeholder="Masukkan angka contoh: 1234"
-              value={jumlahDiskon}
-              onChange={(e) => setJumlahDiskon(e.target.value)}
-              className={inputCls}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Kolom Kiri & Tengah: Form Inputs */}
+        <div className="md:col-span-2 border border-slate-100 rounded-2xl p-6 bg-slate-50/20 flex flex-col justify-between">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {/* Bagian Input Kiri */}
+            <KuponDetailsForm
+              kode={kode}
+              setKode={setKode}
+              judul={judul}
+              setJudul={setJudul}
+              maksDiskon={maksDiskon}
+              setMaksDiskon={setMaksDiskon}
+              minTotal={minTotal}
+              setMinTotal={setMinTotal}
+              tanggalAktif={tanggalAktif}
+              setTanggalAktif={setTanggalAktif}
+              tg={tg}
+              setT={setT}
+              tanggalKadaluarsa={tanggalKadaluarsa}
+              setTanggalKadaluarsa={setTanggalKadaluarsa}
             />
+
+            {/* Bagian Input Tengah (Toggles/Features) */}
+            <KuponFeaturesForm
+              tg={tg}
+              setT={setT}
+              batasPenggunaan={batasPenggunaan}
+              setBatasPenggunaan={setBatasPenggunaan}
+            />
+
+            {/* Bagian Input Kanan (Diskon Selector) */}
+            <div className="space-y-4 pt-4 lg:pt-0 border-t lg:border-t-0 border-slate-200/60">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Diskon</label>
+
+              {/* Segmented Control */}
+              <div className="flex rounded-lg border border-slate-200 overflow-hidden bg-slate-100/50 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setDiscountType('percent')}
+                  className={`flex-1 py-1.5 text-xs font-extrabold text-center rounded-md cursor-pointer transition-all ${
+                    discountType === 'percent'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  % Persen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDiscountType('nominal')}
+                  className={`flex-1 py-1.5 text-xs font-extrabold text-center rounded-md cursor-pointer transition-all ${
+                    discountType === 'nominal'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  $ Nominal
+                </button>
+              </div>
+
+              {/* Input Value */}
+              <div>
+                <input
+                  type="number"
+                  min="0"
+                  value={jumlahDiskon}
+                  onChange={(e) => setJumlahDiskon(e.target.value)}
+                  placeholder="Contoh: 10 atau 10000"
+                  className="w-full border border-slate-200 rounded-xl px-3.5 py-3 text-lg font-bold text-slate-800 outline-none bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all placeholder-slate-450"
+                />
+                <span className="text-[10px] text-slate-400 font-medium block mt-1">
+                  {discountType === 'percent'
+                    ? 'Masukkan persentase diskon (1 - 100).'
+                    : 'Masukkan nominal rupiah diskon.'}
+                </span>
+              </div>
+            </div>
           </div>
-        </FormRow>
 
-        <FormRow label="Maksimal Jumlah Diskon">
-          <input type="number" min="0" value={maksDiskon} onChange={(e) => setMaksDiskon(e.target.value)} className={inputCls} />
-        </FormRow>
-      </div>
+          {/* Delete Button */}
+          {initial?.id && (
+            <div className="mt-8 pt-5 border-t border-slate-100 flex justify-start">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleDelete}
+                className="flex items-center gap-1.5 border border-slate-250 text-slate-500 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 rounded-xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer"
+              >
+                <Trash2 size={13} /> {deleting ? 'Menghapus...' : 'Hapus'}
+              </button>
+            </div>
+          )}
+        </div>
 
-      <div className="px-6 pt-5 text-sm font-semibold text-orange-500">Kriteria Diskon</div>
-      <div className="divide-y divide-slate-100">
-        {toggleRow('Berlakukan untuk semua pelanggan?', 'allCustomers')}
-        {!tg.allCustomers && (
-          <>
-            <FormRow label="Berlaku untuk tipe pelanggan">
-              <input type="text" placeholder="Masukkan Tipe Pelanggan" value={tipePelanggan} onChange={(e) => setTipePelanggan(e.target.value)} className={inputCls} />
-            </FormRow>
-            <FormRow label="Berlaku untuk pelanggan">
-              <TagPicker value={pelanggan} onChange={setPelanggan} fetchUrl="/contacts/" placeholder="Cari pelanggan..." />
-            </FormRow>
-          </>
-        )}
-
-        {toggleRow('Berlakukan untuk semua produk?', 'allProducts')}
-        {!tg.allProducts && (
-          <>
-            <FormRow label="Berlaku untuk grup produk">
-              <TagPicker value={grupProduk} onChange={setGrupProduk} fetchUrl="/product-categories/" placeholder="Cari grup produk..." />
-            </FormRow>
-            <FormRow label="Berlaku untuk produk">
-              <TagPicker value={produk} onChange={setProduk} fetchUrl="/products/" placeholder="Cari produk..." />
-            </FormRow>
-          </>
-        )}
-
-        {toggleRow('Berlakukan untuk semua paket produk?', 'allPackages')}
-        {!tg.allPackages && (
-          <FormRow label="Berlaku untuk paket produk">
-            <TagPicker value={paketProduk} onChange={setPaketProduk} fetchUrl="/product-packages/" placeholder="Cari paket produk..." />
-          </FormRow>
-        )}
-
-        {toggleRow('Berlakukan untuk semua brand?', 'allBrands')}
-        {!tg.allBrands && (
-          <FormRow label="Berlaku untuk brand">
-            <TagPicker value={brand} onChange={setBrand} fetchUrl="/brands/" placeholder="Cari brand..." />
-          </FormRow>
-        )}
+        {/* Kolom Kanan: Aturan/Kriteria */}
+        <KuponRulesForm
+          tg={tg}
+          setT={setT}
+          tipePelanggan={tipePelanggan}
+          setTipePelanggan={setTipePelanggan}
+          pelanggan={pelanggan}
+          setPelanggan={setPelanggan}
+          grupProduk={grupProduk}
+          setGrupProduk={setGrupProduk}
+          produk={produk}
+          setProduk={setProduk}
+          paketProduk={paketProduk}
+          setPaketProduk={setPaketProduk}
+          brand={brand}
+          setBrand={setBrand}
+        />
       </div>
     </div>
   );
