@@ -65,6 +65,33 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
   // Dokumen aktif (mentah dari API) untuk layar detail
   const [activeDoc, setActiveDoc] = useState(null);
 
+  // Inline edit kartu Tanggal & Catatan (pola sama dengan StockOutPage).
+  // Backend hanya mengizinkan ubah saat status draft (product_views.py:1666).
+  const [isEditingTanggal, setIsEditingTanggal] = useState(false);
+  const [isEditingCatatan, setIsEditingCatatan] = useState(false);
+  const [editTanggalValue, setEditTanggalValue] = useState('');
+  const [editCatatanValue, setEditCatatanValue] = useState('');
+
+  const patchDocument = async (payload) => {
+    try {
+      const res = await apiClient.patch(`/stock-production-documents/${activeDoc.id}/`, payload);
+      setActiveDoc(res.data);
+      return true;
+    } catch (err) {
+      console.error('[StockProductionPage] patch document error:', err);
+      setError(err.response?.data?.error || 'Gagal menyimpan perubahan.');
+      return false;
+    }
+  };
+
+  const saveInlineTanggal = async () => {
+    if (await patchDocument({ tanggal: editTanggalValue })) setIsEditingTanggal(false);
+  };
+
+  const saveInlineCatatan = async () => {
+    if (await patchDocument({ catatan: editCatatanValue })) setIsEditingCatatan(false);
+  };
+
   const fetchDocuments = async () => {
     setListLoading(true);
     try {
@@ -525,13 +552,70 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              {/* Kartu Tanggal — bisa diubah selama dokumen masih draft */}
               <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
-                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>Tanggal Produksi</span>
-                <span style={{ fontSize: '14px', color: '#1e293b', fontWeight: 'semibold' }}>{formatDisplayDate(activeDoc.tanggal)}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold' }}>Tanggal Produksi</span>
+                  {activeDoc.status === 'draft' && (!isEditingTanggal ? (
+                    <button
+                      onClick={() => {
+                        setEditTanggalValue(activeDoc.tanggal || '');
+                        setIsEditingTanggal(true);
+                      }}
+                      style={{ border: 0, background: 'transparent', color: '#0ea5e9', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', padding: 0 }}
+                    >
+                      Ubah
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={saveInlineTanggal} style={{ border: 0, background: 'transparent', color: '#16a34a', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', padding: 0 }}>Simpan</button>
+                      <button onClick={() => setIsEditingTanggal(false)} style={{ border: 0, background: 'transparent', color: '#ef4444', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', padding: 0 }}>Batal</button>
+                    </div>
+                  ))}
+                </div>
+                {!isEditingTanggal ? (
+                  <span style={{ fontSize: '14px', color: '#1e293b', fontWeight: 'semibold' }}>{formatDisplayDate(activeDoc.tanggal)}</span>
+                ) : (
+                  <input
+                    type="date"
+                    value={editTanggalValue}
+                    onChange={(e) => setEditTanggalValue(e.target.value)}
+                    style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '6px 8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                )}
               </div>
+
+              {/* Kartu Catatan — bisa diubah selama dokumen masih draft */}
               <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
-                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>Catatan</span>
-                <span style={{ fontSize: '14px', color: activeDoc.catatan ? '#1e293b' : '#94a3b8', fontWeight: 'semibold' }}>{activeDoc.catatan || '-'}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold' }}>Catatan</span>
+                  {activeDoc.status === 'draft' && (!isEditingCatatan ? (
+                    <button
+                      onClick={() => {
+                        setEditCatatanValue(activeDoc.catatan || '');
+                        setIsEditingCatatan(true);
+                      }}
+                      style={{ border: 0, background: 'transparent', color: '#0ea5e9', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', padding: 0 }}
+                    >
+                      Ubah
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={saveInlineCatatan} style={{ border: 0, background: 'transparent', color: '#16a34a', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', padding: 0 }}>Simpan</button>
+                      <button onClick={() => setIsEditingCatatan(false)} style={{ border: 0, background: 'transparent', color: '#ef4444', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', padding: 0 }}>Batal</button>
+                    </div>
+                  ))}
+                </div>
+                {!isEditingCatatan ? (
+                  <span style={{ fontSize: '14px', color: activeDoc.catatan ? '#1e293b' : '#94a3b8', fontWeight: 'semibold' }}>{activeDoc.catatan || '-'}</span>
+                ) : (
+                  <textarea
+                    value={editCatatanValue}
+                    onChange={(e) => setEditCatatanValue(e.target.value)}
+                    rows={2}
+                    style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '6px 8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
+                  />
+                )}
               </div>
             </div>
           </div>
