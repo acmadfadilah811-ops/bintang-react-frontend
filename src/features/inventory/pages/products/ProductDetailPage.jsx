@@ -1294,17 +1294,15 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
       `}</style>
       <div style={{
         position: 'sticky',
-        top: 72,
+        top: 0,
         zIndex: 25,
-        background: 'rgba(248, 250, 252, 0.9)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        background: '#f8fafc',
         paddingTop: 12,
         paddingBottom: 8,
         display: 'flex',
         alignItems: 'center',
         gap: 20,
-        marginBottom: 16,
+        marginBottom: 24,
         borderBottom: '1px solid #e2e8f0'
       }}>
         <button
