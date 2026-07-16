@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, ChevronDown, Calendar, Printer, X, Plus, CloudUpload, Download, Check, ChevronsUpDown, ArrowLeft, Trash2 } from 'lucide-react';
+import { Search, ChevronDown, Calendar, Printer, X, Plus, CloudUpload, Download, Check, ChevronsUpDown, ArrowLeft, Trash2, FileText } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import apiClient from '../../../../api/apiClient';
 import { getLogoUrl } from '../../../../utils/logo';
@@ -38,12 +38,6 @@ const getFileSizeStr = (size) => {
   if (!size) return '0.0 KB';
   const kb = size / 1024;
   return `${kb.toFixed(1)} KB`;
-};
-
-const truncateFilename = (name) => {
-  if (!name) return '';
-  if (name.length <= 25) return name;
-  return name.slice(0, 18) + '...';
 };
 
 const mapDocToRow = (doc) => ({
@@ -1465,7 +1459,8 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
       {/* MODAL: Import Stok Masuk via CSV */}
       {showImportModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#ffffff', borderRadius: '8px', width: '90%', maxWidth: '680px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+          {/* 860px, bukan 680px — 7 kolom pratinjau terjepit di lebar lama. */}
+          <div style={{ background: '#ffffff', borderRadius: '8px', width: '90%', maxWidth: '860px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
               <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>Import Stok Masuk</h3>
@@ -1511,7 +1506,11 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
               <div style={{ flex: 1, borderLeft: '1px solid #e2e8f0', paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Import dari CSV (max. 200 baris)</span>
                 
-                {/* Upload Container Box */}
+                {/* Satu kotak memuat file + status + pratinjau datanya sekaligus.
+                    Olsera menaruh teks datanya DI DALAM kotak dan tombol aksinya
+                    di bawah kotak; punya kita sebelumnya menjatuhkan pratinjau di
+                    luar kotak sehingga terbaca berantakan.
+                    overflow:hidden aman di sini — tidak ada dropdown di dalam kotak. */}
                 <div style={{
                   width: '100%',
                   minHeight: '240px',
@@ -1519,14 +1518,13 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                   border: '1px solid #e2e8f0',
                   borderRadius: '6px',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  flexDirection: 'column',
                   position: 'relative',
-                  padding: '16px',
+                  overflow: 'hidden',
                   boxSizing: 'border-box'
                 }}>
                   {!importFile ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', padding: '16px' }}>
                       <CloudUpload size={32} style={{ color: '#94a3b8' }} />
                       <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '500' }}>Pilih atau seret file ke sini</span>
                       <input
@@ -1549,159 +1547,147 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                       />
                     </div>
                   ) : (
-                    /* Blue status card exactly matching the screenshot */
-                    <div style={{
-                      width: '160px',
-                      height: '160px',
-                      background: '#3b82f6',
-                      borderRadius: '4px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      position: 'relative',
-                      color: '#ffffff',
-                      overflow: 'hidden',
-                      boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-                      padding: '12px',
-                      boxSizing: 'border-box'
-                    }}>
-                      {/* Top Left: file size */}
-                      <span style={{ fontSize: '11px', fontWeight: 'bold' }}>{getFileSizeStr(importFile.size)}</span>
-                      
-                      {/* Center: white X in blue circle */}
-                      <button
-                        type="button"
-                        onClick={resetImportState}
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          background: '#ffffff',
-                          color: '#3b82f6',
-                          border: 0,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          alignSelf: 'center',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 4px 0 rgba(0,0,0,0.1)'
-                        }}
-                      >
-                        <X size={16} />
-                      </button>
+                    <>
+                      {/* Baris identitas file */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#ffffff', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+                        <FileText size={16} style={{ color: '#3b82f6', flexShrink: 0 }} />
+                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#1e293b', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {importFile.name}
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#94a3b8', flexShrink: 0 }}>{getFileSizeStr(importFile.size)}</span>
+                        <button
+                          type="button"
+                          onClick={resetImportState}
+                          title="Buang file"
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: '#f1f5f9', color: '#64748b', border: 0, cursor: 'pointer', flexShrink: 0 }}
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
 
-                      {/* Bottom: filename */}
-                      <span style={{ fontSize: '10px', textAlign: 'center', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', width: '100%', display: 'block' }}>
-                        {truncateFilename(importFile.name)}
-                      </span>
+                      {/* Status — dulu cuma teks 11px terselip di kanan judul pratinjau */}
+                      {(() => {
+                        const pesanServer = importResult?.errors || [];
+                        const bermasalah = previewIssues.length > 0 || pesanServer.length > 0;
+                        return (
+                          <div style={{
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            padding: '10px 12px', flexShrink: 0,
+                            background: bermasalah ? '#fef2f2' : '#f0fdf4',
+                            borderBottom: `1px solid ${bermasalah ? '#fecaca' : '#bbf7d0'}`,
+                            color: bermasalah ? '#b91c1c' : '#15803d',
+                          }}>
+                            {bermasalah ? <X size={15} style={{ flexShrink: 0 }} /> : <Check size={15} style={{ flexShrink: 0 }} />}
+                            <span style={{ fontSize: '13px', fontWeight: 'bold' }}>
+                              {bermasalah
+                                ? `${previewIssues.length + pesanServer.length} masalah — perbaiki dulu`
+                                : `${previewRows.length} baris siap diimpor`}
+                            </span>
+                          </div>
+                        );
+                      })()}
 
-                      {/* Error banner overlay if any error */}
-                      {importResult && importResult.errors && importResult.errors.length > 0 && (
-                        <div style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          background: '#dc2626',
-                          color: '#ffffff',
-                          padding: '6px 8px',
-                          fontSize: '10px',
-                          textAlign: 'center',
-                          fontWeight: 'bold',
-                          lineHeight: '1.2',
-                          maxHeight: '80px',
-                          overflowY: 'auto',
-                          boxSizing: 'border-box'
-                        }}>
-                          {importResult.errors[0]}
+                      {/* Masalah dari pratinjau (sebelum kirim) maupun jawaban server */}
+                      {(previewIssues.length > 0 || (importResult?.errors?.length > 0)) && (
+                        <div style={{ maxHeight: '84px', overflowY: 'auto', padding: '8px 12px', background: '#fff1f2', borderBottom: '1px solid #fecaca', flexShrink: 0 }}>
+                          {[...previewIssues, ...(importResult?.errors || [])].map((msg, i) => (
+                            <div key={i} style={{ fontSize: '11px', color: '#b91c1c', lineHeight: '1.5' }}>• {msg}</div>
+                          ))}
                         </div>
                       )}
-                    </div>
+
+                      {/* Teks datanya — ini yang diminta: ada DI DALAM kotak */}
+                      {previewRows.length > 0 && (
+                        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', background: '#ffffff' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                            <thead>
+                              <tr style={{ background: '#f8fafc' }}>
+                                <th style={{ padding: '6px 8px', textAlign: 'left', color: '#64748b', position: 'sticky', top: 0, background: '#f8fafc' }}>#</th>
+                                {CSV_PREVIEW_COLUMNS.map((col) => (
+                                  <th key={col.key} style={{ padding: '6px 8px', textAlign: 'left', color: '#64748b', whiteSpace: 'nowrap', position: 'sticky', top: 0, background: '#f8fafc' }}>
+                                    {col.label}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {previewRows.map((row, i) => (
+                                <tr key={i} style={{ borderTop: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '5px 8px', color: '#94a3b8' }}>{i + 1}</td>
+                                  {CSV_PREVIEW_COLUMNS.map((col) => (
+                                    <td key={col.key} style={{ padding: '5px 8px', color: '#334155', whiteSpace: 'nowrap' }}>
+                                      {row[col.key] || '-'}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
+                {/* Aksi tepat di bawah kotak, mengikuti Olsera. flexShrink: 0 wajib —
+                    tanpa itu tombol tergencet saat nama file panjang. */}
                 {importFile && (
-                  <button
-                    type="button"
-                    onClick={resetImportState}
-                    style={{
-                      alignSelf: 'flex-start',
-                      background: '#ffffff',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '4px',
-                      padding: '6px 12px',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                      color: '#475569',
-                      cursor: 'pointer',
-                      boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)',
-                      marginTop: '4px'
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
-                    onMouseOut={(e) => e.currentTarget.style.background = '#ffffff'}
-                  >
-                    Hapus semua file
-                  </button>
-                )}
-
-                {/* Preview isi CSV — ditampilkan SEBELUM dikirim ke server */}
-                {importFile && (previewRows.length > 0 || previewIssues.length > 0) && (
-                  <div style={{ marginTop: '4px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#334155' }}>
-                        Pratinjau data ({previewRows.length} baris)
-                      </span>
-                      {previewIssues.length === 0 ? (
-                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#16a34a' }}>Siap diimpor</span>
-                      ) : (
-                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#dc2626' }}>
-                          {previewIssues.length} masalah
-                        </span>
-                      )}
-                    </div>
-
-                    {previewRows.length > 0 && (
-                      <div style={{ maxHeight: '180px', overflow: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
-                          <thead>
-                            <tr style={{ background: '#f8fafc' }}>
-                              <th style={{ padding: '6px 8px', textAlign: 'left', color: '#64748b', position: 'sticky', top: 0, background: '#f8fafc' }}>#</th>
-                              {CSV_PREVIEW_COLUMNS.map((col) => (
-                                <th key={col.key} style={{ padding: '6px 8px', textAlign: 'left', color: '#64748b', whiteSpace: 'nowrap', position: 'sticky', top: 0, background: '#f8fafc' }}>
-                                  {col.label}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {previewRows.map((row, i) => (
-                              <tr key={i} style={{ borderTop: '1px solid #f1f5f9' }}>
-                                <td style={{ padding: '5px 8px', color: '#94a3b8' }}>{i + 1}</td>
-                                {CSV_PREVIEW_COLUMNS.map((col) => (
-                                  <td key={col.key} style={{ padding: '5px 8px', color: '#334155', whiteSpace: 'nowrap' }}>
-                                    {row[col.key] || '-'}
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-
-                    {previewIssues.length > 0 && (
-                      <div style={{ marginTop: '6px', maxHeight: '90px', overflowY: 'auto', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '8px 10px' }}>
-                        {previewIssues.map((msg, i) => (
-                          <div key={i} style={{ fontSize: '11px', color: '#b91c1c', lineHeight: '1.5' }}>• {msg}</div>
-                        ))}
-                      </div>
-                    )}
-
-                    <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '6px' }}>
-                      Produk dicocokkan lewat SKU, atau nama produk bila SKU kosong.
-                    </div>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={resetImportState}
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        padding: '8px 16px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        color: '#475569',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)',
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                      onMouseOut={(e) => e.currentTarget.style.background = '#ffffff'}
+                    >
+                      Hapus
+                    </button>
+                    {(() => {
+                      // CSV bermasalah ditolak di sini, sebelum dokumen dibuat di server.
+                      const belumSiap = importing || previewRows.length === 0 || previewIssues.length > 0;
+                      return (
+                        <button
+                          type="button"
+                          onClick={handleImportCsv}
+                          disabled={belumSiap}
+                          title={previewIssues.length > 0 ? 'Perbaiki dulu masalah pada file CSV' : undefined}
+                          style={{
+                            background: belumSiap ? '#99f6e4' : '#0d9488',
+                            border: 0,
+                            borderRadius: '4px',
+                            padding: '8px 20px',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            color: '#ffffff',
+                            cursor: belumSiap ? 'not-allowed' : 'pointer',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {importing
+                            ? 'Memproses...'
+                            : previewRows.length > 0 && previewIssues.length === 0
+                              ? `Proses ${previewRows.length} baris`
+                              : 'Proses'}
+                        </button>
+                      );
+                    })()}
                   </div>
                 )}
+
+                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                  Produk dicocokkan lewat SKU, atau nama produk bila SKU kosong.
+                </div>
 
                 {/* Import success count banner */}
                 {importResult && importResult.createdCount > 0 && (
@@ -1723,41 +1709,14 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
 
             {/* Modal Actions Footer */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '16px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+              {/* Aksi utama (Hapus/Proses) ada di bawah kotak, mengikuti Olsera —
+                  footer cukup untuk menutup modal. */}
               <button
-                onClick={() => setShowImportModal(false)}
+                onClick={() => { setShowImportModal(false); resetImportState(); }}
                 style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '8px 20px', fontSize: '13px', fontWeight: 'bold', color: '#475569', cursor: 'pointer' }}
               >
-                Batal
+                Tutup
               </button>
-              {(() => {
-                // Tombol hanya aktif kalau preview bersih — CSV bermasalah
-                // ditolak di sini, sebelum dokumen dibuat di server.
-                const belumSiap = !importFile || importing
-                  || previewRows.length === 0 || previewIssues.length > 0;
-                return (
-                  <button
-                    onClick={handleImportCsv}
-                    disabled={belumSiap}
-                    title={previewIssues.length > 0 ? 'Perbaiki dulu masalah pada file CSV' : undefined}
-                    style={{
-                      background: belumSiap ? '#99f6e4' : '#0d9488',
-                      border: 0,
-                      borderRadius: '4px',
-                      padding: '8px 24px',
-                      fontSize: '13px',
-                      fontWeight: 'bold',
-                      color: '#ffffff',
-                      cursor: belumSiap ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {importing
-                      ? 'Memproses...'
-                      : previewRows.length > 0 && previewIssues.length === 0
-                        ? `Import ${previewRows.length} baris`
-                        : 'Import'}
-                  </button>
-                );
-              })()}
             </div>
           </div>
         </div>
