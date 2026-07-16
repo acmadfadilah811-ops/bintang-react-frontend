@@ -100,6 +100,10 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
   // datanya sebelum dokumen dibuat di server (mencegah draft sampah).
   const [previewRows, setPreviewRows] = useState([]);
   const [previewIssues, setPreviewIssues] = useState([]);
+  // Daftar nama supplier (huruf kecil) untuk validasi preview.
+  // null = belum/gagal dimuat -> validasi supplier dilewati di sini dan
+  // diserahkan ke backend, supaya user tidak diblokir tanpa alasan jelas.
+  const [supplierNames, setSupplierNames] = useState(null);
 
   // Stock List State (dari API)
   const [stockList, setStockList] = useState([]);
@@ -275,6 +279,26 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
   };
 
   // Import CSV: buat dokumen draft baru lalu proses file CSV sekaligus
+  // Muat daftar supplier saat modal import dibuka, supaya preview bisa
+  // memperingatkan supplier tak dikenal sebelum file diunggah.
+  useEffect(() => {
+    if (!showImportModal) return undefined;
+    let dibatalkan = false;
+    (async () => {
+      try {
+        const res = await apiClient.get('/suppliers/');
+        const list = Array.isArray(res.data) ? res.data : (res.data?.results || []);
+        if (!dibatalkan) {
+          setSupplierNames(new Set(list.map((s) => String(s.nama || '').trim().toLowerCase())));
+        }
+      } catch (err) {
+        console.error('[StockInPage] gagal memuat daftar supplier:', err);
+        if (!dibatalkan) setSupplierNames(null);
+      }
+    })();
+    return () => { dibatalkan = true; };
+  }, [showImportModal]);
+
   // Baca & periksa CSV di browser sebelum apa pun dikirim ke server.
   // Aturan validasinya sengaja dibuat mengikuti backend (import_csv):
   // produk dicocokkan lewat sku ATAU nama, qty wajib angka > 0.
@@ -308,6 +332,19 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
           issues.push(`Baris ${baris}: qty harus lebih besar dari 0.`);
         }
       });
+
+      // Supplier yang diisi harus sudah terdaftar (backend juga menolak).
+      // Kolom kosong tetap boleh — template resmi pun mencontohkan begitu.
+      if (supplierNames) {
+        const takDikenal = [...new Set(rows.map((r) => r.supplier).filter(Boolean))]
+          .filter((nama) => !supplierNames.has(nama.toLowerCase()));
+        if (takDikenal.length > 0) {
+          issues.push(
+            `Supplier belum terdaftar: ${takDikenal.map((n) => `"${n}"`).join(', ')}. `
+            + 'Tambahkan dulu lewat menu Pelanggan & Supplier, atau kosongkan kolom supplier.'
+          );
+        }
+      }
 
       setPreviewRows(rows);
       setPreviewIssues(issues);
