@@ -749,8 +749,11 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
               <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>Produk yang Diproduksi</span>
             </div>
             <div style={{ padding: '20px' }}>
+              {/* Proporsi mengikuti Olsera: kolom produk melebar, qty diberi
+                  ruang cukup supaya tombol - dan + tidak berdempetan dan
+                  terbaca sebagai satu tombol. */}
               {activeDoc.status === 'draft' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 120px auto', gap: '16px', alignItems: 'flex-end', marginBottom: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 40px', gap: '12px', alignItems: 'flex-end', marginBottom: '20px' }}>
                   <div style={{ position: 'relative' }}>
                     <label style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', marginBottom: '6px', display: 'block' }}>Produk</label>
                     <div style={{ position: 'relative' }}>
@@ -797,7 +800,7 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
                     disabled={!selectedProduct || itemSaving}
                     style={{
                       background: (!selectedProduct || itemSaving) ? '#bae6fd' : '#0ea5e9',
-                      color: '#ffffff', border: 0, borderRadius: '4px', width: '36px', height: '36px',
+                      color: '#ffffff', border: 0, borderRadius: '4px', width: '40px', height: '36px',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       cursor: (!selectedProduct || itemSaving) ? 'not-allowed' : 'pointer',
                     }}

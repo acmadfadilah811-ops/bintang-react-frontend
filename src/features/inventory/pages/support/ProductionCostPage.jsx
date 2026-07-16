@@ -62,7 +62,8 @@ export function ProductionCostPage() {
     setSaving(true);
     setError('');
     try {
-      const payload = { nama: form.nama, nilai: form.nilai || 0, akun: form.akun };
+      // akun: null, bukan '' — opsional, dan DRF menolak string kosong untuk FK.
+      const payload = { nama: form.nama, nilai: form.nilai || 0, akun: form.akun || null };
       if (form.id) {
         await apiClient.patch(`/production-costs/${form.id}/`, payload);
       } else {
@@ -167,12 +168,12 @@ export function ProductionCostPage() {
               onChange={(e) => setForm({ ...form, akun: e.target.value })}
               style={{ border: '1px solid #cbd5e1', borderRadius: '4px', padding: '7px 10px', fontSize: '13px', outline: 'none', background: '#fff' }}
             >
-              <option value="">Pilih akun…</option>
+              <option value="">Akun terkait (opsional)</option>
               {akunList.map((a) => (
                 <option key={a.id} value={a.id}>{a.kode_akun} — {a.nama_akun}</option>
               ))}
             </select>
-            <Button variant="primary" disabled={!form.nama || !form.akun || saving} onClick={simpan}>
+            <Button variant="primary" disabled={!form.nama || saving} onClick={simpan}>
               {saving ? 'Menyimpan…' : 'Simpan'}
             </Button>
             <button

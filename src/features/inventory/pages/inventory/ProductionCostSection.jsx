@@ -87,7 +87,8 @@ export function ProductionCostSection({ documentId, isDraft, biaya = [], totalBi
       const res = await apiClient.post('/production-costs/', {
         nama: formNama,
         nilai: formNilai || 0,
-        akun: formAkun,
+        // null, bukan '' — akun opsional dan DRF menolak string kosong untuk FK.
+        akun: formAkun || null,
       });
       setShowBuatBaru(false);
       setFormNama(''); setFormNilai(''); setFormAkun('');
@@ -228,20 +229,20 @@ export function ProductionCostSection({ documentId, isDraft, biaya = [], totalBi
               onChange={(e) => setFormAkun(e.target.value)}
               style={{ border: '1px solid #cbd5e1', borderRadius: '4px', padding: '7px 10px', fontSize: '13px', outline: 'none', background: '#fff' }}
             >
-              <option value="">Pilih akun…</option>
+              <option value="">Akun terkait (opsional)</option>
               {akunList.map((a) => (
                 <option key={a.id} value={a.id}>{a.kode_akun} — {a.nama_akun}</option>
               ))}
             </select>
             <button
               type="button"
-              disabled={!formNama || !formAkun || saving}
+              disabled={!formNama || saving}
               onClick={simpanBiayaBaru}
               style={{
-                background: (!formNama || !formAkun || saving) ? '#bae6fd' : '#0ea5e9',
+                background: (!formNama || saving) ? '#bae6fd' : '#0ea5e9',
                 border: 0, borderRadius: '4px', padding: '7px 16px', fontSize: '13px',
                 fontWeight: 'bold', color: '#fff',
-                cursor: (!formNama || !formAkun || saving) ? 'not-allowed' : 'pointer',
+                cursor: (!formNama || saving) ? 'not-allowed' : 'pointer',
               }}
             >
               Simpan
