@@ -15,7 +15,6 @@ export default function TambahDiskonForm({ initial, onCancel, onSaved }) {
   const [jumlahDiskon, setJumlahDiskon] = useState(initial ? String(initial.jumlah_diskon) : '0');
   const [tipePelanggan, setTipePelanggan] = useState(initial?.tipe_pelanggan || '');
   const [brand, setBrand] = useState(initial?.brand || '');
-  const [catatan, setCatatan] = useState(initial?.catatan || '');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
@@ -36,7 +35,7 @@ export default function TambahDiskonForm({ initial, onCancel, onSaved }) {
       jumlah_diskon: parseFloat(jumlahDiskon) || 0,
       tipe_pelanggan: tipePelanggan,
       brand,
-      catatan,
+      catatan: '',
     };
     try {
       if (initial?.id) {
@@ -150,19 +149,6 @@ export default function TambahDiskonForm({ initial, onCancel, onSaved }) {
                     className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all animate-in fade-in duration-200"
                   />
                 )}
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
-                  Catatan (Opsional)
-                </label>
-                <textarea
-                  value={catatan}
-                  onChange={(e) => setCatatan(e.target.value)}
-                  rows={2}
-                  placeholder="Masukkan catatan..."
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all placeholder-slate-400"
-                />
               </div>
             </div>
 
