@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Plus, ChevronsUpDown, Pencil, Trash2 } from 'lucide-react';
+import { Plus, ChevronsUpDown } from 'lucide-react';
 import apiClient from '../../../api/apiClient';
 import { fmtDate, fmtDiskon } from '../format';
-import { StatusToggle } from './Common';
 import TambahKuponForm from './TambahKuponForm';
+import DetailKuponDiskon from './DetailKuponDiskon';
 
 /** Tab "Kupon Diskon". */
 export default function KuponDiskonTab() {
   const [view, setView] = useState('list');
   const [editing, setEditing] = useState(null);
+  const [selected, setSelected] = useState(null);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -33,24 +34,22 @@ export default function KuponDiskonTab() {
     fetchRows();
   }, []);
 
-  const handleToggle = async (row) => {
-    try {
-      const res = await apiClient.post(`/discount-coupons/${row.id}/toggle-status/`);
-      setRows((prev) => prev.map((r) => (r.id === row.id ? res.data : r)));
-    } catch (err) {
-      console.error('[VoucherDiskon] toggle coupon error:', err);
-    }
-  };
-
-  const handleDelete = async (row) => {
-    if (!window.confirm(`Hapus kupon "${row.kode}"?`)) return;
-    try {
-      await apiClient.delete(`/discount-coupons/${row.id}/`);
-      fetchRows();
-    } catch (err) {
-      console.error('[VoucherDiskon] delete coupon error:', err);
-    }
-  };
+  if (view === 'detail') {
+    return (
+      <DetailKuponDiskon
+        row={selected}
+        onCancel={() => {
+          setView('list');
+          setSelected(null);
+        }}
+        onEdit={(row) => {
+          setEditing(row);
+          setView('edit');
+        }}
+        onSaved={fetchRows}
+      />
+    );
+  }
 
   if (view === 'create' || view === 'edit') {
     return (
@@ -77,7 +76,6 @@ export default function KuponDiskonTab() {
     { key: null, label: 'Berakhir' },
     { key: null, label: 'Kadaluarsa' },
     { key: null, label: 'Penggunaan' },
-    { key: null, label: 'Aksi' },
   ];
 
   const sortedRows = sortKey
@@ -136,7 +134,14 @@ export default function KuponDiskonTab() {
                 </tr>
               ) : (
                 sortedRows.map((row) => (
-                  <tr key={row.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/30 transition-colors">
+                  <tr
+                    key={row.id}
+                    onClick={() => {
+                      setSelected(row);
+                      setView('detail');
+                    }}
+                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors cursor-pointer"
+                  >
                     <td className="px-4 py-3.5 text-sm font-bold text-blue-600 whitespace-nowrap">{row.kode}</td>
                     <td className="px-4 py-3.5 text-sm font-semibold text-slate-700">{row.judul}</td>
                     <td className="px-4 py-3.5 text-sm font-bold text-slate-800">{fmtDiskon(row)}</td>
@@ -145,30 +150,6 @@ export default function KuponDiskonTab() {
                     <td className="px-4 py-3.5 text-sm font-medium text-slate-500">{row.tanpa_kadaluarsa ? 'Tanpa Kadaluarsa' : 'Ya'}</td>
                     <td className="px-4 py-3.5 text-sm font-medium text-slate-500">
                       {row.unlimited_usage ? `${row.penggunaan_count} (Tidak Terbatas)` : `${row.penggunaan_count} / ${row.batas_penggunaan ?? '-'}`}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-2">
-                        <StatusToggle active={row.is_active} onToggle={() => handleToggle(row)} />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditing(row);
-                            setView('edit');
-                          }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
-                          title="Ubah"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(row)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="Hapus"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 ))

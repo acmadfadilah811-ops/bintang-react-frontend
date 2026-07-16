@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import apiClient from '../../../api/apiClient';
 import { fmtDate, fmtDiskon, fmtRupiah } from '../format';
-import { StatusToggle } from './Common';
 import TambahDiskonForm from './TambahDiskonForm';
+import DetailDiskonPenjualan from './DetailDiskonPenjualan';
 
 /** Tab "Diskon Penjualan". */
 export default function DiskonPenjualanTab() {
   const [view, setView] = useState('list');
   const [editing, setEditing] = useState(null);
+  const [selected, setSelected] = useState(null);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -31,24 +32,22 @@ export default function DiskonPenjualanTab() {
     fetchRows();
   }, []);
 
-  const handleToggle = async (row) => {
-    try {
-      const res = await apiClient.post(`/sales-discounts/${row.id}/toggle-status/`);
-      setRows((prev) => prev.map((r) => (r.id === row.id ? res.data : r)));
-    } catch (err) {
-      console.error('[VoucherDiskon] toggle sales discount error:', err);
-    }
-  };
-
-  const handleDelete = async (row) => {
-    if (!window.confirm('Hapus diskon penjualan ini?')) return;
-    try {
-      await apiClient.delete(`/sales-discounts/${row.id}/`);
-      fetchRows();
-    } catch (err) {
-      console.error('[VoucherDiskon] delete sales discount error:', err);
-    }
-  };
+  if (view === 'detail') {
+    return (
+      <DetailDiskonPenjualan
+        row={selected}
+        onCancel={() => {
+          setView('list');
+          setSelected(null);
+        }}
+        onEdit={(row) => {
+          setEditing(row);
+          setView('edit');
+        }}
+        onSaved={fetchRows}
+      />
+    );
+  }
 
   if (view === 'create' || view === 'edit') {
     return (
@@ -90,7 +89,7 @@ export default function DiskonPenjualanTab() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
-                {['Min. Order', 'Diskon', 'Mulai', 'Kadaluarsa', 'Aksi'].map((c) => (
+                {['Min. Order', 'Diskon', 'Mulai', 'Kadaluarsa'].map((c) => (
                   <th key={c} className="px-4 py-3 text-[10px] font-extrabold tracking-wider text-slate-400 uppercase whitespace-nowrap">
                     {c}
                   </th>
@@ -100,7 +99,7 @@ export default function DiskonPenjualanTab() {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center">
+                  <td colSpan={4} className="px-4 py-12 text-center">
                     <div className="flex flex-col items-center">
                       <span className="text-xs font-bold text-slate-400">{loading ? 'Memuat...' : 'No Data'}</span>
                     </div>
@@ -108,35 +107,18 @@ export default function DiskonPenjualanTab() {
                 </tr>
               ) : (
                 rows.map((row) => (
-                  <tr key={row.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/30 transition-colors">
+                  <tr
+                    key={row.id}
+                    onClick={() => {
+                      setSelected(row);
+                      setView('detail');
+                    }}
+                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors cursor-pointer"
+                  >
                     <td className="px-4 py-3.5 text-sm font-semibold text-slate-700">{fmtRupiah(row.minimal_total_pesanan)}</td>
                     <td className="px-4 py-3.5 text-sm font-bold text-slate-800">{fmtDiskon(row)}</td>
                     <td className="px-4 py-3.5 text-sm font-medium text-slate-500">{fmtDate(row.tanggal_aktif)}</td>
                     <td className="px-4 py-3.5 text-sm font-medium text-slate-500">{row.tanpa_kadaluarsa ? 'Tanpa Kadaluarsa' : fmtDate(row.tanggal_kadaluarsa)}</td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-2">
-                        <StatusToggle active={row.is_active} onToggle={() => handleToggle(row)} />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditing(row);
-                            setView('edit');
-                          }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
-                          title="Ubah"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(row)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="Hapus"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 ))
               )}

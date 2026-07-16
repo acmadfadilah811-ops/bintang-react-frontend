@@ -1,35 +1,14 @@
 import { useState } from 'react';
-import { Search, Plus, Pencil, Trash2 } from 'lucide-react';
-import apiClient from '../../../api/apiClient';
+import { Search, Plus } from 'lucide-react';
 import { fmtDate } from '../format';
-import { StatusToggle } from './Common';
 import PromoTipeDropdown from './PromoTipeDropdown';
 import SalinDiskonButton from './SalinDiskonButton';
 
 /** Daftar Promosi (POS) — toolbar filter + tabel. */
-export default function PromosiPosList({ rows, loading, error, onAdd, onEdit, onRefresh }) {
+export default function PromosiPosList({ rows, loading, error, onAdd, onSelectRow, onRefresh }) {
   const [tipe, setTipe] = useState('Semua');
   const [judul, setJudul] = useState('Judul');
   const [cari, setCari] = useState('');
-
-  const handleToggle = async (row) => {
-    try {
-      await apiClient.post(`/pos-promotions/${row.id}/toggle-status/`);
-      onRefresh();
-    } catch (err) {
-      console.error('[VoucherDiskon] toggle promotion error:', err);
-    }
-  };
-
-  const handleDelete = async (row) => {
-    if (!window.confirm(`Hapus promosi "${row.judul}"?`)) return;
-    try {
-      await apiClient.delete(`/pos-promotions/${row.id}/`);
-      onRefresh();
-    } catch (err) {
-      console.error('[VoucherDiskon] delete promotion error:', err);
-    }
-  };
 
   const filtered = rows.filter((row) => {
     if (tipe !== 'Semua' && row.tipe_promosi !== tipe) return false;
@@ -100,7 +79,7 @@ export default function PromosiPosList({ rows, loading, error, onAdd, onEdit, on
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  {['Judul', 'Tipe', 'Mulai', 'Kadaluarsa', 'Aksi'].map((c) => (
+                  {['Judul', 'Tipe', 'Mulai', 'Kadaluarsa'].map((c) => (
                     <th key={c} className="px-4 py-3 text-[10px] font-extrabold tracking-wider text-slate-400 uppercase whitespace-nowrap">
                       {c}
                     </th>
@@ -109,7 +88,11 @@ export default function PromosiPosList({ rows, loading, error, onAdd, onEdit, on
               </thead>
               <tbody>
                 {filtered.map((row) => (
-                  <tr key={row.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/30 transition-colors">
+                  <tr
+                    key={row.id}
+                    onClick={() => onSelectRow(row)}
+                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors cursor-pointer"
+                  >
                     <td className="px-4 py-3.5 text-sm font-semibold text-slate-700">{row.judul}</td>
                     <td className="px-4 py-3.5 text-sm">
                       <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide ${tipeColors[row.tipe_promosi] || 'bg-slate-50 text-slate-600 border border-slate-200'}`}>
@@ -118,27 +101,6 @@ export default function PromosiPosList({ rows, loading, error, onAdd, onEdit, on
                     </td>
                     <td className="px-4 py-3.5 text-sm font-medium text-slate-500">{fmtDate(row.tanggal_aktif)}</td>
                     <td className="px-4 py-3.5 text-sm font-medium text-slate-500">{row.tanpa_kadaluarsa ? 'Tanpa Kadaluarsa' : fmtDate(row.tanggal_kadaluarsa)}</td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-2">
-                        <StatusToggle active={row.is_active} onToggle={() => handleToggle(row)} />
-                        <button
-                          type="button"
-                          onClick={() => onEdit(row)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
-                          title="Ubah"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(row)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="Hapus"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import apiClient from '../../../api/apiClient';
 import TambahPromosiForm from './TambahPromosiForm';
 import PromosiPosList from './PromosiPosList';
+import DetailPromosiPos from './DetailPromosiPos';
 
 /** Tab "Promosi (POS)" — toggle antara daftar dan form tambah. */
 export default function PromosiPosTab() {
   const [view, setView] = useState('list');
   const [editing, setEditing] = useState(null);
+  const [selected, setSelected] = useState(null);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -28,6 +30,23 @@ export default function PromosiPosTab() {
   useEffect(() => {
     fetchRows();
   }, []);
+
+  if (view === 'detail') {
+    return (
+      <DetailPromosiPos
+        row={selected}
+        onCancel={() => {
+          setView('list');
+          setSelected(null);
+        }}
+        onEdit={(row) => {
+          setEditing(row);
+          setView('edit');
+        }}
+        onSaved={fetchRows}
+      />
+    );
+  }
 
   if (view === 'create' || view === 'edit') {
     return (
@@ -55,9 +74,9 @@ export default function PromosiPosTab() {
         setEditing(null);
         setView('create');
       }}
-      onEdit={(row) => {
-        setEditing(row);
-        setView('edit');
+      onSelectRow={(row) => {
+        setSelected(row);
+        setView('detail');
       }}
       onRefresh={fetchRows}
     />
