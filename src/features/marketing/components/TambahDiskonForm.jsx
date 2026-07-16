@@ -35,7 +35,6 @@ export default function TambahDiskonForm({ initial, onCancel, onSaved }) {
       jumlah_diskon: parseFloat(jumlahDiskon) || 0,
       tipe_pelanggan: tipePelanggan,
       brand,
-      catatan: '',
     };
     try {
       if (initial?.id) {
