@@ -1,33 +1,19 @@
 import { useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Trash2 } from 'lucide-react';
 import apiClient from '../../../api/apiClient';
 import { useAuth } from '../../../context/AuthContext';
-import { extractApiError, inputCls } from '../format';
-import { FormRow, Toggle, ErrorBanner } from './Common';
-import TagPicker from './TagPicker';
+import { extractApiError } from '../format';
+import PromoDetailsForm from './PromoDetailsForm';
+import PromoRulesForm from './PromoRulesForm';
+import PromoTargetsForm from './PromoTargetsForm';
 
-const PROMO_DAYS = [
-  ['min', 'Minggu'],
-  ['sen', 'Senin'],
-  ['sel', 'Selasa'],
-  ['rab', 'Rabu'],
-  ['kam', 'Kamis'],
-  ['jum', 'Jumat'],
-  ['sab', 'Sabtu'],
-];
-const PROMO_DAY_KEYS = PROMO_DAYS.map(([k]) => k);
+const PROMO_DAY_KEYS = ['min', 'sen', 'sel', 'rab', 'kam', 'jum', 'sab'];
 
-const TIPE_PROMOSI_LABEL = {
-  BX: 'BX (Beli produk tertentu, gratis produk lain)',
-  DQ: 'DQ (Diskon jika membeli produk dengan kuantitas tertentu)',
-  DA: 'DA (Diskon jika memenuhi total transaksi yang ditentukan)',
-  FI: 'FI (Gratis produk)',
-};
-
-/** Form "Tambah/Ubah Promosi (POS)". */
+/** Form "Tambah/Ubah Promosi (POS)" dengan layout premium split-card matching screenshot & Detail view */
 export default function TambahPromosiForm({ initial, onCancel, onSaved }) {
   const { user, businessSettings } = useAuth();
   const accountName = businessSettings?.nama_bisnis || user?.name || user?.email || 'Akun';
+
   const [judul, setJudul] = useState(initial?.judul || '');
   const [tipe, setTipe] = useState(initial?.tipe_promosi || 'BX');
   const [combineQty, setCombineQty] = useState(initial ? initial.combine_qty : true);
@@ -49,7 +35,9 @@ export default function TambahPromosiForm({ initial, onCancel, onSaved }) {
   const [jamMulai, setJamMulai] = useState(initial?.jam_mulai || '');
   const [jamBerakhir, setJamBerakhir] = useState(initial?.jam_berakhir || '');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
+
   const initialDayKeys = initial?.hari ? initial.hari.split(',') : PROMO_DAY_KEYS;
   const [days, setDays] = useState(() => {
     const d = { all: PROMO_DAY_KEYS.every((k) => initialDayKeys.includes(k)) };
@@ -59,16 +47,13 @@ export default function TambahPromosiForm({ initial, onCancel, onSaved }) {
     return d;
   });
 
-  const toggleField = (label, on, setOn) => (
-    <FormRow label={label}>
-      <div className="flex items-center gap-2">
-        <Toggle on={on} onChange={setOn} />
-        <span className="text-sm text-slate-600">{on ? 'Ya' : 'Tidak'}</span>
-      </div>
-    </FormRow>
-  );
+  const toggleDay = (k) =>
+    setDays((p) => {
+      const next = { ...p, [k]: !p[k] };
+      next.all = PROMO_DAY_KEYS.every((key) => next[key]);
+      return next;
+    });
 
-  const toggleDay = (k) => setDays((p) => ({ ...p, [k]: !p[k] }));
   const toggleAllDays = () =>
     setDays((p) => {
       const v = !p.all;
@@ -97,11 +82,11 @@ export default function TambahPromosiForm({ initial, onCancel, onSaved }) {
       paket_produk: paketProduk,
       brand,
       berlaku_membeli: berlakuMembeli,
-      produk_gratis: produkGratis,
+      produk_gratis: tipe === 'BX' || tipe === 'FI' ? produkGratis : '',
       berlaku_kelipatan: kelipatan,
       all_customers: allCustomers,
-      tipe_pelanggan: tipePelanggan,
-      pelanggan,
+      tipe_pelanggan: allCustomers ? '' : tipePelanggan,
+      pelanggan: allCustomers ? '' : pelanggan,
       tanggal_aktif: tanggalAktif,
       tanpa_kadaluarsa: noExpiry,
       tanggal_kadaluarsa: noExpiry ? null : tanggalKadaluarsa || null,
@@ -118,24 +103,43 @@ export default function TambahPromosiForm({ initial, onCancel, onSaved }) {
       }
       onSaved();
     } catch (err) {
-      console.error('[VoucherDiskon] save promotion error:', err);
+      console.error('[TambahPromosiForm] save error:', err);
       setError(extractApiError(err, 'Gagal menyimpan promosi.'));
     } finally {
       setSaving(false);
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm(`Hapus promosi "${judul}"?`)) return;
+    setDeleting(true);
+    try {
+      await apiClient.delete(`/pos-promotions/${initial.id}/`);
+      onSaved();
+    } catch (err) {
+      console.error('[TambahPromosiForm] delete error:', err);
+      setError('Gagal menghapus promosi.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-5 border-b border-slate-100">
-        <h2 className="text-slate-800 font-extrabold text-[15px]">{initial ? 'Ubah' : 'Tambah'} Promosi (POS)</h2>
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 animate-in fade-in duration-200">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-slate-100 mb-6">
+        <h2 className="text-slate-800 font-extrabold text-base">Rincian Promosi (POS)</h2>
         <div className="flex items-center gap-4">
-          <button type="button" onClick={onCancel} className="text-slate-500 hover:text-slate-700 text-xs font-bold cursor-pointer transition-colors">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-blue-600 hover:text-blue-700 text-xs font-bold cursor-pointer transition-colors"
+          >
             Batal
           </button>
           <div className="text-right">
             <div className="text-[10px] font-bold text-slate-400 leading-none mb-1 uppercase tracking-wider">Simpan di:</div>
-            <select className="border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-600 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer">
+            <select className="border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-650 bg-white outline-none focus:border-blue-500 transition-all cursor-pointer">
               <option>{accountName}</option>
             </select>
           </div>
@@ -143,117 +147,89 @@ export default function TambahPromosiForm({ initial, onCancel, onSaved }) {
             type="button"
             disabled={saving}
             onClick={handleSave}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-60 text-white rounded-xl px-4.5 py-2.5 text-xs font-bold cursor-pointer transition-all active:scale-[0.98] shadow-md shadow-emerald-500/10"
+            className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white rounded-xl px-5 py-2.5 text-xs font-bold cursor-pointer transition-all active:scale-[0.98] shadow-md shadow-emerald-500/10"
           >
             <Check size={14} /> {saving ? 'Menyimpan...' : 'Simpan'}
           </button>
         </div>
       </div>
 
-      <ErrorBanner message={error} />
+      {error && (
+        <div className="mb-5 px-4 py-3 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold">
+          {error}
+        </div>
+      )}
 
-      <div className="divide-y divide-slate-100">
-        <FormRow label="Judul" required>
-          <input type="text" placeholder="Masukkan Judul" value={judul} onChange={(e) => setJudul(e.target.value)} className={inputCls} />
-        </FormRow>
-        <FormRow label="Tipe Promosi">
-          <select value={tipe} onChange={(e) => setTipe(e.target.value)} className={`${inputCls} cursor-pointer`}>
-            {Object.entries(TIPE_PROMOSI_LABEL).map(([k, label]) => (
-              <option key={k} value={k}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </FormRow>
-      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Kolom Kiri & Tengah: Form Inputs */}
+        <div className="md:col-span-2 space-y-6">
+          <PromoDetailsForm
+            judul={judul}
+            setJudul={setJudul}
+            tanggalAktif={tanggalAktif}
+            setTanggalAktif={setTanggalAktif}
+            noExpiry={noExpiry}
+            setNoExpiry={setNoExpiry}
+            tanggalKadaluarsa={tanggalKadaluarsa}
+            setTanggalKadaluarsa={setTanggalKadaluarsa}
+            jam24={jam24}
+            setJam24={setJam24}
+            jamMulai={jamMulai}
+            setJamMulai={setJamMulai}
+            jamBerakhir={jamBerakhir}
+            setJamBerakhir={setJamBerakhir}
+            days={days}
+            toggleDay={toggleDay}
+            toggleAllDays={toggleAllDays}
+          />
 
-      <div className="px-6 pt-5 text-sm font-semibold text-orange-500">Aturan Promo</div>
-      <div className="divide-y divide-slate-100">
-        <FormRow label="Kombinasikan qty pembelian dari produk-produk di bawah">
-          <div className="space-y-2 max-w-md">
-            <Toggle on={combineQty} onChange={setCombineQty} />
-            <input type="number" min="1" value={combineQtyValue} onChange={(e) => setCombineQtyValue(e.target.value)} className={inputCls} />
-          </div>
-        </FormRow>
-        <FormRow label="Produk-produk mana saja yang diperbolehkan untuk diskon ini?">
-          <TagPicker value={produk} onChange={setProduk} fetchUrl="/products/" placeholder="Cari produk..." />
-        </FormRow>
-        <FormRow label="Grup produk mana saja yang diperbolehkan untuk diskon ini?">
-          <TagPicker value={grupProduk} onChange={setGrupProduk} fetchUrl="/product-categories/" placeholder="Cari grup produk..." />
-        </FormRow>
-        <FormRow label="Paket produk mana saja yang diperbolehkan untuk diskon ini?">
-          <TagPicker value={paketProduk} onChange={setPaketProduk} fetchUrl="/product-packages/" placeholder="Cari paket produk..." />
-        </FormRow>
-        <FormRow label="Brand mana saja yang diperbolehkan untuk diskon ini? (tidak berlaku untuk POS)">
-          <TagPicker value={brand} onChange={setBrand} fetchUrl="/brands/" placeholder="Cari brand..." />
-        </FormRow>
-        <FormRow label="Promo berlaku apabila membeli:">
-          <div className="space-y-2 text-sm text-slate-600">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="radio" name="berlakuMembeli" checked={berlakuMembeli === 'salah-satu'} onChange={() => setBerlakuMembeli('salah-satu')} />
-              Salah satu produk yang diatur
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="radio" name="berlakuMembeli" checked={berlakuMembeli === 'semua'} onChange={() => setBerlakuMembeli('semua')} />
-              Semua produk yang diatur
-            </label>
-          </div>
-        </FormRow>
-        <FormRow label="Produk yang didapat secara gratis">
-          <TagPicker value={produkGratis} onChange={setProdukGratis} fetchUrl="/products/" placeholder="Cari produk..." />
-        </FormRow>
-        {toggleField('Berlaku kelipatan', kelipatan, setKelipatan)}
-      </div>
+          <PromoRulesForm
+            tipe={tipe}
+            setTipe={setTipe}
+            combineQty={combineQty}
+            setCombineQty={setCombineQty}
+            combineQtyValue={combineQtyValue}
+            setCombineQtyValue={setCombineQtyValue}
+            kelipatan={kelipatan}
+            setKelipatan={setKelipatan}
+            berlakuMembeli={berlakuMembeli}
+            setBerlakuMembeli={setBerlakuMembeli}
+          />
 
-      <div className="px-6 pt-5 text-sm font-semibold text-orange-500">Pelanggan</div>
-      <div className="divide-y divide-slate-100">
-        {toggleField('Berlakukan untuk semua pelanggan/anggota', allCustomers, setAllCustomers)}
-        {!allCustomers && (
-          <>
-            <FormRow label="Berlaku untuk tipe pelanggan">
-              <input type="text" placeholder="Masukkan Tipe Pelanggan" value={tipePelanggan} onChange={(e) => setTipePelanggan(e.target.value)} className={inputCls} />
-            </FormRow>
-            <FormRow label="Berlaku untuk pelanggan">
-              <TagPicker value={pelanggan} onChange={setPelanggan} fetchUrl="/contacts/" placeholder="Cari pelanggan..." />
-            </FormRow>
-          </>
-        )}
-      </div>
+          {initial?.id && (
+            <div className="pt-2 flex justify-start">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleDelete}
+                className="flex items-center gap-1.5 border border-slate-250 text-slate-500 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 rounded-xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer"
+              >
+                <Trash2 size={13} /> {deleting ? 'Menghapus...' : 'Hapus'}
+              </button>
+            </div>
+          )}
+        </div>
 
-      <div className="px-6 pt-5 text-sm font-semibold text-orange-500">Masa Berlaku Promo</div>
-      <div className="divide-y divide-slate-100">
-        <FormRow label="Tanggal Aktif" required>
-          <input type="date" value={tanggalAktif} onChange={(e) => setTanggalAktif(e.target.value)} className={inputCls} />
-        </FormRow>
-        <FormRow label="Tanpa Kadaluarsa">
-          <div className="space-y-2 max-w-md">
-            <Toggle on={noExpiry} onChange={setNoExpiry} />
-            {!noExpiry && <input type="date" value={tanggalKadaluarsa} onChange={(e) => setTanggalKadaluarsa(e.target.value)} className={inputCls} />}
-          </div>
-        </FormRow>
-        <FormRow label="Berlaku 24 Jam">
-          <div className="space-y-2 max-w-md">
-            <Toggle on={jam24} onChange={setJam24} />
-            {!jam24 && (
-              <>
-                <input type="time" value={jamMulai} onChange={(e) => setJamMulai(e.target.value)} placeholder="Mulai" className={inputCls} />
-                <input type="time" value={jamBerakhir} onChange={(e) => setJamBerakhir(e.target.value)} placeholder="Berakhir" className={inputCls} />
-              </>
-            )}
-          </div>
-        </FormRow>
-        <FormRow label="Berlaku pada hari">
-          <div className="space-y-1.5 text-sm text-slate-600">
-            <label className="flex items-center gap-2 cursor-pointer font-semibold">
-              <input type="checkbox" checked={days.all} onChange={toggleAllDays} /> Pilih Semua
-            </label>
-            {PROMO_DAYS.map(([k, label]) => (
-              <label key={k} className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={days[k]} onChange={() => toggleDay(k)} /> {label}
-              </label>
-            ))}
-          </div>
-        </FormRow>
+        {/* Kolom Kanan: Target & Kriteria */}
+        <PromoTargetsForm
+          tipe={tipe}
+          produkGratis={produkGratis}
+          setProdukGratis={setProdukGratis}
+          produk={produk}
+          setProduk={setProduk}
+          grupProduk={grupProduk}
+          setGrupProduk={setGrupProduk}
+          paketProduk={paketProduk}
+          setPaketProduk={setPaketProduk}
+          brand={brand}
+          setBrand={setBrand}
+          allCustomers={allCustomers}
+          setAllCustomers={setAllCustomers}
+          tipePelanggan={tipePelanggan}
+          setTipePelanggan={setTipePelanggan}
+          pelanggan={pelanggan}
+          setPelanggan={setPelanggan}
+        />
       </div>
     </div>
   );
