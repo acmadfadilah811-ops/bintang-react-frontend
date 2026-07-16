@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Search, X, Plus, ArrowLeft, ArrowRight, ChevronsUpDown, Trash2, CloudUpload } from 'lucide-react';
+import { Search, X, Plus, ArrowLeft, ArrowRight, ChevronsUpDown, Trash2, CloudUpload, Printer, ChevronDown } from 'lucide-react';
 import apiClient from '../../../../api/apiClient';
+import { useAuth } from '../../../../context/AuthContext';
 import { todayISO } from '../../../../utils/date';
+import { getLogoUrl } from '../../../../utils/logo';
 
 const STATUS_LABEL = { draft: 'Draft', selesai: 'Selesai', batal: 'Batal' };
 const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -67,6 +69,11 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
 
   // Inline edit kartu Tanggal & Catatan (pola sama dengan StockOutPage).
   // Backend hanya mengizinkan ubah saat status draft (product_views.py:1666).
+  // Nama bisnis & logo untuk kop cetak
+  const { businessSettings } = useAuth();
+  // Dropdown Cetak: Cetak (A4) / Cetak A5
+  const [cetakMenuOpen, setCetakMenuOpen] = useState(false);
+
   const [isEditingTanggal, setIsEditingTanggal] = useState(false);
   const [isEditingCatatan, setIsEditingCatatan] = useState(false);
   const [editTanggalValue, setEditTanggalValue] = useState('');
@@ -90,6 +97,67 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
 
   const saveInlineCatatan = async () => {
     if (await patchDocument({ catatan: editCatatanValue })) setIsEditingCatatan(false);
+  };
+
+  /**
+   * Cetak dokumen produksi. Olsera menyediakan dua pilihan di sini: "Cetak"
+   * (A4) dan "Cetak A5" — tanpa Delivery Order, karena produksi tidak dikirim
+   * ke pihak luar. Tidak ada library PDF di proyek ini, jadi user menyimpan PDF
+   * lewat dialog cetak browser.
+   */
+  const handleCetak = (mode = 'pdf') => {
+    if (!activeDoc) return;
+    const isA5 = mode === 'a5';
+    const doc = activeDoc;
+    const esc = (v) => String(v ?? '-').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const namaBisnis = businessSettings?.nama_bisnis || '';
+    const logoUrl = getLogoUrl(businessSettings?.logo_url);
+    let totalQty = 0;
+    const rows = (doc.items || []).map((item, i) => {
+      const qty = Number(item.qty) || 0;
+      totalQty += qty;
+      const varian = item.variant_nama ? ` — ${esc(item.variant_nama)}` : '';
+      return `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${esc(item.product_nama)}${item.product_sku ? ` (${esc(item.product_sku)})` : ''}${varian}</td>
+        <td style="text-align:right">${qty} ${esc(item.product_satuan || '')}</td>
+      </tr>`;
+    }).join('');
+    const html = `<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>${esc(doc.nomor)}</title>
+      <style>
+        @page { size: ${isA5 ? 'A5' : 'A4'}; margin: ${isA5 ? '8mm' : '14mm'}; }
+        body { font-family: Arial, sans-serif; font-size: ${isA5 ? '10px' : '13px'}; color: #111; margin: 0; }
+        .logo-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: ${isA5 ? '8px' : '16px'}; margin-bottom: ${isA5 ? '8px' : '16px'}; min-height: ${isA5 ? '34px' : '60px'}; display: flex; align-items: center; }
+        .logo-box img { max-height: ${isA5 ? '30px' : '56px'}; max-width: ${isA5 ? '100px' : '160px'}; object-fit: contain; }
+        .doc-title { font-size: ${isA5 ? '12px' : '15px'}; margin: 0 0 4px; }
+        .doc-title .biz { font-size: ${isA5 ? '10px' : '12px'}; color: #555; margin-left: 6px; }
+        .tanggal { margin: 6px 0 4px; }
+        .info-extra { color: #666; font-size: ${isA5 ? '9px' : '11px'}; margin-bottom: 10px; }
+        table.items { border-collapse: collapse; width: 100%; margin-top: ${isA5 ? '6px' : '10px'}; }
+        table.items th, table.items td { border: 1px solid #999; padding: ${isA5 ? '3px 5px' : '6px 8px'}; text-align: left; }
+        table.items th { background: #f8fafc; }
+        .foot { margin-top: ${isA5 ? '12px' : '24px'}; color: #999; font-size: ${isA5 ? '8px' : '10px'}; }
+      </style></head><body>
+      <div class="logo-box">${logoUrl ? `<img src="${esc(logoUrl)}" alt="logo">` : ''}</div>
+      <p class="doc-title">No. Produksi Stok #${esc(doc.nomor)}<span class="biz">${esc(namaBisnis)}</span></p>
+      <p class="tanggal"><strong>Tanggal</strong> : ${esc(doc.tanggal)}</p>
+      ${doc.catatan ? `<p class="info-extra">Catatan: ${esc(doc.catatan)}</p>` : ''}
+      <table class="items">
+        <thead><tr><th>#</th><th>Produk</th><th style="text-align:right">Qty</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="3">Tidak ada produk</td></tr>'}</tbody>
+        <tfoot><tr><td style="text-align:right"><strong>Total</strong></td><td></td><td style="text-align:right">${totalQty}</td></tr></tfoot>
+      </table>
+      <p class="foot">Dicetak ${new Date().toLocaleString('id-ID')}</p>
+      <script>window.onload = function () { window.print(); };</script>
+      </body></html>`;
+    const win = window.open('', '_blank', isA5 ? 'width=600,height=520' : 'width=800,height=600');
+    if (!win) {
+      setError('Popup diblokir browser. Izinkan popup untuk mencetak.');
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
   };
 
   const fetchDocuments = async () => {
@@ -533,8 +601,61 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
                 </div>
                 <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0' }}>Dibuat pada {formatDisplayDate(activeDoc.tanggal)} oleh {activeDoc.dibuat_oleh_nama || '-'}</p>
               </div>
-              {activeDoc.status === 'draft' && (
-                <div style={{ display: 'flex', gap: '8px' }}>
+              {/* Cetak tersedia untuk semua status — dokumen yang sudah
+                  diposting pun tetap perlu bisa dicetak ulang. */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={() => setCetakMenuOpen((open) => !open)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      background: cetakMenuOpen ? '#f8fafc' : '#ffffff',
+                      border: '1px solid #cbd5e1', borderRadius: '6px',
+                      padding: '8px 14px', fontSize: '13px', fontWeight: 'bold',
+                      color: '#475569', cursor: 'pointer'
+                    }}
+                  >
+                    <Printer size={14} />
+                    <span>Cetak</span>
+                    <ChevronDown size={14} style={{ transform: cetakMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                  </button>
+
+                  {cetakMenuOpen && (
+                    <>
+                      <div onClick={() => setCetakMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+                      <div style={{
+                        position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 41,
+                        background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', minWidth: '150px', overflow: 'hidden'
+                      }}>
+                        {[
+                          { label: 'Cetak', mode: 'pdf' },
+                          { label: 'Cetak A5', mode: 'a5' },
+                        ].map((opt) => (
+                          <button
+                            key={opt.mode}
+                            type="button"
+                            onClick={() => { setCetakMenuOpen(false); handleCetak(opt.mode); }}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+                              border: 0, background: 'transparent', padding: '9px 14px',
+                              fontSize: '13px', color: '#475569', cursor: 'pointer', textAlign: 'left'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                            onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                          >
+                            <Printer size={14} />
+                            <span>{opt.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {activeDoc.status === 'draft' && (
+                  <>
                   <button
                     onClick={handleCancelDoc}
                     style={{ background: '#ffffff', border: '1px solid #fecdd3', borderRadius: '6px', padding: '8px 16px', fontSize: '13px', fontWeight: 'bold', color: '#e11d48', cursor: 'pointer' }}
@@ -547,8 +668,9 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
                   >
                     Posting Sekarang
                   </button>
-                </div>
-              )}
+                  </>
+                )}
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
