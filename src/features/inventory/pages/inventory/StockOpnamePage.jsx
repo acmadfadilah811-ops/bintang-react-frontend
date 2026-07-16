@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../../../../context/AuthContext';
 import apiClient from '../../../../api/apiClient';
 import { getLogoUrl } from '../../../../utils/logo';
-import { nowTimeLocal } from '../../../../utils/date';
+import { nowTimeLocal, todayISO } from '../../../../utils/date';
 import { receivedByDisplay } from '../../../../utils/stockDocument';
 
 
@@ -160,7 +160,7 @@ export function StockOpnamePage({ onToggleCreate, viewState: propViewState }) {
   };
 
   // Form pembuatan dokumen baru
-  const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
+  const [tanggal, setTanggal] = useState(todayISO());
   const [catatan, setCatatan] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -345,7 +345,7 @@ export function StockOpnamePage({ onToggleCreate, viewState: propViewState }) {
       const res = await apiClient.post('/stock-opname-documents/', { tanggal, catatan });
       setActiveDetailDoc(res.data);
       handleStateChange('detail');
-      setTanggal(new Date().toISOString().slice(0, 10));
+      setTanggal(todayISO());
       setCatatan('');
     } catch (err) {
       console.error('[StockOpnamePage] create document error:', err);
@@ -471,7 +471,7 @@ export function StockOpnamePage({ onToggleCreate, viewState: propViewState }) {
     setImportResult(null);
     try {
       const docRes = await apiClient.post('/stock-opname-documents/', {
-        tanggal: new Date().toISOString().slice(0, 10),
+        tanggal: todayISO(),
         catatan: 'Import CSV',
       });
       const docId = docRes.data.id;
@@ -648,7 +648,7 @@ export function StockOpnamePage({ onToggleCreate, viewState: propViewState }) {
               <button
                 type="button"
                 onClick={() => {
-                  setTanggal(new Date().toISOString().slice(0, 10));
+                  setTanggal(todayISO());
                   setCatatan('');
                   handleStateChange('create');
                 }}
