@@ -148,10 +148,14 @@ export function ProductionCostSection({ documentId, isDraft, biaya = [], totalBi
             {menuOpen && (
               <>
                 <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+                {/* Menu dibuka KE ATAS, bukan ke bawah. Section ini ada di
+                    paling bawah halaman, dan .pi-full-panel (ProductInventory.css)
+                    memakai overflow:hidden — menu yang menjulur ke bawah akan
+                    terpotong batas panel. */}
                 <div style={{
-                  position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 41,
+                  position: 'absolute', bottom: 'calc(100% + 4px)', right: 0, zIndex: 41,
                   background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)', minWidth: '240px', maxHeight: '260px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: '240px', maxHeight: '260px',
                   overflowY: 'auto',
                 }}>
                   {belumDipakai.map((m) => (

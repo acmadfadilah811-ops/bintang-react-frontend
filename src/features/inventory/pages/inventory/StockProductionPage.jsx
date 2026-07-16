@@ -796,7 +796,7 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
                     onClick={handleAddItem}
                     disabled={!selectedProduct || itemSaving}
                     style={{
-                      background: (!selectedProduct || itemSaving) ? '#86efac' : '#16a34a',
+                      background: (!selectedProduct || itemSaving) ? '#bae6fd' : '#0ea5e9',
                       color: '#ffffff', border: 0, borderRadius: '4px', width: '36px', height: '36px',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       cursor: (!selectedProduct || itemSaving) ? 'not-allowed' : 'pointer',
