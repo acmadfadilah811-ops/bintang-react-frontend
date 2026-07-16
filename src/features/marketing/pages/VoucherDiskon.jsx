@@ -20,14 +20,14 @@ export default function VoucherDiskon() {
 
   return (
     <div className="flex flex-col flex-1 min-h-full bg-slate-50/50">
-      <div className="flex gap-2 border-b border-slate-100 bg-white shrink-0 px-6">
+      <div className="grid grid-cols-3 border-b border-slate-100 bg-white shrink-0">
         {TABS.map((t) => {
           const isActive = t.id === tab;
           return (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-4 py-4 text-xs font-bold text-center whitespace-nowrap transition-all duration-200 border-b-2 cursor-pointer ${
+              className={`py-4 text-sm font-bold text-center whitespace-nowrap transition-all duration-200 border-b-2 cursor-pointer ${
                 isActive
                   ? 'text-blue-600 border-blue-600 font-extrabold'
                   : 'text-slate-400 border-transparent hover:text-slate-650 hover:border-slate-200'
