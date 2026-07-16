@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { Calendar, ChevronDown } from 'lucide-react';
-import PolarBearEmpty from './PolarBearEmpty';
 
 const inputClass =
   'w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 text-slate-700 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300';
 
 /**
  * Modal "Pembelian Baru" — langkah awal membuat transaksi pembelian.
- * Pilih supplier dahulu (empty-state beruang kutub), lalu isi tanggal,
+ * Pilih supplier dahulu (empty-state), lalu isi tanggal,
  * mata uang, dan catatan. Tombol Simpan aktif setelah supplier dipilih.
  */
 export default function PembelianBaruModal({ onClose, onSave }) {
@@ -63,7 +62,6 @@ export default function PembelianBaruModal({ onClose, onSave }) {
           {/* Empty-state: pilih supplier dahulu */}
           {!canSave && (
             <div className="rounded-xl bg-slate-50/70 border border-slate-100 flex flex-col items-center justify-center py-6">
-              <PolarBearEmpty />
               <p className="text-slate-500 text-sm font-medium -mt-2">
                 Pilih supplier terlebih dahulu
               </p>

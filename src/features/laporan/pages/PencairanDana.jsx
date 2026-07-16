@@ -3,7 +3,6 @@ import { MoreVertical } from 'lucide-react';
 import { Dropdown, DateRangePicker } from '../../transaksi/components/TransactionScaffold';
 import { useTransaksiCrumb } from '../../transaksi/components/TransaksiContext';
 import { useAuth } from '../../../context/AuthContext';
-import PolarBearEmpty from '../../transaksi/components/PolarBearEmpty';
 import TambahAkunBankModal from '../components/TambahAkunBankModal';
 
 const tabs = [
@@ -15,7 +14,6 @@ const tabs = [
 function SettlementEmpty() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-center px-6 pb-12">
-      <PolarBearEmpty />
       <h3 className="mt-4 text-slate-700 font-bold text-lg">Daftar settlement akan muncul di sini</h3>
       <p className="mt-1.5 text-sm text-sky-600/70 max-w-md leading-relaxed">
         Settlement akan berhasil jika akun bank Anda tersedia dan valid. Settlement yang belum

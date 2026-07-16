@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { Plus, UploadCloud, Settings } from 'lucide-react';
+import { Plus, UploadCloud, Settings, ShoppingCart } from 'lucide-react';
 import TransactionScaffold, { TButton } from '../components/TransactionScaffold';
 import ImportPembelianModal from '../components/ImportPembelianModal';
 import PembelianBaruModal from '../components/PembelianBaruModal';
 import PembelianSettingsDrawer from '../components/PembelianSettingsDrawer';
 import TambahReturModal from '../components/TambahReturModal';
-import PolarBearEmpty from '../components/PolarBearEmpty';
 
 const columns = [
   { key: 'no', label: 'No. Pembelian' },
@@ -116,7 +115,7 @@ export default function Pembelian() {
         columns={columns}
         statusOptions={statusOptions}
         searchPlaceholder="Cari Pesanan"
-        emptyArt={<PolarBearEmpty />}
+        emptyIcon={ShoppingCart}
         actions={actions}
         onTabChange={setActiveTab}
       />

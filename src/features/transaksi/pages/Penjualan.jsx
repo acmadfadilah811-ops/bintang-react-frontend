@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { Plus, FileSpreadsheet } from 'lucide-react';
+import { Plus, FileSpreadsheet, Receipt } from 'lucide-react';
 import TransactionScaffold, { TButton } from '../components/TransactionScaffold';
 import CreateOrderForm from '../components/CreateOrderForm';
 import ReturnOrderForm from '../components/ReturnOrderForm';
 import ImportStatusModal from '../components/ImportStatusModal';
-import PolarBearEmpty from '../components/PolarBearEmpty';
 
 const columns = [
   { key: 'no', label: 'No. Pesanan' },
@@ -101,7 +100,7 @@ export default function Penjualan() {
         columns={columns}
         statusOptions={statusOptions}
         searchPlaceholder="Cari Pesanan"
-        emptyArt={<PolarBearEmpty />}
+        emptyIcon={Receipt}
         actions={actions}
         onTabChange={(id) => {
           setActiveTab(id);

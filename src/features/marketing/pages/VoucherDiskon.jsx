@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import apiClient from '../../../api/apiClient';
 import { useAuth } from '../../../context/AuthContext';
-import { PolarBearSvg } from '../../inventory/pages/inventory/_shared';
 import { useTransaksiCrumb } from '../../transaksi/components/TransaksiContext';
 
 const TABS = [
@@ -454,7 +453,6 @@ function DiskonPenjualanTab() {
               <tr>
                 <td colSpan={5} className="px-2 py-12 text-center">
                   <div className="flex flex-col items-center">
-                    <PolarBearSvg />
                     <span className="text-sm text-slate-400 mt-3">{loading ? 'Memuat...' : 'No Data'}</span>
                   </div>
                 </td>
@@ -878,7 +876,6 @@ function KuponDiskonTab() {
               <tr>
                 <td colSpan={cols.length} className="px-2 py-12 text-center">
                   <div className="flex flex-col items-center">
-                    <PolarBearSvg />
                     <span className="text-sm text-slate-400 mt-3">{loading ? 'Memuat...' : 'No Data'}</span>
                   </div>
                 </td>
@@ -1431,7 +1428,6 @@ function PromosiPosList({ rows, loading, error, onAdd, onEdit, onRefresh }) {
 
       {filtered.length === 0 ? (
         <div className="mt-4 rounded-xl bg-slate-50/70 border border-slate-100 flex flex-col items-center justify-center py-16">
-          <PolarBearSvg />
           <span className="text-sm text-slate-400 mt-3">{loading ? 'Memuat...' : 'Belum ada promosi'}</span>
         </div>
       ) : (

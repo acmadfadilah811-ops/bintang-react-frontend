@@ -52,7 +52,7 @@ function StatusToggle({ active, onToggle }) {
 }
 
 // Cute Polar Bear & Blue Profiles empty state SVG
-const PolarBearEmptyState = ({ title, desc }) => (
+const EmptyState = ({ title, desc }) => (
   <div style={{
     display: 'flex',
     flexDirection: 'column',
@@ -65,31 +65,6 @@ const PolarBearEmptyState = ({ title, desc }) => (
     textAlign: 'center',
     boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
   }}>
-    <svg width="280" height="160" viewBox="0 0 280 160" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block', margin: '0 auto 16px auto' }}>
-      <circle cx="140" cy="80" r="54" fill="#f0f9ff" />
-      <g transform="translate(100, 52)">
-        <circle cx="20" cy="18" r="13" fill="#0ea5e9" />
-        <path d="M5 40C5 31.5 11.5 25 20 25C28.5 25 35 31.5 35 40" fill="#0ea5e9" />
-      </g>
-      <g transform="translate(122, 58)">
-        <circle cx="20" cy="18" r="13" fill="#38bdf8" />
-        <path d="M5 40C5 31.5 11.5 25 20 25C28.5 25 35 31.5 35 40" fill="#38bdf8" />
-      </g>
-      <g transform="translate(152, 42)">
-        <circle cx="30" cy="30" r="23" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.5" />
-        <circle cx="12" cy="10" r="6" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.5" />
-        <circle cx="12" cy="10" r="3.5" fill="#f1f5f9" />
-        <circle cx="48" cy="10" r="6" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.5" />
-        <circle cx="48" cy="10" r="3.5" fill="#f1f5f9" />
-        <circle cx="21" cy="24" r="2.2" fill="#0f172a" />
-        <circle cx="39" cy="24" r="2.2" fill="#0f172a" />
-        <path d="M18 19C19.5 18 21.5 18 23 19" stroke="#475569" strokeWidth="1.2" strokeLinecap="round" />
-        <path d="M42 19C40.5 18 38.5 18 37 19" stroke="#475569" strokeWidth="1.2" strokeLinecap="round" />
-        <ellipse cx="30" cy="34" rx="7.5" ry="5.5" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="1" />
-        <ellipse cx="30" cy="32" rx="4.5" ry="2.8" fill="#0f172a" />
-        <path d="M30 35V38.5M30 38.5C28.5 39 27.5 37.5 27.5 37.5M30 38.5C31.5 39 32.5 37.5 32.5 37.5" stroke="#0f172a" strokeWidth="1.2" strokeLinecap="round" />
-      </g>
-    </svg>
     <h4 style={{ fontSize: '15px', fontWeight: 'bold', color: '#1e293b', margin: '0 0 6px 0' }}>{title}</h4>
     <p style={{ fontSize: '13px', color: '#64748b', margin: 0, maxWidth: '380px', lineHeight: '1.4' }}>{desc}</p>
   </div>
@@ -587,7 +562,7 @@ function CustomerSupplierInner() {
               </div>
 
               {filteredCustomers.length === 0 ? (
-                <PolarBearEmptyState
+                <EmptyState
                   title="Eh, belum ada Pelanggan. Kelola pelanggan hingga Loyalty Point"
                   desc="Hubungkan kontak WhatsApp pelanggan Anda, kelompokkan berdasarkan grup tertentu, dan catat saldo deposit mereka untuk proses pengerjaan yang lebih cepat."
                 />
@@ -690,7 +665,7 @@ function CustomerSupplierInner() {
               {loadingNotes ? (
                 <p style={{ fontSize: '13px', color: '#94a3b8' }}>Memuat...</p>
               ) : filteredNotes.length === 0 ? (
-                <PolarBearEmptyState
+                <EmptyState
                   title="Belum ada catatan pelanggan"
                   desc="Catat riwayat, permintaan, atau kendala pelanggan lengkap dengan tanggal, tag, dan lampiran dokumen."
                 />

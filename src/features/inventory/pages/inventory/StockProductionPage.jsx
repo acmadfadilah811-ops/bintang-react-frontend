@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Search, X, Plus, ArrowLeft, ArrowRight, ChevronsUpDown, Trash2, CloudUpload } from 'lucide-react';
-import { PolarBearSvg } from './_shared';
 import apiClient from '../../../../api/apiClient';
 
 const STATUS_LABEL = { draft: 'Draft', selesai: 'Selesai', batal: 'Batal' };
@@ -372,7 +371,6 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
                   <tr>
                     <td colSpan={5} style={{ padding: '40px 20px', textAlign: 'center' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <PolarBearSvg />
                         <span style={{ fontSize: '14px', color: '#64748b', marginTop: '16px', fontWeight: 'bold' }}>{listLoading ? 'Memuat...' : 'No Data'}</span>
                       </div>
                     </td>
@@ -626,7 +624,6 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
                 </table>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '30px 0' }}>
-                  <PolarBearSvg />
                   <span style={{ fontSize: '14px', color: '#64748b', marginTop: '16px', fontWeight: 'bold' }}>Belum ada produk</span>
                 </div>
               )}

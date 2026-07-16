@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Calendar, Download, ChevronsUpDown, ChevronDown } from 'lucide-react';
-import { PolarBearSvg } from './_shared';
 import apiClient from '../../../../api/apiClient';
 
 export function StockMovementPage() {
@@ -494,7 +493,6 @@ export function StockMovementPage() {
               <tr>
                 <td colSpan={8} style={{ padding: '40px 20px', textAlign: 'center' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <PolarBearSvg />
                     <span style={{ fontSize: '14px', color: '#64748b', marginTop: '16px', fontWeight: 'bold' }}>No Data</span>
                   </div>
                 </td>

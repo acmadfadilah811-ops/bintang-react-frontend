@@ -3,7 +3,6 @@ import { Search, ChevronDown, ChevronUp, MoreHorizontal, Printer, X, Plus, Trash
 import * as XLSX from 'xlsx';
 import { useAuth } from '../../../../context/AuthContext';
 import apiClient from '../../../../api/apiClient';
-import { PolarBearSvg } from './_shared';
 
 const getLogoUrl = (url) => {
   if (!url) return null;
@@ -711,7 +710,6 @@ export function StockOpnamePage({ onToggleCreate, viewState: propViewState }) {
                   <tr>
                     <td colSpan={5} style={{ padding: '40px 20px', textAlign: 'center', borderBottom: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <PolarBearSvg />
                         <span style={{ fontSize: '14px', color: '#64748b', marginTop: '16px', fontWeight: 'bold' }}>{listLoading ? 'Memuat...' : 'No Data'}</span>
                       </div>
                     </td>
@@ -948,7 +946,6 @@ export function StockOpnamePage({ onToggleCreate, viewState: propViewState }) {
                   <tr>
                     <td colSpan={9 - (effectiveHideQtySistem ? 1 : 0) - (effectiveHideQtySelisih ? 2 : 0) - (activeDetailDoc.status === 'draft' ? 0 : 1)} style={{ padding: '40px 20px', textAlign: 'center' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <PolarBearSvg />
                         <span style={{ fontSize: '14px', color: '#64748b', marginTop: '16px', fontWeight: 'bold' }}>Belum ada produk</span>
                       </div>
                     </td>
@@ -1150,7 +1147,6 @@ export function StockOpnamePage({ onToggleCreate, viewState: propViewState }) {
                 <div style={{ padding: '40px 0', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>Mencari...</div>
               ) : addModalResults.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0' }}>
-                  <PolarBearSvg />
                   <span style={{ fontSize: '14px', color: '#64748b', marginTop: '16px', fontWeight: 'bold' }}>Belum ada produk</span>
                 </div>
               ) : (

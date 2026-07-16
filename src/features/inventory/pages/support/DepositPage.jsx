@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Settings, SlidersHorizontal, Search, Plus } from 'lucide-react';
-import { PolarBearSvgWithWallet } from './_shared';
 
 export function DepositPage() {
   const [searchVal, setSearchVal] = useState('');
@@ -156,7 +155,6 @@ export function DepositPage() {
             <tr>
               <td colSpan={6} style={{ padding: '60px 20px', textAlign: 'center' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <PolarBearSvgWithWallet />
                   <span style={{ fontSize: '14px', color: '#64748b', marginTop: '16px', fontWeight: 'bold' }}>Tidak ada deposit</span>
                 </div>
               </td>
