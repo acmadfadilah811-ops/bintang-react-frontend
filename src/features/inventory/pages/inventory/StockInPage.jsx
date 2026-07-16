@@ -3,6 +3,7 @@ import { Search, ChevronDown, Calendar, Printer, X, Plus, CloudUpload, Download,
 import * as XLSX from 'xlsx';
 import apiClient from '../../../../api/apiClient';
 import { useAuth } from '../../../../context/AuthContext';
+import { todayISO, startOfYearISO } from '../../../../utils/date';
 
 const getLogoUrl = (url) => {
   if (!url) return null;
@@ -13,17 +14,6 @@ const getLogoUrl = (url) => {
 
 const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const STATUS_LABEL = { draft: 'Draft', selesai: 'Selesai', batal: 'Batal' };
-
-// Tanggal lokal (bukan UTC) — toISOString() menggeser tanggal untuk WIB
-// sehingga dokumen bisa tercatat mundur sehari di jam-jam awal pagi.
-const todayISO = () => {
-  const d = new Date();
-  const bulan = String(d.getMonth() + 1).padStart(2, '0');
-  const tgl = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${bulan}-${tgl}`;
-};
-
-const startOfYearISO = () => `${new Date().getFullYear()}-01-01`;
 
 // Batas baris import CSV — harus sama dengan batas di backend
 // (StockInDocumentViewSet.import_csv) supaya user tidak ditolak server

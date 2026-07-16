@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, ChevronDown, Calendar, Printer, X, Plus, CloudUpload, Download, Check, ChevronsUpDown, ArrowLeft, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { PolarBearSvg } from './_shared';
 import apiClient from '../../../../api/apiClient';
 import { useAuth } from '../../../../context/AuthContext';
+import { todayISO, startOfYearISO } from '../../../../utils/date';
 
 const getLogoUrl = (url) => {
   if (!url) return null;
@@ -78,7 +78,9 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
   }, []);
 
   // Form State
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Pakai tanggal lokal — toISOString() memundurkan tanggal sehari di WIB
+  // pada dini hari, sehingga dokumen tercatat di tanggal yang salah.
+  const todayStr = todayISO();
   const [tanggal, setTanggal] = useState(todayStr);
   const [catatan, setCatatan] = useState('');
   const [transferKe, setTransferKe] = useState('');
@@ -138,7 +140,7 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
   const [editTransferKeValue, setEditTransferKeValue] = useState('');
 
   const [validationError, setValidationError] = useState('');
-  const [startDate, setStartDate] = useState('2026-01-01');
+  const [startDate, setStartDate] = useState(startOfYearISO());
   const [endDate, setEndDate] = useState(todayStr);
   const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState('custom');
@@ -1109,7 +1111,6 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
                       <tr>
                         <td colSpan={7} style={{ padding: '40px 20px', textAlign: 'center', borderBottom: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <PolarBearSvg />
                             <span style={{ fontSize: '14px', color: '#64748b', marginTop: '16px', fontWeight: 'bold' }}>{listLoading ? 'Memuat...' : 'No Data'}</span>
                           </div>
                         </td>
@@ -1963,7 +1964,6 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', borderTop: '1px solid #f1f5f9' }}>
-                  <PolarBearSvg />
                   <span style={{ fontSize: '14px', color: '#64748b', marginTop: '16px', fontWeight: 'bold' }}>Belum ada produk</span>
                 </div>
               )}
