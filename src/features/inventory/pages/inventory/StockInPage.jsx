@@ -2252,7 +2252,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
               <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>Tambah Produk</span>
             </div>
             <div style={{ padding: '20px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px auto', gap: '16px', alignItems: 'flex-end', marginBottom: '24px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 220px 44px', gap: '12px', alignItems: 'flex-end', marginBottom: '24px' }}>
                 {/* Cari Produk */}
                 <div>
                   <label style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', marginBottom: '6px', display: 'block' }}>Produk</label>
@@ -2348,7 +2348,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                       type="button"
                       onClick={() => setQtyValue(prev => Math.max(1, prev - 1))}
                       disabled={activeDetailDoc.status !== 'draft'}
-                      style={{ border: 0, background: '#f8fafc', width: '32px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', color: '#64748b' }}
+                      style={{ border: 0, background: '#f8fafc', width: '44px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', color: '#64748b' }}
                     >
                       -
                     </button>
@@ -2374,7 +2374,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                       type="button"
                       onClick={() => setQtyValue(prev => prev + 1)}
                       disabled={activeDetailDoc.status !== 'draft'}
-                      style={{ border: 0, background: '#f8fafc', width: '32px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', color: '#64748b' }}
+                      style={{ border: 0, background: '#f8fafc', width: '44px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', color: '#64748b' }}
                     >
                       +
                     </button>
@@ -2391,7 +2391,7 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                     color: '#ffffff',
                     border: 0,
                     borderRadius: '4px',
-                    width: '36px',
+                    width: '44px',
                     height: '36px',
                     display: 'flex',
                     alignItems: 'center',
