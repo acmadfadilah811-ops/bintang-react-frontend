@@ -1,4 +1,5 @@
 import TagPicker from './TagPicker';
+import TagPickerQty from './TagPickerQty';
 import { Toggle } from './Common';
 
 /** Sub-komponen untuk Kolom Kanan (Produk Hadiah, Produk Terkait, Target Pelanggan) Promosi POS */
@@ -6,8 +7,8 @@ export default function PromoTargetsForm({
   tipe,
   produkGratis,
   setProdukGratis,
-  produk,
-  setProduk,
+  produkQty,
+  setProdukQty,
   grupProduk,
   setGrupProduk,
   paketProduk,
@@ -44,7 +45,7 @@ export default function PromoTargetsForm({
         
         <div>
           <label className="text-[9px] font-bold text-slate-400 block mb-0.5">Produk Terkait</label>
-          <TagPicker value={produk} onChange={setProduk} fetchUrl="/products/" placeholder="Tambah Produk" />
+          <TagPickerQty value={produkQty} onChange={setProdukQty} fetchUrl="/products/" placeholder="Tambah Produk" />
         </div>
 
         <div className="border-t border-slate-100 pt-3">

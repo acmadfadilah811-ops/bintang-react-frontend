@@ -18,7 +18,7 @@ export default function TambahPromosiForm({ initial, onCancel, onSaved }) {
   const [tipe, setTipe] = useState(initial?.tipe_promosi || 'BX');
   const [combineQty, setCombineQty] = useState(initial ? initial.combine_qty : true);
   const [combineQtyValue, setCombineQtyValue] = useState(initial ? String(initial.combine_qty_value) : '1');
-  const [produk, setProduk] = useState(initial?.produk || '');
+  const [produkQty, setProdukQty] = useState(initial?.produk_qty || []);
   const [grupProduk, setGrupProduk] = useState(initial?.grup_produk || '');
   const [paketProduk, setPaketProduk] = useState(initial?.paket_produk || '');
   const [brand, setBrand] = useState(initial?.brand || '');
@@ -77,7 +77,7 @@ export default function TambahPromosiForm({ initial, onCancel, onSaved }) {
       tipe_promosi: tipe,
       combine_qty: combineQty,
       combine_qty_value: parseInt(combineQtyValue, 10) || 1,
-      produk,
+      produk_qty: produkQty,
       grup_produk: grupProduk,
       paket_produk: paketProduk,
       brand,
@@ -215,8 +215,8 @@ export default function TambahPromosiForm({ initial, onCancel, onSaved }) {
           tipe={tipe}
           produkGratis={produkGratis}
           setProdukGratis={setProdukGratis}
-          produk={produk}
-          setProduk={setProduk}
+          produkQty={produkQty}
+          setProdukQty={setProdukQty}
           grupProduk={grupProduk}
           setGrupProduk={setGrupProduk}
           paketProduk={paketProduk}
