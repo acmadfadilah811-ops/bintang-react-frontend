@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, ChevronDown, Calendar, Printer, X, Plus, CloudUpload, Download, Check, ChevronsUpDown, ArrowLeft, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import apiClient from '../../../../api/apiClient';
@@ -11,7 +11,28 @@ import { ImportCsvModal } from './ImportCsvModal';
 
 const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const STATUS_LABEL = { draft: 'Draft', selesai: 'Selesai', batal: 'Batal' };
-const REASON_LABEL = { transfer: 'Transfer Toko', manual: 'Manual' };
+// Daftar alasan Olsera, urut seperti di layarnya. 'transfer' & 'manual' sengaja
+// TIDAK ditawarkan: 'transfer' punya alurnya sendiri (lewat Transfer ke), dan
+// 'manual' cuma nilai bawaan dokumen lama — keduanya tetap ada di REASON_LABEL
+// supaya dokumen lama tetap terbaca.
+const REASON_OPTIONS = [
+  { value: 'rusak', label: 'Rusak' },
+  { value: 'kadaluarsa', label: 'Kadaluarsa' },
+  { value: 'refund', label: 'Pengembalian dana (refund)' },
+  { value: 'kelebihan_stok', label: 'Jumlah stock kelebihan' },
+  { value: 'lainnya', label: 'Alasan lainnya' },
+];
+const REASON_LABEL = {
+  transfer: 'Transfer Toko',
+  manual: 'Manual',
+  ...Object.fromEntries(REASON_OPTIONS.map((o) => [o.value, o.label])),
+};
+
+// Untuk 'lainnya', teks bebasnya lebih menjelaskan daripada label "Alasan lainnya".
+const reasonText = (doc) => {
+  if (doc.alasan === 'lainnya' && doc.alasan_lainnya) return doc.alasan_lainnya;
+  return REASON_LABEL[doc.alasan] || doc.alasan || '-';
+};
 
 // Batas baris import CSV — harus sama dengan CSV_IMPORT_MAX_ROWS_STOCK_OUT di
 // backend (product_views.py) supaya user tidak ditolak server setelah pratinjau
@@ -40,7 +61,7 @@ const mapDocToRow = (doc) => ({
   transferTo: doc.transfer_ke || '-',
   date: formatDisplayDate(doc.tanggal),
   note: doc.catatan || '-',
-  reason: REASON_LABEL[doc.alasan] || doc.alasan || '-',
+  reason: reasonText(doc),
   status: STATUS_LABEL[doc.status] || doc.status,
   receivedBy: receivedByDisplay(doc),
   // Nilai mentah untuk export XLSX
@@ -147,6 +168,7 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
   const [editTanggalValue, setEditTanggalValue] = useState('');
   const [editCatatanValue, setEditCatatanValue] = useState('');
   const [editAlasanValue, setEditAlasanValue] = useState('');
+  const [editAlasanLainnyaValue, setEditAlasanLainnyaValue] = useState('');
   const [editTransferKeValue, setEditTransferKeValue] = useState('');
 
   const [validationError, setValidationError] = useState('');
@@ -154,19 +176,6 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
   const [endDate, setEndDate] = useState(todayStr);
   const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState('custom');
-
-  // Table container reference and horizontal scroll handler
-  const tableContainerRef = useRef(null);
-
-  const scrollTable = (direction) => {
-    if (tableContainerRef.current) {
-      const scrollAmount = 180;
-      tableContainerRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
-      });
-    }
-  };
 
   // Column Widths
   const [columnWidths, setColumnWidths] = useState({
@@ -437,13 +446,23 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
   };
 
   // Inline updates PATCH
+  // Mengembalikan true bila tersimpan, supaya pemanggilnya tidak menutup editor
+  // (dan membuang ketikan user) saat server menolak.
   const patchDocument = async (payload) => {
     try {
       const res = await apiClient.patch(`/stock-out-documents/${activeDetailDoc.id}/`, payload);
       setActiveDetailDoc(res.data);
+      return true;
     } catch (err) {
       console.error('[StockOutPage] patch document error:', err);
-      setValidationError(err.response?.data?.error || 'Gagal menyimpan perubahan.');
+      const data = err.response?.data;
+      // DRF mengirim error per-field ({ alasan_lainnya: ['...'] }), bukan { error }.
+      // Tanpa ini pesannya jatuh ke teks generik dan alasan penolakannya hilang.
+      const pesan = typeof data === 'string'
+        ? data
+        : data?.error || (data ? Object.values(data).flat()[0] : null);
+      setValidationError(typeof pesan === 'string' ? pesan : 'Gagal menyimpan perubahan.');
+      return false;
     }
   };
 
@@ -458,8 +477,18 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
   };
 
   const saveInlineAlasan = async () => {
-    await patchDocument({ alasan: editAlasanValue });
-    setIsEditingAlasan(false);
+    const teks = editAlasanLainnyaValue.trim();
+    if (editAlasanValue === 'lainnya' && !teks) {
+      setValidationError('Tulis dulu alasannya saat memilih "Alasan lainnya".');
+      return;
+    }
+    const tersimpan = await patchDocument({
+      alasan: editAlasanValue,
+      // Teks bebas hanya berlaku untuk 'lainnya'; backend juga membuangnya
+      // untuk alasan lain, dikirim di sini supaya tampilannya langsung cocok.
+      alasan_lainnya: editAlasanValue === 'lainnya' ? teks : '',
+    });
+    if (tersimpan) setIsEditingAlasan(false);
   };
 
   const saveInlineTransferKe = async () => {
@@ -536,7 +565,7 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
       </tr>`;
     }).join('');
     const infoExtra = [
-      doc.alasan === 'transfer' && doc.transfer_ke ? `Transfer ke: ${esc(doc.transfer_ke)}` : `Alasan: ${esc(REASON_LABEL[doc.alasan] || doc.alasan)}`,
+      doc.alasan === 'transfer' && doc.transfer_ke ? `Transfer ke: ${esc(doc.transfer_ke)}` : `Alasan: ${esc(reasonText(doc))}`,
       doc.catatan ? `Catatan: ${esc(doc.catatan)}` : '',
     ].filter(Boolean).join(' &nbsp;·&nbsp; ');
     const judul = isDeliveryOrder ? 'SURAT JALAN' : `No. Stok Keluar #${esc(doc.nomor)}`;
@@ -759,9 +788,10 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
                 <span>Export</span>
               </button>
 
-              {/* Import Button */}
+              {/* Import Button — ImportCsvModal mengosongkan dirinya sendiri
+                  saat ditutup, jadi di sini cukup membukanya. */}
               <button
-                onClick={() => { setImportResult(null); setImportFile(null); setShowImportModal(true); }}
+                onClick={() => setShowImportModal(true)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -888,15 +918,17 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
               </div>
 
               {/* Table Container - WITH RESIZABLE COLUMNS AND HORIZONTAL SCROLLSIDEWAY & VERTICAL DIVIDERS */}
-              <div 
-                ref={tableContainerRef}
+              <div
                 className="pi-table-scroll-container"
-                style={{ 
-                  overflowX: 'scroll', 
-                  width: '100%', 
-                  marginTop: '8px', 
+                style={{
+                  overflowX: 'scroll',
+                  width: '100%',
+                  marginTop: '8px',
+                  marginBottom: '16px',
                   border: '1px solid #e2e8f0',
-                  borderRadius: '6px 6px 0 0'
+                  // Sudut bawah dulu siku karena ditutup bar tombol scroll di
+                  // bawahnya; bar itu sudah dibuang, jadi tabel menutup sendiri.
+                  borderRadius: '6px'
                 }}
               >
                 <table style={{ 
@@ -1194,49 +1226,6 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
                     )}
                   </tbody>
                 </table>
-              </div>
-
-              {/* Horizontal Scroll Controls at the bottom of the table */}
-              <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', border: '1px solid #cbd5e1', borderTop: 0, borderRadius: '0 0 6px 6px', padding: '6px 12px', gap: '8px', marginBottom: '16px' }}>
-                <button 
-                  type="button"
-                  onClick={() => scrollTable('left')}
-                  style={{
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    borderRadius: '4px',
-                    width: '26px',
-                    height: '26px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    fontSize: '10px',
-                    color: '#64748b'
-                  }}
-                >
-                  ◀
-                </button>
-                <div style={{ flex: 1, height: '4px', background: '#e2e8f0', borderRadius: '2px' }} />
-                <button 
-                  type="button"
-                  onClick={() => scrollTable('right')}
-                  style={{
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    borderRadius: '4px',
-                    width: '26px',
-                    height: '26px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    fontSize: '10px',
-                    color: '#64748b'
-                  }}
-                >
-                  ▶
-                </button>
               </div>
 
               {/* Pagination Footer */}
@@ -1798,9 +1787,10 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
               <div style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9' }}>
                 <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>Alasan</span>
                 {activeDetailDoc.status === 'draft' && (!isEditingAlasan ? (
-                  <button 
+                  <button
                     onClick={() => {
                       setEditAlasanValue(activeDetailDoc.alasan || '');
+                      setEditAlasanLainnyaValue(activeDetailDoc.alasan_lainnya || '');
                       setIsEditingAlasan(true);
                     }}
                     style={{ border: 0, background: 'transparent', color: '#0ea5e9', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
@@ -1816,16 +1806,42 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
               </div>
               <div style={{ padding: '16px' }}>
                 {!isEditingAlasan ? (
-                  <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1e293b' }}>{REASON_LABEL[activeDetailDoc.alasan] || activeDetailDoc.alasan || '-'}</div>
+                  <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1e293b' }}>
+                    {reasonText(activeDetailDoc)}
+                  </div>
                 ) : (
-                  <select 
-                    value={editAlasanValue} 
-                    onChange={(e) => setEditAlasanValue(e.target.value)} 
-                    style={{ border: '1px solid #cbd5e1', borderRadius: '4px', padding: '4px 8px', fontSize: '13px', outline: 'none', height: '28px', color: '#334155', width: '100%', background: '#ffffff' }}
-                  >
-                    <option value="transfer">Transfer Toko</option>
-                    <option value="manual">Manual</option>
-                  </select>
+                  <>
+                    {/* <select> bawaan, bukan panel melayang seperti Olsera: kotak
+                        Alasan ini ber-overflow:hidden, dan dropdown buatan akan
+                        terpotong olehnya. Isinya sama persis. */}
+                    <select
+                      value={editAlasanValue}
+                      onChange={(e) => setEditAlasanValue(e.target.value)}
+                      style={{ border: '1px solid #cbd5e1', borderRadius: '4px', padding: '4px 8px', fontSize: '13px', outline: 'none', height: '28px', color: '#334155', width: '100%', background: '#ffffff' }}
+                    >
+                      <option value="">Pilih Alasan</option>
+                      {REASON_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                      {/* Dokumen lama bisa ber-alasan transfer/manual — tetap
+                          ditampilkan supaya nilainya tidak diam-diam berubah
+                          saat kotaknya dibuka. */}
+                      {(editAlasanValue === 'transfer' || editAlasanValue === 'manual') && (
+                        <option value={editAlasanValue}>{REASON_LABEL[editAlasanValue]}</option>
+                      )}
+                    </select>
+                    {editAlasanValue === 'lainnya' && (
+                      <input
+                        type="text"
+                        autoFocus
+                        value={editAlasanLainnyaValue}
+                        onChange={(e) => setEditAlasanLainnyaValue(e.target.value)}
+                        placeholder="Tulis alasannya"
+                        maxLength={255}
+                        style={{ marginTop: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '4px 8px', fontSize: '13px', outline: 'none', height: '28px', color: '#334155', width: '100%', minWidth: 0, boxSizing: 'border-box', background: '#ffffff' }}
+                      />
+                    )}
+                  </>
                 )}
               </div>
             </div>
