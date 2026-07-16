@@ -4,6 +4,7 @@ import apiClient from '../../../../api/apiClient';
 import { useAuth } from '../../../../context/AuthContext';
 import { todayISO } from '../../../../utils/date';
 import { getLogoUrl } from '../../../../utils/logo';
+import { ProductionCostSection } from './ProductionCostSection';
 
 const STATUS_LABEL = { draft: 'Draft', selesai: 'Selesai', batal: 'Batal' };
 const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -458,7 +459,7 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
                     style={{ padding: '14px 20px', fontSize: '13px', fontWeight: 'bold', color: '#475569', cursor: 'pointer', userSelect: 'none' }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span>Dibuat Oleh</span>
+                      <span>Diterima Oleh</span>
                       <ChevronsUpDown size={14} style={{ color: sortKey === 'receivedBy' ? '#0085ca' : '#94a3b8' }} />
                     </div>
                   </th>
@@ -838,6 +839,14 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
               )}
             </div>
           </div>
+
+          <ProductionCostSection
+            documentId={activeDoc.id}
+            isDraft={activeDoc.status === 'draft'}
+            biaya={activeDoc.biaya || []}
+            totalBiaya={activeDoc.total_biaya || 0}
+            onChanged={() => fetchDocDetail(activeDoc.id)}
+          />
         </div>
       )}
 
