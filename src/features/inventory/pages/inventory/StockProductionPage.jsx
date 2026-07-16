@@ -4,6 +4,7 @@ import apiClient from '../../../../api/apiClient';
 import { useAuth } from '../../../../context/AuthContext';
 import { todayISO } from '../../../../utils/date';
 import { getLogoUrl } from '../../../../utils/logo';
+import { receivedByDisplay } from '../../../../utils/stockDocument';
 import { ProductionCostSection } from './ProductionCostSection';
 
 const STATUS_LABEL = { draft: 'Draft', selesai: 'Selesai', batal: 'Batal' };
@@ -23,7 +24,7 @@ const mapDocToRow = (doc) => ({
   date: formatDisplayDate(doc.tanggal),
   note: doc.catatan || '-',
   status: STATUS_LABEL[doc.status] || doc.status,
-  receivedBy: doc.dibuat_oleh_nama || '-',
+  receivedBy: receivedByDisplay(doc),
 });
 
 export function StockProductionPage({ onToggleCreate, viewState: propViewState }) {

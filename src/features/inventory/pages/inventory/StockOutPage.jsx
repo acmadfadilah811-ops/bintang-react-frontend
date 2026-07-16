@@ -5,6 +5,7 @@ import apiClient from '../../../../api/apiClient';
 import { getLogoUrl } from '../../../../utils/logo';
 import { useAuth } from '../../../../context/AuthContext';
 import { todayISO, startOfYearISO } from '../../../../utils/date';
+import { receivedByDisplay, receivedByRaw } from '../../../../utils/stockDocument';
 
 
 const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -27,12 +28,12 @@ const mapDocToRow = (doc) => ({
   note: doc.catatan || '-',
   reason: REASON_LABEL[doc.alasan] || doc.alasan || '-',
   status: STATUS_LABEL[doc.status] || doc.status,
-  receivedBy: doc.dibuat_oleh_nama || '-',
+  receivedBy: receivedByDisplay(doc),
   // Nilai mentah untuk export XLSX
   transferToRaw: doc.transfer_ke || '',
   tanggalRaw: doc.tanggal || '',
   noteRaw: doc.catatan || '',
-  receivedByRaw: doc.dibuat_oleh_nama || '',
+  receivedByRaw: receivedByRaw(doc),
 });
 
 export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
@@ -1186,7 +1187,7 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
                               fontWeight: 'bold' 
                             }}>{row.status}</span>
                           </td>
-                          <td style={{ width: `${columnWidths.receivedBy}px`, minWidth: `${columnWidths.receivedBy}px`, maxWidth: `${columnWidths.receivedBy}px`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '14px 20px', fontSize: '13px', color: '#475569', borderBottom: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>{row.receivedBy || '-'}</td>
+                          <td style={{ width: `${columnWidths.receivedBy}px`, minWidth: `${columnWidths.receivedBy}px`, maxWidth: `${columnWidths.receivedBy}px`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '14px 20px', fontSize: '13px', color: '#475569', borderBottom: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>{row.receivedBy}</td>
                         </tr>
                       ))
                     )}

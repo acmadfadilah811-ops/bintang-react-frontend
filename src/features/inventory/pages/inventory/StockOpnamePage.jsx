@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../../../../context/AuthContext';
 import apiClient from '../../../../api/apiClient';
 import { getLogoUrl } from '../../../../utils/logo';
+import { receivedByDisplay } from '../../../../utils/stockDocument';
 
 
 const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -31,7 +32,7 @@ const mapDocToRow = (doc) => ({
   date: formatDisplayDate(doc.tanggal),
   note: doc.catatan || '-',
   status: STATUS_LABEL[doc.status] || doc.status,
-  receivedBy: doc.dibuat_oleh_nama || '-',
+  receivedBy: receivedByDisplay(doc),
 });
 
 /** Section "Terapkan di" mandiri milik satu checkbox (Qty Sistem atau Qty Selisih). */
