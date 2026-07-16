@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../../../../context/AuthContext';
 import apiClient from '../../../../api/apiClient';
 import { getLogoUrl } from '../../../../utils/logo';
+import { nowTimeLocal } from '../../../../utils/date';
 import { receivedByDisplay } from '../../../../utils/stockDocument';
 
 
@@ -372,8 +373,10 @@ export function StockOpnamePage({ onToggleCreate, viewState: propViewState }) {
     setIsEditingCatatan(false);
   };
 
+  // Dipanggil tiap kali modal dibuka, jadi jamnya selalu jam saat itu — bukan
+  // jam halaman ini dimuat. Tetap bisa diubah user lewat input-nya.
   const resetAddProductForm = () => {
-    setAddModalTime('');
+    setAddModalTime(nowTimeLocal());
     setAddModalCategory('');
     setAddModalSearch('');
     setAddModalResults([]);
