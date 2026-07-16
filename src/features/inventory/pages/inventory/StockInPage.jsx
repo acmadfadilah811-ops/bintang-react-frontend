@@ -1,65 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, ChevronDown, Calendar, Printer, X, Plus, CloudUpload, Download, Check, ChevronsUpDown, ArrowLeft, Trash2, FileText } from 'lucide-react';
+import { Search, ChevronDown, Calendar, Printer, X, Plus, CloudUpload, Download, Check, ChevronsUpDown, ArrowLeft, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import apiClient from '../../../../api/apiClient';
 import { getLogoUrl } from '../../../../utils/logo';
 import { useAuth } from '../../../../context/AuthContext';
 import { todayISO, startOfYearISO } from '../../../../utils/date';
-import { receivedByDisplay, receivedByRaw } from '../../../../utils/stockDocument';
 import { ImportCsvModal } from './ImportCsvModal';
+import { PembelianModal } from './PembelianModal';
+import { StockInCreateForm } from './StockInCreateForm';
+import {
+  STATUS_LABEL,
+  CSV_MAX_ROWS,
+  CSV_PREVIEW_COLUMNS,
+  formatDisplayDate,
+  mapDocToRow,
+  formatCurrencyRp,
+} from './stockInHelpers';
 
 
-const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-const STATUS_LABEL = { draft: 'Draft', selesai: 'Selesai', batal: 'Batal' };
-
-// Batas baris import CSV — harus sama dengan batas di backend
-// (StockInDocumentViewSet.import_csv) supaya user tidak ditolak server
-// setelah preview terlanjur bilang aman.
-const CSV_MAX_ROWS = 200;
-// Kolom template resmi: product,variant,sku,supplier,qty,new_buy_price,rack
-const CSV_PREVIEW_COLUMNS = [
-  { key: 'product', label: 'Produk' },
-  { key: 'variant', label: 'Varian' },
-  { key: 'sku', label: 'SKU' },
-  { key: 'supplier', label: 'Supplier' },
-  { key: 'qty', label: 'Qty' },
-  { key: 'new_buy_price', label: 'Harga Beli' },
-  { key: 'rack', label: 'Rak' },
-];
-
-const formatDisplayDate = (isoStr) => {
-  if (!isoStr) return '-';
-  const d = new Date(`${isoStr}T00:00:00`);
-  if (isNaN(d.getTime())) return '-';
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${day}-${MONTHS_ID[d.getMonth()]}-${d.getFullYear()}`;
-};
-
-const getFileSizeStr = (size) => {
-  if (!size) return '0.0 KB';
-  const kb = size / 1024;
-  return `${kb.toFixed(1)} KB`;
-};
-
-const mapDocToRow = (doc) => ({
-  id: doc.id,
-  no: doc.nomor,
-  from: doc.nama_penerima || '-',
-  supplier: doc.supplier || '-',
-  date: formatDisplayDate(doc.tanggal),
-  note: doc.catatan || '-',
-  status: STATUS_LABEL[doc.status] || doc.status,
-  receivedBy: receivedByDisplay(doc),
-  // Nilai mentah (bukan untuk tampilan) — dipakai saat export XLSX agar cocok kolom asli Olsera
-  supplierRaw: doc.supplier || '',
-  tanggalRaw: doc.tanggal || '',
-  noteRaw: doc.catatan || '',
-  receiverNameRaw: doc.nama_penerima || '',
-  receivedByRaw: receivedByRaw(doc),
-});
-
-const formatCurrencyRp = (value) =>
-  new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value || 0);
 
 export function StockInPage({ onToggleCreate, viewState: propViewState }) {
   const { businessSettings } = useAuth();
@@ -1321,71 +1279,12 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
       )}
 
       {/* MODAL: Terima dari Pembelian */}
-      {showPembelianModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#ffffff', borderRadius: '8px', width: '90%', maxWidth: '800px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-            {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>Terima dari Pembelian</h3>
-              <button 
-                onClick={() => setShowPembelianModal(false)}
-                style={{ background: '#f1f5f9', border: 0, padding: '6px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#475569' }}
-              >
-                Batal
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div style={{ padding: '20px' }}>
-              {/* Search Bar */}
-              <div style={{ position: 'relative', marginBottom: '16px' }}>
-                <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                <input 
-                  type="text" 
-                  placeholder="Cari No. Pembelian/Nama Supplier"
-                  value={searchPembelian}
-                  onChange={(e) => setSearchPembelian(e.target.value)}
-                  style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '10px 12px 10px 36px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              {/* Table */}
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-                  <thead>
-                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                      <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569' }}>No. Pembelian</th>
-                      <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569' }}>Nama Supplier</th>
-                      <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569' }}>Jumlah</th>
-                      <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569' }}>Tgl. Beli</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td colSpan="4" style={{ textAlign: 'center', padding: '40px 16px', color: '#94a3b8' }}>
-                        No Data
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '13px' }}>
-              <div style={{ color: '#64748b' }}>Total 0</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button disabled style={{ border: '1px solid #cbd5e1', borderRadius: '4px', padding: '4px 8px', background: '#ffffff', cursor: 'not-allowed', color: '#cbd5e1' }}>&lt;</button>
-                <span style={{ background: '#3b82f6', color: '#ffffff', width: '24px', height: '24px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>1</span>
-                <button disabled style={{ border: '1px solid #cbd5e1', borderRadius: '4px', padding: '4px 8px', background: '#ffffff', cursor: 'not-allowed', color: '#cbd5e1' }}>&gt;</button>
-                <span style={{ color: '#64748b', marginLeft: '8px' }}>
-                  Go to <input type="number" defaultValue="1" style={{ width: '40px', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '3px', textAlign: 'center', fontSize: '12px' }} />
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <PembelianModal
+        open={showPembelianModal}
+        onClose={() => setShowPembelianModal(false)}
+        searchPembelian={searchPembelian}
+        setSearchPembelian={setSearchPembelian}
+      />
 
       {/* MODAL: Import Stok Masuk via CSV — ditangani ImportCsvModal */}
       <ImportCsvModal
@@ -1402,100 +1301,14 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
       />
       {/* STATE: create (Tambah Stok Masuk Form) */}
       {viewState === 'create' && (
-        <div style={{ padding: '24px', background: '#f8fafc', minHeight: '100%' }}>
-          <div className="pi-category-card" style={{ maxWidth: '1200px', margin: '0 auto', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
-              <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#1e293b' }}>Tambah Stok Masuk</span>
-            </div>
-
-            <div style={{ padding: '24px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
-                {/* Tanggal */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>Tanggal</label>
-                  <div style={{ position: 'relative' }}>
-                    <Calendar size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', zIndex: 10 }} />
-                    <input 
-                      type="date" 
-                      value={tanggal}
-                      onChange={(e) => setTanggal(e.target.value)}
-                      style={{ 
-                        width: '100%', 
-                        border: '1px solid #cbd5e1', 
-                        borderRadius: '4px', 
-                        padding: '8px 12px 8px 38px', 
-                        fontSize: '13px', 
-                        outline: 'none', 
-                        boxSizing: 'border-box', 
-                        color: '#334155',
-                        height: '36px'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Catatan */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>Catatan <span style={{ color: '#94a3b8', fontWeight: '400' }}>(opsional)</span></label>
-                  <input 
-                    type="text" 
-                    placeholder="Masukkan catatan"
-                    value={catatan}
-                    onChange={(e) => setCatatan(e.target.value)}
-                    style={{ 
-                      width: '100%', 
-                      border: '1px solid #cbd5e1', 
-                      borderRadius: '4px', 
-                      padding: '8px 12px', 
-                      fontSize: '13px', 
-                      outline: 'none', 
-                      boxSizing: 'border-box', 
-                      color: '#334155',
-                      height: '36px'
-                    }}
-                  />
-                </div>
-
-              </div>
-
-              {/* Actions Footer */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
-                <button 
-                  onClick={() => handleStateChange('list')}
-                  style={{ 
-                    background: '#ffffff', 
-                    border: '1px solid #cbd5e1', 
-                    borderRadius: '4px', 
-                    padding: '8px 20px', 
-                    fontSize: '13px', 
-                    fontWeight: 'bold', 
-                    color: '#475569', 
-                    cursor: 'pointer',
-                    height: '36px'
-                  }}
-                >
-                  Batal
-                </button>
-                <button 
-                  onClick={handleStageStock}
-                  style={{ 
-                    background: '#0ea5e9', 
-                    border: 0, 
-                    borderRadius: '4px', 
-                    padding: '8px 24px', 
-                    fontSize: '13px', 
-                    fontWeight: 'bold', 
-                    color: '#ffffff', 
-                    cursor: 'pointer',
-                    height: '36px'
-                  }}
-                >
-                  Lanjut tambah stok masuk
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <StockInCreateForm
+          tanggal={tanggal}
+          setTanggal={setTanggal}
+          catatan={catatan}
+          setCatatan={setCatatan}
+          onBatal={() => handleStateChange('list')}
+          onLanjut={handleStageStock}
+        />
       )}
 
       {/* STATE: detail (Detail/Incoming Add View) */}
