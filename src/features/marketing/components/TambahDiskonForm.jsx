@@ -1,25 +1,23 @@
 import { useState } from 'react';
-import { Check, Calendar } from 'lucide-react';
+import { Check, Calendar, Trash2 } from 'lucide-react';
 import apiClient from '../../../api/apiClient';
-import { useAuth } from '../../../context/AuthContext';
-import { extractApiError, inputCls } from '../format';
-import { FormRow, Toggle, PercentNominalField, ErrorBanner } from './Common';
+import { extractApiError } from '../format';
+import { Toggle } from './Common';
 import TagPicker from './TagPicker';
 
-/** Form "Tambah/Ubah Diskon Penjualan". */
+/** Form "Tambah/Ubah Diskon Penjualan" dengan layout premium split-card matching Detail view */
 export default function TambahDiskonForm({ initial, onCancel, onSaved }) {
-  const { user, businessSettings } = useAuth();
-  const accountName = businessSettings?.nama_bisnis || user?.name || user?.email || 'Akun';
   const [tanggalAktif, setTanggalAktif] = useState(initial?.tanggal_aktif || new Date().toISOString().slice(0, 10));
   const [noExpiry, setNoExpiry] = useState(initial ? initial.tanpa_kadaluarsa : true);
   const [tanggalKadaluarsa, setTanggalKadaluarsa] = useState(initial?.tanggal_kadaluarsa || '');
   const [minimalTotal, setMinimalTotal] = useState(initial ? String(initial.minimal_total_pesanan) : '0');
   const [discountType, setDiscountType] = useState(initial?.tipe_diskon || 'percent');
-  const [jumlahDiskon, setJumlahDiskon] = useState(initial ? String(initial.jumlah_diskon) : '');
+  const [jumlahDiskon, setJumlahDiskon] = useState(initial ? String(initial.jumlah_diskon) : '0');
   const [tipePelanggan, setTipePelanggan] = useState(initial?.tipe_pelanggan || '');
   const [brand, setBrand] = useState(initial?.brand || '');
   const [catatan, setCatatan] = useState(initial?.catatan || '');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
 
   const handleSave = async () => {
@@ -55,83 +53,207 @@ export default function TambahDiskonForm({ initial, onCancel, onSaved }) {
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm('Hapus diskon penjualan ini?')) return;
+    setDeleting(true);
+    try {
+      await apiClient.delete(`/sales-discounts/${initial.id}/`);
+      onSaved();
+    } catch (err) {
+      console.error('[TambahDiskonForm] delete error:', err);
+      setError('Gagal menghapus diskon penjualan.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-5 border-b border-slate-100">
-        <h2 className="text-slate-800 font-extrabold text-[15px]">{initial ? 'Ubah' : 'Tambah'} Diskon Penjualan</h2>
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-slate-100 mb-6">
+        <h2 className="text-slate-800 font-extrabold text-base">Rincian Diskon</h2>
         <div className="flex items-center gap-4">
-          <button type="button" onClick={onCancel} className="text-slate-500 hover:text-slate-700 text-xs font-bold cursor-pointer transition-colors">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-blue-600 hover:text-blue-700 text-xs font-bold cursor-pointer transition-colors"
+          >
             Batal
           </button>
-          <div className="text-right">
-            <div className="text-[10px] font-bold text-slate-400 leading-none mb-1 uppercase tracking-wider">Simpan di:</div>
-            <select className="border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-600 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer">
-              <option>{accountName}</option>
-            </select>
-          </div>
           <button
             type="button"
             disabled={saving}
             onClick={handleSave}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-60 text-white rounded-xl px-4.5 py-2.5 text-xs font-bold cursor-pointer transition-all active:scale-[0.98] shadow-md shadow-emerald-500/10"
+            className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white rounded-xl px-5 py-2.5 text-xs font-bold cursor-pointer transition-all active:scale-[0.98] shadow-md shadow-emerald-500/10"
           >
             <Check size={14} /> {saving ? 'Menyimpan...' : 'Simpan'}
           </button>
         </div>
       </div>
 
-      <ErrorBanner message={error} />
+      {error && (
+        <div className="mb-5 px-4 py-3 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold">
+          {error}
+        </div>
+      )}
 
-      <div className="divide-y divide-slate-100">
-        <FormRow label="Tanggal Aktif" required>
-          <div className="relative">
-            <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="date" value={tanggalAktif} onChange={(e) => setTanggalAktif(e.target.value)} className={`${inputCls} pl-9`} />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Kolom Kiri & Tengah: Form Inputs */}
+        <div className="md:col-span-2 border border-slate-100 rounded-2xl p-6 bg-slate-50/20 flex flex-col justify-between">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
+            {/* Bagian Input Kiri */}
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                  Min. Total Harga Pesanan
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={minimalTotal}
+                    onChange={(e) => setMinimalTotal(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs font-semibold text-slate-700 outline-none bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                  Tanggal Aktif
+                </label>
+                <div className="relative">
+                  <Calendar size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-450" />
+                  <input
+                    type="date"
+                    value={tanggalAktif}
+                    onChange={(e) => setTanggalAktif(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs font-semibold text-slate-700 outline-none bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                  Tanggal Berakhir
+                </label>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-semibold text-slate-650">Tanpa Kadaluarsa</span>
+                  <Toggle on={noExpiry} onChange={setNoExpiry} />
+                </div>
+                {!noExpiry && (
+                  <input
+                    type="date"
+                    value={tanggalKadaluarsa}
+                    onChange={(e) => setTanggalKadaluarsa(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all animate-in fade-in duration-200"
+                  />
+                )}
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                  Catatan (Opsional)
+                </label>
+                <textarea
+                  value={catatan}
+                  onChange={(e) => setCatatan(e.target.value)}
+                  rows={2}
+                  placeholder="Masukkan catatan..."
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all placeholder-slate-400"
+                />
+              </div>
+            </div>
+
+            {/* Bagian Input Kanan: Persen vs Nominal & Jumlah Diskon */}
+            <div className="space-y-4">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Tipe & Jumlah Diskon
+              </label>
+
+              {/* Segmented Control */}
+              <div className="flex rounded-lg border border-slate-200 overflow-hidden bg-slate-100/50 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setDiscountType('percent')}
+                  className={`flex-1 py-1.5 text-xs font-extrabold text-center rounded-md cursor-pointer transition-all ${
+                    discountType === 'percent'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  % Persen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDiscountType('nominal')}
+                  className={`flex-1 py-1.5 text-xs font-extrabold text-center rounded-md cursor-pointer transition-all ${
+                    discountType === 'nominal'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  $ Nominal
+                </button>
+              </div>
+
+              {/* Input Value */}
+              <div>
+                <input
+                  type="number"
+                  min="0"
+                  value={jumlahDiskon}
+                  onChange={(e) => setJumlahDiskon(e.target.value)}
+                  placeholder="Contoh: 10 atau 10000"
+                  className="w-full border border-slate-200 rounded-xl px-3.5 py-3 text-lg font-bold text-slate-800 outline-none bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all placeholder-slate-400"
+                />
+                <span className="text-[10px] text-slate-400 font-medium block mt-1">
+                  {discountType === 'percent'
+                    ? 'Masukkan persentase diskon (1 - 100).'
+                    : 'Masukkan nominal rupiah diskon.'}
+                </span>
+              </div>
+            </div>
           </div>
-        </FormRow>
 
-        <FormRow label="Tanpa Kadaluarsa">
-          <div className="flex items-center gap-2">
-            <Toggle on={noExpiry} onChange={setNoExpiry} />
-            <span className="text-sm text-slate-600">{noExpiry ? 'Ya' : 'Tidak'}</span>
-          </div>
-        </FormRow>
+          {/* Delete Button (hanya jika Edit) */}
+          {initial?.id && (
+            <div className="mt-8 pt-5 border-t border-slate-100 flex justify-start">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleDelete}
+                className="flex items-center gap-1.5 border border-slate-250 text-slate-500 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 rounded-xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer"
+              >
+                <Trash2 size={13} /> {deleting ? 'Menghapus...' : 'Hapus'}
+              </button>
+            </div>
+          )}
+        </div>
 
-        {!noExpiry && (
-          <FormRow label="Tanggal Kadaluarsa">
-            <input type="date" value={tanggalKadaluarsa} onChange={(e) => setTanggalKadaluarsa(e.target.value)} className={inputCls} />
-          </FormRow>
-        )}
-
-        <FormRow label="Minimal Total Harga Pesanan" help="Minimal jumlah pembelian untuk mendapatkan diskon ini">
-          <input type="number" min="0" value={minimalTotal} onChange={(e) => setMinimalTotal(e.target.value)} className={inputCls} />
-        </FormRow>
-
-        <FormRow label="Jumlah Diskon" help="Cukup hanya masukkan angka saja, tanpa simbol persen (%), minimal: 0 dan maksimal: 100">
-          <div className="space-y-2">
-            <PercentNominalField value={discountType} onChange={setDiscountType} />
-            <input
-              type="number"
-              min="0"
-              placeholder="Masukkan angka contoh: 1234"
-              value={jumlahDiskon}
-              onChange={(e) => setJumlahDiskon(e.target.value)}
-              className={inputCls}
+        {/* Kolom Kanan: Kriteria TagPicker */}
+        <div className="space-y-4">
+          <div className="border border-slate-150 rounded-2xl p-5 bg-white shadow-sm">
+            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Berlaku untuk pelanggan</h3>
+            <TagPicker
+              value={tipePelanggan}
+              onChange={setTipePelanggan}
+              fetchUrl="/contacts/"
+              placeholder="Tambah Pelanggan"
             />
           </div>
-        </FormRow>
 
-        <FormRow label="Berlaku untuk pelanggan" help="Kosongkan jika berlaku untuk semua pelanggan">
-          <TagPicker value={tipePelanggan} onChange={setTipePelanggan} fetchUrl="/contacts/" placeholder="Cari pelanggan..." />
-        </FormRow>
-
-        <FormRow label="Berlaku untuk brand" help="Kosongkan jika berlaku untuk semua brand">
-          <TagPicker value={brand} onChange={setBrand} fetchUrl="/brands/" placeholder="Cari brand..." />
-        </FormRow>
-
-        <FormRow label="Catatan" help="Opsional">
-          <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} rows={2} className={inputCls} />
-        </FormRow>
+          <div className="border border-slate-150 rounded-2xl p-5 bg-white shadow-sm">
+            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Berlaku untuk brand</h3>
+            <TagPicker
+              value={brand}
+              onChange={setBrand}
+              fetchUrl="/brands/"
+              placeholder="Tambah Brand"
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
