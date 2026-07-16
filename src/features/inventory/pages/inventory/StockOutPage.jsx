@@ -51,6 +51,8 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
   }, [propViewState]);
 
   const [showTambahDropdown, setShowTambahDropdown] = useState(false);
+  // Dropdown Cetak: Download PDF / Delivery Order / Cetak A5
+  const [cetakMenuOpen, setCetakMenuOpen] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importing, setImporting] = useState(false);
@@ -505,8 +507,22 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
     }
   };
 
-  const handleCetak = () => {
+  /**
+   * Cetak dokumen stok keluar.
+   *
+   * mode:
+   *  - 'pdf'            : tampilan A4 biasa. Tidak ada library PDF di proyek ini,
+   *                       jadi "Download PDF" mengandalkan dialog cetak browser —
+   *                       user memilih "Save as PDF". Teksnya tetap tajam & bisa
+   *                       dicari, beda dengan hasil raster library PDF.
+   *  - 'delivery-order' : surat jalan — menonjolkan penerima dan menyediakan
+   *                       kolom tanda tangan pengirim/penerima.
+   *  - 'a5'             : sama seperti 'pdf' tapi kertas A5 dengan skala lebih kecil.
+   */
+  const handleCetak = (mode = 'pdf') => {
     if (!activeDetailDoc) return;
+    const isA5 = mode === 'a5';
+    const isDeliveryOrder = mode === 'delivery-order';
     const doc = activeDetailDoc;
     const esc = (v) => String(v ?? '-').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const namaBisnis = businessSettings?.nama_bisnis || '';
@@ -526,33 +542,47 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
       doc.alasan === 'transfer' && doc.transfer_ke ? `Transfer ke: ${esc(doc.transfer_ke)}` : `Alasan: ${esc(REASON_LABEL[doc.alasan] || doc.alasan)}`,
       doc.catatan ? `Catatan: ${esc(doc.catatan)}` : '',
     ].filter(Boolean).join(' &nbsp;·&nbsp; ');
+    const judul = isDeliveryOrder ? 'SURAT JALAN' : `No. Stok Keluar #${esc(doc.nomor)}`;
     const html = `<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>${esc(doc.nomor)}</title>
       <style>
-        body { font-family: Arial, sans-serif; font-size: 13px; color: #111; margin: 24px; }
-        .logo-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px; margin-bottom: 16px; min-height: 60px; display: flex; align-items: center; }
-        .logo-box img { max-height: 56px; max-width: 160px; object-fit: contain; }
-        .doc-title { font-size: 15px; margin: 0 0 4px; }
-        .doc-title .biz { font-size: 12px; color: #555; margin-left: 6px; }
+        @page { size: ${isA5 ? 'A5' : 'A4'}; margin: ${isA5 ? '8mm' : '14mm'}; }
+        body { font-family: Arial, sans-serif; font-size: ${isA5 ? '10px' : '13px'}; color: #111; margin: 0; }
+        .logo-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: ${isA5 ? '8px' : '16px'}; margin-bottom: ${isA5 ? '8px' : '16px'}; min-height: ${isA5 ? '34px' : '60px'}; display: flex; align-items: center; }
+        .logo-box img { max-height: ${isA5 ? '30px' : '56px'}; max-width: ${isA5 ? '100px' : '160px'}; object-fit: contain; }
+        .doc-title { font-size: ${isDeliveryOrder ? '18px' : (isA5 ? '12px' : '15px')}; margin: 0 0 4px; ${isDeliveryOrder ? 'letter-spacing: 2px; text-align: center; font-weight: bold;' : ''} }
+        .doc-title .biz { font-size: ${isA5 ? '10px' : '12px'}; color: #555; margin-left: 6px; }
         .tanggal { margin: 6px 0 4px; }
-        .info-extra { color: #666; font-size: 11px; margin-bottom: 10px; }
-        table.items { border-collapse: collapse; width: 100%; margin-top: 10px; }
-        table.items th, table.items td { border: 1px solid #999; padding: 6px 8px; text-align: left; }
+        .info-extra { color: #666; font-size: ${isA5 ? '9px' : '11px'}; margin-bottom: 10px; }
+        table.items { border-collapse: collapse; width: 100%; margin-top: ${isA5 ? '6px' : '10px'}; }
+        table.items th, table.items td { border: 1px solid #999; padding: ${isA5 ? '3px 5px' : '6px 8px'}; text-align: left; }
         table.items th { background: #f8fafc; }
-        .foot { margin-top: 24px; color: #999; font-size: 10px; }
+        .foot { margin-top: ${isA5 ? '12px' : '24px'}; color: #999; font-size: ${isA5 ? '8px' : '10px'}; }
+        .kepada { border: 1px solid #999; padding: 10px 12px; margin: 12px 0; }
+        .kepada .label { color: #666; font-size: 11px; margin-bottom: 2px; }
+        .kepada .nama { font-size: 14px; font-weight: bold; }
+        .ttd { display: flex; justify-content: space-between; margin-top: 48px; }
+        .ttd div { width: 40%; text-align: center; }
+        .ttd .garis { margin-top: 56px; border-top: 1px solid #333; padding-top: 4px; font-size: 11px; }
       </style></head><body>
       <div class="logo-box">${logoUrl ? `<img src="${esc(logoUrl)}" alt="logo">` : ''}</div>
-      <p class="doc-title">No. Stok Keluar #${esc(doc.nomor)}<span class="biz">${esc(namaBisnis)}</span></p>
+      <p class="doc-title">${judul}${isDeliveryOrder ? '' : `<span class="biz">${esc(namaBisnis)}</span>`}</p>
+      ${isDeliveryOrder ? `<p class="tanggal" style="text-align:center;color:#555">${esc(namaBisnis)} &nbsp;·&nbsp; No. ${esc(doc.nomor)}</p>` : ''}
       <p class="tanggal"><strong>Tanggal</strong> : ${esc(doc.tanggal)}</p>
-      ${infoExtra ? `<p class="info-extra">${infoExtra}</p>` : ''}
+      ${isDeliveryOrder
+        ? `<div class="kepada"><div class="label">Dikirim kepada</div><div class="nama">${esc(doc.transfer_ke || '-')}</div></div>`
+        : (infoExtra ? `<p class="info-extra">${infoExtra}</p>` : '')}
       <table class="items">
         <thead><tr><th>#</th><th>Produk</th><th style="text-align:right">Qty</th></tr></thead>
         <tbody>${rows || '<tr><td colspan="3">Tidak ada produk</td></tr>'}</tbody>
         <tfoot><tr><td style="text-align:right"><strong>Total</strong></td><td></td><td style="text-align:right">${totalQty}</td></tr></tfoot>
       </table>
+      ${isDeliveryOrder
+        ? `<div class="ttd"><div><div>Pengirim</div><div class="garis">( .......................... )</div></div><div><div>Penerima</div><div class="garis">( .......................... )</div></div></div>`
+        : ''}
       <p class="foot">Dicetak ${new Date().toLocaleString('id-ID')}</p>
       <script>window.onload = function () { window.print(); };</script>
       </body></html>`;
-    const win = window.open('', '_blank', 'width=800,height=600');
+    const win = window.open('', '_blank', isA5 ? 'width=600,height=520' : 'width=800,height=600');
     if (!win) {
       setValidationError('Popup diblokir browser. Izinkan popup untuk mencetak.');
       return;
@@ -1430,25 +1460,29 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
           </div>
 
           {/* Header Card */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'stretch', 
-            background: '#ffffff', 
-            border: '1px solid #e2e8f0', 
-            borderRadius: '8px', 
+          {/* Catatan: JANGAN pakai overflow:hidden di sini — itu memotong
+              dropdown Cetak yang menjulur ke bawah kartu. Sudut membulat
+              blok status di kiri diatur lewat borderRadius-nya sendiri. */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'stretch',
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '8px',
             marginBottom: '20px',
-            overflow: 'hidden',
             minHeight: '80px',
             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
           }}>
             {/* Left Status Block */}
-            <div style={{ 
-              background: 'linear-gradient(135deg, #fff7ed, #ffedd5)', 
-              borderRight: '1px solid #fed7aa', 
-              padding: '16px 28px', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center', 
+            <div style={{
+              background: 'linear-gradient(135deg, #fff7ed, #ffedd5)',
+              borderRight: '1px solid #fed7aa',
+              borderTopLeftRadius: '8px',
+              borderBottomLeftRadius: '8px',
+              padding: '16px 28px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
               justifyContent: 'center',
               color: '#c2410c',
               gap: '4px',
@@ -1489,30 +1523,86 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
 
             {/* Right Action Buttons */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 24px' }}>
-              <button
-                type="button"
-                onClick={handleCetak}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  padding: '8px 14px',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  color: '#475569',
-                  cursor: 'pointer',
-                  height: '36px',
-                  transition: 'background 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
-                onMouseOut={(e) => e.currentTarget.style.background = '#ffffff'}
-              >
-                <Printer size={14} />
-                <span>Cetak</span>
-              </button>
+              {/* Dropdown Cetak — Download PDF / Delivery Order / Cetak A5 */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => setCetakMenuOpen((open) => !open)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: cetakMenuOpen ? '#f8fafc' : '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    padding: '8px 14px',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: '#475569',
+                    cursor: 'pointer',
+                    height: '36px',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseOut={(e) => e.currentTarget.style.background = cetakMenuOpen ? '#f8fafc' : '#ffffff'}
+                >
+                  <Printer size={14} />
+                  <span>Cetak</span>
+                  <ChevronDown size={14} style={{ transform: cetakMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                </button>
+
+                {cetakMenuOpen && (
+                  <>
+                    {/* Lapisan penutup: klik di mana pun menutup menu */}
+                    <div
+                      onClick={() => setCetakMenuOpen(false)}
+                      style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 4px)',
+                      right: 0,
+                      zIndex: 41,
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                      minWidth: '175px',
+                      overflow: 'hidden'
+                    }}>
+                      {[
+                        { label: 'Download PDF', mode: 'pdf' },
+                        { label: 'Delivery Order', mode: 'delivery-order' },
+                        { label: 'Cetak A5', mode: 'a5' },
+                      ].map((opt) => (
+                        <button
+                          key={opt.mode}
+                          type="button"
+                          onClick={() => { setCetakMenuOpen(false); handleCetak(opt.mode); }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            width: '100%',
+                            border: 0,
+                            background: 'transparent',
+                            padding: '9px 14px',
+                            fontSize: '13px',
+                            color: '#475569',
+                            cursor: 'pointer',
+                            textAlign: 'left'
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                          onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <Printer size={14} />
+                          <span>{opt.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
 
               {activeDetailDoc.status === 'draft' && (
                 <>
