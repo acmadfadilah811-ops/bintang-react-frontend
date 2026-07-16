@@ -6,11 +6,25 @@ import { getLogoUrl } from '../../../../utils/logo';
 import { useAuth } from '../../../../context/AuthContext';
 import { todayISO, startOfYearISO } from '../../../../utils/date';
 import { receivedByDisplay, receivedByRaw } from '../../../../utils/stockDocument';
+import { ImportCsvModal } from './ImportCsvModal';
 
 
 const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const STATUS_LABEL = { draft: 'Draft', selesai: 'Selesai', batal: 'Batal' };
 const REASON_LABEL = { transfer: 'Transfer Toko', manual: 'Manual' };
+
+// Batas baris import CSV — harus sama dengan CSV_IMPORT_MAX_ROWS_STOCK_OUT di
+// backend (product_views.py) supaya user tidak ditolak server setelah pratinjau
+// terlanjur menyatakan aman. Olsera memakai 500 untuk Stok Keluar (Stok Masuk 200).
+const CSV_MAX_ROWS = 500;
+// Kolom template resmi Olsera: to_store_url_id,product,variant,sku,qty
+const CSV_PREVIEW_COLUMNS = [
+  { key: 'to_store_url_id', label: 'Transfer Ke' },
+  { key: 'product', label: 'Produk' },
+  { key: 'variant', label: 'Varian' },
+  { key: 'sku', label: 'SKU' },
+  { key: 'qty', label: 'Qty' },
+];
 
 const formatDisplayDate = (isoStr) => {
   if (!isoStr) return '-';
@@ -49,10 +63,8 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
   const [showTambahDropdown, setShowTambahDropdown] = useState(false);
   // Dropdown Cetak: Download PDF / Delivery Order / Cetak A5
   const [cetakMenuOpen, setCetakMenuOpen] = useState(false);
+  // File, pratinjau, dan status import dipegang ImportCsvModal.
   const [showImportModal, setShowImportModal] = useState(false);
-  const [importFile, setImportFile] = useState(null);
-  const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState(null);
 
   // Stock List State
   const [stockList, setStockList] = useState([]);
@@ -226,38 +238,27 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
     }
   };
 
-  // Import CSV
-  const handleImportCsv = async () => {
-    if (!importFile || importing) return;
-    setImporting(true);
-    setImportResult(null);
-    try {
-      const docRes = await apiClient.post('/stock-out-documents/', {
-        tanggal: todayStr,
-        catatan: 'Import CSV',
-        alasan: 'transfer',
-      });
-      const docId = docRes.data.id;
+  // Import CSV — pratinjau & validasi ditangani ImportCsvModal; di sini murni
+  // panggilan API-nya.
+  const prosesImportCsv = async (file) => {
+    const docRes = await apiClient.post('/stock-out-documents/', {
+      tanggal: todayStr,
+      catatan: 'Import CSV',
+      alasan: 'transfer',
+    });
+    const docId = docRes.data.id;
 
-      const fd = new FormData();
-      fd.append('file', importFile);
-      const importRes = await apiClient.post(`/stock-out-documents/${docId}/import-csv/`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+    const fd = new FormData();
+    fd.append('file', file);
+    const importRes = await apiClient.post(`/stock-out-documents/${docId}/import-csv/`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
 
-      setImportResult({ errors: importRes.data.errors || [], createdCount: importRes.data.created?.length || 0 });
-      setActiveDetailDoc(importRes.data.document);
-      setImportFile(null);
-      if ((importRes.data.created?.length || 0) > 0) {
-        setShowImportModal(false);
-        handleStateChange('detail');
-      }
-    } catch (err) {
-      console.error('[StockOutPage] import csv error:', err);
-      setImportResult({ errors: [err.response?.data?.error || 'Gagal mengimpor file CSV.'], createdCount: 0 });
-    } finally {
-      setImporting(false);
-    }
+    return {
+      errors: importRes.data.errors || [],
+      createdCount: importRes.data.created?.length || 0,
+      document: importRes.data.document,
+    };
   };
 
   // Commit document status
@@ -2060,124 +2061,17 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
       )}
 
       {/* IMPORT MODAL */}
-      {showImportModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.4)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10000,
-          backdropFilter: 'blur(4px)'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '12px',
-            padding: '24px',
-            maxWidth: '500px',
-            width: '90%',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-            border: '1px solid #cbd5e1'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>Import Stok Keluar dari CSV</h3>
-              <button 
-                onClick={() => setShowImportModal(false)}
-                style={{ border: 0, background: 'transparent', cursor: 'pointer', color: '#64748b' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <p style={{ fontSize: '13px', color: '#475569', lineHeight: '1.5', marginBottom: '16px' }}>
-              Pilih file CSV sesuai template dengan format kolom: <br />
-              <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
-                to_store_url_id,product,variant,sku,qty
-              </code>
-            </p>
-            <a
-              href="/templates/stok-keluar-template.csv"
-              download
-              style={{ display: 'inline-block', fontSize: '12px', color: '#0284c7', fontWeight: 'bold', textDecoration: 'underline', marginBottom: '16px' }}
-            >
-              Download Template CSV
-            </a>
-
-            <div style={{ marginBottom: '20px' }}>
-              <input 
-                type="file" 
-                accept=".csv"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files.length > 0) {
-                    setImportFile(e.target.files[0]);
-                  }
-                }}
-                style={{ fontSize: '13px', color: '#334155' }}
-              />
-            </div>
-
-            {importResult && (
-              <div style={{
-                background: importResult.errors.length > 0 ? '#fef2f2' : '#f0fdf4',
-                border: `1px solid ${importResult.errors.length > 0 ? '#fecaca' : '#bbf7d0'}`,
-                borderRadius: '6px',
-                padding: '12px',
-                marginBottom: '20px',
-                maxHeight: '150px',
-                overflowY: 'auto'
-              }}>
-                <div style={{ fontSize: '13px', fontWeight: 'bold', color: importResult.errors.length > 0 ? '#991b1b' : '#166534', marginBottom: '4px' }}>
-                  {importResult.errors.length > 0 ? 'Beberapa baris gagal diimpor:' : 'Sukses mengimpor item!'}
-                </div>
-                {importResult.errors.map((err, idx) => (
-                  <div key={idx} style={{ fontSize: '12px', color: '#7f1d1d', marginTop: '2px' }}>
-                    • {err}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button 
-                onClick={() => setShowImportModal(false)}
-                disabled={importing}
-                style={{
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  padding: '8px 16px',
-                  fontSize: '13px',
-                  fontWeight: 'bold',
-                  color: '#475569',
-                  cursor: 'pointer'
-                }}
-              >
-                Batal
-              </button>
-              <button 
-                onClick={handleImportCsv}
-                disabled={!importFile || importing}
-                style={{
-                  background: (!importFile || importing) ? '#93c5fd' : '#0ea5e9',
-                  color: '#ffffff',
-                  border: 0,
-                  borderRadius: '6px',
-                  padding: '8px 20px',
-                  fontSize: '13px',
-                  fontWeight: 'bold',
-                  cursor: (!importFile || importing) ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {importing ? 'Mengimpor...' : 'Mulai Import'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ImportCsvModal
+        open={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        title="Import Stok Keluar"
+        templateHref="/templates/stok-keluar-template.csv"
+        columns={CSV_PREVIEW_COLUMNS}
+        maxRows={CSV_MAX_ROWS}
+        footnote="Produk dicocokkan lewat SKU, atau nama produk bila SKU kosong."
+        onProcess={prosesImportCsv}
+        onSuccess={(doc) => { setActiveDetailDoc(doc); handleStateChange('detail'); }}
+      />
 
       {/* VALIDATION ERROR MODAL OVERLAY */}
       {validationError && (
