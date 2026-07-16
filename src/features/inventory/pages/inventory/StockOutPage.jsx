@@ -2,15 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, ChevronDown, Calendar, Printer, X, Plus, CloudUpload, Download, Check, ChevronsUpDown, ArrowLeft, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import apiClient from '../../../../api/apiClient';
+import { getLogoUrl } from '../../../../utils/logo';
 import { useAuth } from '../../../../context/AuthContext';
 import { todayISO, startOfYearISO } from '../../../../utils/date';
 
-const getLogoUrl = (url) => {
-  if (!url) return null;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  const apiBase = (import.meta.env.VITE_API_URL || 'https://bintang-adv.duckdns.org/api').replace('/api', '');
-  return `${apiBase}${url.startsWith('/') ? url : `/${url}`}`;
-};
 
 const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const STATUS_LABEL = { draft: 'Draft', selesai: 'Selesai', batal: 'Batal' };

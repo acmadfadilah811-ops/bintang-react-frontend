@@ -3,13 +3,8 @@ import { Search, ChevronDown, ChevronUp, MoreHorizontal, Printer, X, Plus, Trash
 import * as XLSX from 'xlsx';
 import { useAuth } from '../../../../context/AuthContext';
 import apiClient from '../../../../api/apiClient';
+import { getLogoUrl } from '../../../../utils/logo';
 
-const getLogoUrl = (url) => {
-  if (!url) return null;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  const apiBase = (import.meta.env.VITE_API_URL || 'https://bintang-adv.duckdns.org/api').replace('/api', '');
-  return `${apiBase}${url.startsWith('/') ? url : `/${url}`}`;
-};
 
 const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const STATUS_LABEL = { draft: 'Draft', selesai: 'Selesai', batal: 'Batal' };
