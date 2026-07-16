@@ -748,11 +748,6 @@ export function StockOpnamePage({ onToggleCreate, viewState: propViewState }) {
               <input type="number" min={1} max={totalPages} value={currentPage} onChange={(e) => { const val = parseInt(e.target.value, 10); if (val >= 1 && val <= totalPages) setCurrentPage(val); }} style={{ width: '45px', height: '28px', border: '1px solid #cbd5e1', borderRadius: '6px', textAlign: 'center', outline: 'none', fontSize: '13px' }} />
             </div>
           </div>
-
-          <div style={{ marginTop: '20px', padding: '14px', background: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#1e3a8a' }}>
-            <span style={{ fontWeight: 'bold' }}>Pengaturan opname:</span>
-            <span>sembunyikan Qty System dan sembunyikan Qty Selisih saat proses hitung fisik.</span>
-          </div>
         </div>
       )}
 
