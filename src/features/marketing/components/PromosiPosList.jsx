@@ -44,13 +44,20 @@ export default function PromosiPosList({ rows, loading, error, onAdd, onEdit, on
     return row.judul.toLowerCase().includes(q);
   });
 
+  const tipeColors = {
+    BX: 'bg-indigo-50 text-indigo-750 border border-indigo-200/40',
+    DQ: 'bg-amber-50/60 text-amber-800 border border-amber-250/30',
+    DA: 'bg-rose-50 text-rose-700 border border-rose-200/40',
+    FI: 'bg-teal-50 text-teal-700 border border-teal-200/40',
+  };
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+      <div className="flex flex-wrap items-center gap-3">
         <PromoTipeDropdown value={tipe} onChange={setTipe} />
 
-        <div className="flex-1 min-w-[260px] flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white focus-within:border-blue-400">
-          <select value={judul} onChange={(e) => setJudul(e.target.value)} className="bg-transparent text-sm text-slate-700 px-3 py-2 outline-none cursor-pointer">
+        <div className="flex-1 min-w-[260px] flex items-center border border-slate-200 rounded-xl overflow-hidden bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all shadow-sm">
+          <select value={judul} onChange={(e) => setJudul(e.target.value)} className="bg-transparent text-xs font-bold text-slate-600 px-3.5 py-2.5 outline-none cursor-pointer">
             <option>Judul</option>
             <option>Grup Produk</option>
             <option>Paket Produk</option>
@@ -66,7 +73,7 @@ export default function PromosiPosList({ rows, loading, error, onAdd, onEdit, on
               value={cari}
               onChange={(e) => setCari(e.target.value)}
               placeholder="Cari"
-              className="w-full text-sm bg-transparent outline-none text-slate-700 placeholder-slate-400 py-2"
+              className="w-full text-xs font-semibold bg-transparent outline-none text-slate-750 placeholder-slate-400 py-2.5"
             />
           </div>
         </div>
@@ -75,62 +82,68 @@ export default function PromosiPosList({ rows, loading, error, onAdd, onEdit, on
         <button
           type="button"
           onClick={onAdd}
-          className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
+          className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-705 shadow-md shadow-emerald-500/10 text-white rounded-xl px-4.5 py-2.5 text-xs font-bold cursor-pointer transition-all active:scale-[0.98]"
         >
-          <Plus size={16} /> Tambah
+          <Plus size={14} /> Tambah
         </button>
       </div>
 
-      {error && <p className="mt-3 text-xs text-rose-600">{error}</p>}
+      {error && <p className="mt-3 text-xs text-rose-600 font-semibold">{error}</p>}
 
       {filtered.length === 0 ? (
-        <div className="mt-4 rounded-xl bg-slate-50/70 border border-slate-100 flex flex-col items-center justify-center py-16">
-          <span className="text-sm text-slate-400 mt-3">{loading ? 'Memuat...' : 'Belum ada promosi'}</span>
+        <div className="mt-5 rounded-xl bg-slate-50/70 border border-slate-100/70 flex flex-col items-center justify-center py-16">
+          <span className="text-xs font-bold text-slate-450">{loading ? 'Memuat...' : 'Belum ada promosi'}</span>
         </div>
       ) : (
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-100">
-                {['Judul', 'Tipe', 'Mulai', 'Kadaluarsa', 'Aksi'].map((c) => (
-                  <th key={c} className="px-2 py-3 text-sm font-semibold text-slate-600 whitespace-nowrap">
-                    {c}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((row) => (
-                <tr key={row.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                  <td className="px-2 py-3 text-sm text-slate-600">{row.judul}</td>
-                  <td className="px-2 py-3 text-sm text-slate-600">{row.tipe_promosi}</td>
-                  <td className="px-2 py-3 text-sm text-slate-600">{fmtDate(row.tanggal_aktif)}</td>
-                  <td className="px-2 py-3 text-sm text-slate-600">{row.tanpa_kadaluarsa ? 'Tanpa Kadaluarsa' : fmtDate(row.tanggal_kadaluarsa)}</td>
-                  <td className="px-2 py-3">
-                    <div className="flex items-center gap-2">
-                      <StatusToggle active={row.is_active} onToggle={() => handleToggle(row)} />
-                      <button
-                        type="button"
-                        onClick={() => onEdit(row)}
-                        className="p-1.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 cursor-pointer"
-                        title="Ubah"
-                      >
-                        <Pencil size={15} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(row)}
-                        className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
-                        title="Hapus"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
-                  </td>
+        <div className="mt-5 overflow-x-auto">
+          <div className="border border-slate-100 rounded-xl overflow-hidden">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  {['Judul', 'Tipe', 'Mulai', 'Kadaluarsa', 'Aksi'].map((c) => (
+                    <th key={c} className="px-4 py-3 text-[10px] font-extrabold tracking-wider text-slate-400 uppercase whitespace-nowrap">
+                      {c}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((row) => (
+                  <tr key={row.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/30 transition-colors">
+                    <td className="px-4 py-3.5 text-sm font-semibold text-slate-700">{row.judul}</td>
+                    <td className="px-4 py-3.5 text-sm">
+                      <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide ${tipeColors[row.tipe_promosi] || 'bg-slate-50 text-slate-600 border border-slate-200'}`}>
+                        {row.tipe_promosi}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-sm font-medium text-slate-500">{fmtDate(row.tanggal_aktif)}</td>
+                    <td className="px-4 py-3.5 text-sm font-medium text-slate-500">{row.tanpa_kadaluarsa ? 'Tanpa Kadaluarsa' : fmtDate(row.tanggal_kadaluarsa)}</td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-2">
+                        <StatusToggle active={row.is_active} onToggle={() => handleToggle(row)} />
+                        <button
+                          type="button"
+                          onClick={() => onEdit(row)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                          title="Ubah"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(row)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="Hapus"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

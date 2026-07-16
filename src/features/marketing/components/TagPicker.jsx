@@ -45,12 +45,16 @@ export default function TagPicker({ value, onChange, fetchUrl, placeholder }) {
 
   return (
     <div className="relative" ref={ref}>
-      <div className="flex flex-wrap items-center gap-1.5 border border-slate-200 rounded-lg px-2 py-1.5 focus-within:border-blue-400">
+      <div className="flex flex-wrap items-center gap-1.5 border border-slate-200 rounded-xl px-3 py-2 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
         {tags.map((t) => (
-          <span key={t} className="flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-medium px-2 py-1 rounded-md">
+          <span key={t} className="flex items-center gap-1.5 bg-blue-50/70 border border-blue-100 text-blue-750 text-xs font-bold px-2.5 py-1 rounded-lg transition-all">
             {t}
-            <button type="button" onClick={() => removeTag(t)} className="hover:text-blue-900 cursor-pointer">
-              <X size={12} />
+            <button
+              type="button"
+              onClick={() => removeTag(t)}
+              className="hover:text-blue-900 cursor-pointer p-0.5 rounded-full hover:bg-blue-100/85 transition-colors flex items-center justify-center"
+            >
+              <X size={11} />
             </button>
           </span>
         ))}
@@ -63,20 +67,20 @@ export default function TagPicker({ value, onChange, fetchUrl, placeholder }) {
             loadOptions();
           }}
           placeholder={tags.length === 0 ? placeholder : ''}
-          className="flex-1 min-w-[100px] text-sm outline-none py-0.5 text-slate-700 placeholder-slate-400"
+          className="flex-1 min-w-[100px] text-sm outline-none py-0.5 text-slate-700 placeholder-slate-400 font-medium"
         />
       </div>
       {open && (
-        <div className="absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto bg-white rounded-lg border border-slate-200 shadow-lg z-30 py-1">
+        <div className="absolute left-0 top-full mt-1.5 w-full max-h-48 overflow-y-auto bg-white rounded-xl border border-slate-100 shadow-xl z-30 py-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
           {filteredOptions.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-slate-400">{loaded ? 'Tidak ada hasil' : 'Memuat...'}</div>
+            <div className="px-4 py-2.5 text-xs font-semibold text-slate-400">{loaded ? 'Tidak ada hasil' : 'Memuat...'}</div>
           ) : (
             filteredOptions.slice(0, 20).map((o) => (
               <button
                 key={o}
                 type="button"
                 onClick={() => addTag(o)}
-                className="w-full text-left px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 cursor-pointer"
+                className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-650 hover:bg-slate-50 cursor-pointer transition-colors"
               >
                 {o}
               </button>

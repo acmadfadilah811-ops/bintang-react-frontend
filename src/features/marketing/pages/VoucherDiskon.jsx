@@ -19,18 +19,18 @@ export default function VoucherDiskon() {
   }, [setSubtitle]);
 
   return (
-    <div className="flex flex-col flex-1 min-h-full bg-white">
-      <div className="flex border-b border-slate-200 bg-white shrink-0">
+    <div className="flex flex-col flex-1 min-h-full bg-slate-50/50">
+      <div className="flex gap-2 border-b border-slate-100 bg-white shrink-0 px-6">
         {TABS.map((t) => {
           const isActive = t.id === tab;
           return (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex-1 px-4 py-4 text-sm font-semibold text-center whitespace-nowrap transition-colors cursor-pointer ${
+              className={`px-4 py-4 text-xs font-bold text-center whitespace-nowrap transition-all duration-200 border-b-2 cursor-pointer ${
                 isActive
-                  ? 'text-blue-600 bg-blue-50/70 border-b-2 border-blue-600'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50/40'
+                  ? 'text-blue-600 border-blue-600 font-extrabold'
+                  : 'text-slate-400 border-transparent hover:text-slate-650 hover:border-slate-200'
               }`}
             >
               {t.label}

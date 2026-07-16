@@ -113,16 +113,16 @@ export default function TambahKuponForm({ initial, onCancel, onSaved }) {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
-        <h2 className="text-slate-800 font-bold text-[15px]">{initial ? 'Ubah' : 'Tambah'} Kupon Diskon</h2>
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-5 border-b border-slate-100">
+        <h2 className="text-slate-800 font-extrabold text-[15px]">{initial ? 'Ubah' : 'Tambah'} Kupon Diskon</h2>
         <div className="flex items-center gap-4">
-          <button type="button" onClick={onCancel} className="text-blue-600 text-sm font-semibold cursor-pointer hover:underline">
+          <button type="button" onClick={onCancel} className="text-slate-500 hover:text-slate-700 text-xs font-bold cursor-pointer transition-colors">
             Batal
           </button>
           <div className="text-right">
-            <div className="text-[11px] text-slate-400 leading-none mb-1">Simpan di:</div>
-            <select className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-600 bg-white outline-none focus:border-blue-400 cursor-pointer">
+            <div className="text-[10px] font-bold text-slate-400 leading-none mb-1 uppercase tracking-wider">Simpan di:</div>
+            <select className="border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-600 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer">
               <option>{accountName}</option>
             </select>
           </div>
@@ -130,9 +130,9 @@ export default function TambahKuponForm({ initial, onCancel, onSaved }) {
             type="button"
             disabled={saving}
             onClick={handleSave}
-            className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
+            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-60 text-white rounded-xl px-4.5 py-2.5 text-xs font-bold cursor-pointer transition-all active:scale-[0.98] shadow-md shadow-emerald-500/10"
           >
-            <Check size={16} /> {saving ? 'Menyimpan...' : 'Simpan'}
+            <Check size={14} /> {saving ? 'Menyimpan...' : 'Simpan'}
           </button>
         </div>
       </div>
@@ -148,9 +148,9 @@ export default function TambahKuponForm({ initial, onCancel, onSaved }) {
               type="button"
               onClick={() => setKode(randomKode())}
               title="Buat kode baru"
-              className="shrink-0 p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer"
+              className="shrink-0 p-2.5 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-blue-500 transition-colors cursor-pointer"
             >
-              <RefreshCw size={15} />
+              <RefreshCw size={14} />
             </button>
           </div>
         </FormRow>

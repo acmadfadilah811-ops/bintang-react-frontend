@@ -26,4 +26,4 @@ export const extractApiError = (err, fallback) => {
 };
 
 export const inputCls =
-  'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-400 placeholder-slate-400';
+  'w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all placeholder-slate-400';
