@@ -94,7 +94,7 @@ export default function DetailDiskonPenjualan({ row, onCancel, onEdit, onSaved }
           <div className="border border-slate-150 rounded-2xl p-5 bg-white shadow-sm">
             <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Berlaku untuk pelanggan</h3>
             <div className="text-xs text-slate-500 leading-relaxed font-semibold">
-              {row.tipe_pelanggan ? row.tipe_pelanggan : 'Semua tipe pelanggan'}
+              {row.tipe_pelanggan ? row.tipe_pelanggan : 'Semua pelanggan'}
             </div>
           </div>
 

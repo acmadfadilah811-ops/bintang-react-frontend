@@ -9,7 +9,7 @@ export const fmtDate = (isoStr) => {
 
 export const fmtDiskon = (row) =>
   row.tipe_diskon === 'percent'
-    ? `${row.jumlah_diskon}%`
+    ? `${Number(row.jumlah_diskon)}%`
     : `Rp ${Number(row.jumlah_diskon).toLocaleString('id-ID')}`;
 
 export const fmtRupiah = (v) => `Rp ${Number(v || 0).toLocaleString('id-ID')}`;

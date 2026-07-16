@@ -121,14 +121,8 @@ export default function TambahDiskonForm({ initial, onCancel, onSaved }) {
           </div>
         </FormRow>
 
-        <FormRow label="Berlaku untuk tipe pelanggan" help="Kosongkan jika berlaku untuk semua tipe pelanggan">
-          <input
-            type="text"
-            placeholder="Masukkan Tipe Pelanggan"
-            value={tipePelanggan}
-            onChange={(e) => setTipePelanggan(e.target.value)}
-            className={inputCls}
-          />
+        <FormRow label="Berlaku untuk pelanggan" help="Kosongkan jika berlaku untuk semua pelanggan">
+          <TagPicker value={tipePelanggan} onChange={setTipePelanggan} fetchUrl="/contacts/" placeholder="Cari pelanggan..." />
         </FormRow>
 
         <FormRow label="Berlaku untuk brand" help="Kosongkan jika berlaku untuk semua brand">
