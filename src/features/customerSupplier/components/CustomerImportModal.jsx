@@ -1,19 +1,65 @@
 import { useRef, useState } from 'react';
 import { X, UploadCloud, FileText, Trash2 } from 'lucide-react';
 import apiClient from '../../../api/apiClient';
+import { parseCsvRows } from '../../../utils/csv';
+import CustomerImportPreview from './CustomerImportPreview';
 
 const TEMPLATE_URL = '/templates/pelanggan-template.csv';
+// Harus sama dengan MAX_IMPORT_ROWS di backend (customer_views.py) supaya user
+// tidak ditolak server setelah pratinjau terlanjur menyatakan aman.
+const MAX_ROWS = 500;
+
+/** Aturannya sengaja meniru backend: kolom `name` wajib, maksimal 500 baris. */
+const periksaBaris = (rows, namaFile, banyakFile) => {
+  const asal = banyakFile ? `${namaFile} — ` : '';
+  const pesan = [];
+  if (rows.length === 0) pesan.push(`${asal}file tidak berisi baris data.`);
+  if (rows.length > MAX_ROWS) {
+    pesan.push(`${asal}maksimal ${MAX_ROWS} baris — file ini berisi ${rows.length} baris.`);
+  }
+  rows.forEach((row, i) => {
+    if (!row.name) pesan.push(`${asal}baris ${i + 2}: kolom "name" wajib diisi.`);
+  });
+  return pesan;
+};
 
 export default function CustomerImportModal({ onClose, onImported }) {
   const fileRef = useRef(null);
   const [files, setFiles] = useState([]);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
+  // Isi CSV dibaca di browser dulu supaya user melihat datanya sebelum diproses.
+  const [previewRows, setPreviewRows] = useState([]);
+  const [issues, setIssues] = useState([]);
 
-  const addFiles = (list) => {
+  const addFiles = async (list) => {
     if (!list?.length) return;
     setResult(null);
-    setFiles((prev) => [...prev, ...Array.from(list)]);
+    const berikutnya = [...files, ...Array.from(list)];
+    setFiles(berikutnya);
+
+    const semuaBaris = [];
+    const semuaMasalah = [];
+    for (const f of berikutnya) {
+      try {
+        const rows = await parseCsvRows(f);
+        // Batas 500 dicek PER file — backend memproses tiap file terpisah.
+        semuaMasalah.push(...periksaBaris(rows, f.name, berikutnya.length > 1));
+        semuaBaris.push(...rows);
+      } catch (err) {
+        console.error('[CustomerImportModal] parse csv error:', err);
+        semuaMasalah.push(`${f.name} — gagal dibaca. Pastikan berformat CSV (UTF-8).`);
+      }
+    }
+    setPreviewRows(semuaBaris);
+    setIssues(semuaMasalah);
+  };
+
+  const bersihkan = () => {
+    setFiles([]);
+    setResult(null);
+    setPreviewRows([]);
+    setIssues([]);
   };
 
   const handleDownloadTemplate = () => {
@@ -116,12 +162,15 @@ export default function CustomerImportModal({ onClose, onImported }) {
 
           <button
             type="button"
-            onClick={() => { setFiles([]); setResult(null); }}
+            onClick={bersihkan}
             disabled={files.length === 0}
             className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 border border-slate-200 rounded-lg px-4 py-2 hover:bg-slate-50 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Trash2 size={15} /> Hapus semua file
           </button>
+
+          {/* Pratinjau isi CSV — ditampilkan SEBELUM dikirim ke server, seperti Olsera */}
+          {files.length > 0 && <CustomerImportPreview rows={previewRows} issues={issues} />}
 
           {result && (
             <div className={`mt-4 rounded-lg border px-4 py-3 text-sm ${result.errors.length ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
@@ -146,17 +195,23 @@ export default function CustomerImportModal({ onClose, onImported }) {
           >
             Batal
           </button>
+          {/* CSV bermasalah ditolak di sini, sebelum apa pun dikirim ke server. */}
           <button
             type="button"
-            disabled={files.length === 0 || processing}
+            disabled={files.length === 0 || processing || issues.length > 0 || previewRows.length === 0}
             onClick={handleProcess}
+            title={issues.length > 0 ? 'Perbaiki dulu masalah pada file CSV' : undefined}
             className={`text-sm font-semibold rounded-lg px-6 py-2 transition-colors ${
-              files.length > 0 && !processing
+              files.length > 0 && !processing && issues.length === 0 && previewRows.length > 0
                 ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer shadow-sm'
                 : 'bg-slate-100 text-slate-400 cursor-not-allowed'
             }`}
           >
-            {processing ? 'Memproses...' : 'Proses'}
+            {processing
+              ? 'Memproses...'
+              : previewRows.length > 0 && issues.length === 0
+                ? `Proses ${previewRows.length} baris`
+                : 'Proses'}
           </button>
         </div>
       </div>
