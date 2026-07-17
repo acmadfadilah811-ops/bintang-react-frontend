@@ -693,15 +693,6 @@ function CustomerSupplierInner() {
                   onImported={() => { setShowImportModal(false); fetchCustomers(); }}
                 />
               )}
-
-              {(showAddCustomerModal || editingCustomer) && (
-                <AddCustomerModal
-                  customer={editingCustomer}
-                  groups={groups}
-                  onClose={closeCustomerModal}
-                  onSaved={handleCustomerSaved}
-                />
-              )}
             </>
           )}
 
@@ -1081,6 +1072,14 @@ function CustomerSupplierInner() {
       </section>
         </div>
       </div>
+      {(showAddCustomerModal || editingCustomer) && (
+        <AddCustomerModal
+          customer={editingCustomer}
+          groups={groups}
+          onClose={closeCustomerModal}
+          onSaved={handleCustomerSaved}
+        />
+      )}
     </div>
   );
 }
