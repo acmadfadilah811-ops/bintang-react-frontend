@@ -35,10 +35,24 @@ function Card({ title, children }) {
  * Baris "Kata Sandi" juga dilewati: `password` write_only di serializer, jadi
  * tidak pernah sampai ke sini. Titik-titik palsu = mengarang.
  */
+const FIELD_ALAMAT = [
+  ['alamat', 'Alamat'],
+  ['negara', 'Negara'],
+  ['provinsi', 'Propinsi'],
+  ['kota', 'Kota'],
+  ['kecamatan', 'Kecamatan'],
+  ['kode_pos', 'Kode Pos'],
+];
+
 export default function CustomerDetailPage({ customer, notes = [], onBack, onEdit, onDelete, onAddNote }) {
   const [showMore, setShowMore] = useState(false);
   const c = customer;
   const catatanPelanggan = notes.filter((n) => String(n.customer) === String(c.id));
+
+  // Template import Olsera tidak punya kolom province, dan kita belum punya master
+  // wilayah untuk menurunkannya dari kota. Daripada membiarkan '-' membisu,
+  // sebutkan apa yang kosong dan ke mana mengisinya.
+  const alamatKosong = FIELD_ALAMAT.filter(([key]) => !c[key]).map(([, label]) => label);
 
   return (
     <div className="pb-6">
@@ -133,6 +147,12 @@ export default function CustomerDetailPage({ customer, notes = [], onBack, onEdi
               <Row label="Kota" value={c.kota} />
               <Row label="Kecamatan" value={c.kecamatan} />
               <Row label="Kode Pos" value={c.kode_pos} />
+              {alamatKosong.length > 0 && (
+                <p className="pt-2.5 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-2 mt-2">
+                  Belum diisi: <span className="font-semibold">{alamatKosong.join(', ')}</span>.
+                  Import tidak mengisinya karena template Olsera tidak memuat kolom itu — lengkapi lewat <span className="font-semibold">Ubah</span>.
+                </p>
+              )}
             </Card>
           </div>
         )}
