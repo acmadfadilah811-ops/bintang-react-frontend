@@ -600,9 +600,16 @@ function CustomerSupplierInner() {
                           <td style={{ padding: '12px 16px', color: '#64748b' }}>{cust.email || '-'}</td>
                           <td style={{ padding: '12px 16px', color: '#334155' }}>{cust.handphone || '-'}</td>
                           <td style={{ padding: '12px 16px' }}>
+                            {/* "Guest" = pelanggan tanpa tipe, mengikuti Olsera. Itu
+                                LABEL tampilan, bukan tipe sungguhan — di database
+                                customer_group-nya tetap kosong. Sengaja berwarna
+                                netral, bukan biru seperti tipe asli, supaya tidak
+                                dikira ada tipe "Guest" di tab Tipe Pelanggan. */}
                             {cust.customer_group_nama ? (
                               <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', background: '#dbeafe', color: '#1d4ed8' }}>{cust.customer_group_nama}</span>
-                            ) : '-'}
+                            ) : (
+                              <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', background: '#f1f5f9', color: '#64748b' }}>Guest</span>
+                            )}
                           </td>
                           <td style={{ padding: '12px 16px', fontWeight: '600', color: '#16a34a', whiteSpace: 'nowrap' }}>{formatCurrency(cust.deposit)}</td>
                           <td style={{ padding: '12px 16px', color: '#334155' }}>{cust.loyalty_points ?? 0}</td>
