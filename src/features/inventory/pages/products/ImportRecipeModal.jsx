@@ -61,7 +61,7 @@ export default function ImportRecipeModal({ open, onClose, onSuccess }) {
   };
 
   const handleDownloadTemplate = () => {
-    window.open('/templates/olsera_recept_import_template.csv', '_blank');
+    window.open('/templates/resep-template.csv', '_blank');
   };
 
   const handleProcess = async () => {

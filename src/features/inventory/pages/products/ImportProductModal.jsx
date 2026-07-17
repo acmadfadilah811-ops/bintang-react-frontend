@@ -61,7 +61,7 @@ export default function ImportProductModal({ open, onClose, onSuccess, title = '
   };
 
   const handleDownloadTemplate = () => {
-    window.open('/templates/olsera_product_import_template.csv', '_blank');
+    window.open('/templates/produk-template.csv', '_blank');
   };
 
   const handleDownloadClassification = () => {

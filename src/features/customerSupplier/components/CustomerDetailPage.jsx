@@ -150,7 +150,7 @@ export default function CustomerDetailPage({ customer, notes = [], onBack, onEdi
               {alamatKosong.length > 0 && (
                 <p className="pt-2.5 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-2 mt-2">
                   Belum diisi: <span className="font-semibold">{alamatKosong.join(', ')}</span>.
-                  Import tidak mengisinya karena template Olsera tidak memuat kolom itu — lengkapi lewat <span className="font-semibold">Ubah</span>.
+                  Template import tidak memuat kolom tersebut — lengkapi lewat <span className="font-semibold">Ubah</span>.
                 </p>
               )}
             </Card>

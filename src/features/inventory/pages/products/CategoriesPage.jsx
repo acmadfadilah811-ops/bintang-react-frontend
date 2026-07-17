@@ -275,19 +275,19 @@ export function CategoriesPage() {
         }
 
         /* Switch Styles matching Olsera */
-        .olsera-switch-container {
+        .pi-switch-container {
           display: flex;
           align-items: center;
           gap: 8px;
           font-size: 12px;
           font-weight: 600;
         }
-        .olsera-switch-label {
+        .pi-switch-label {
           color: #94a3b8;
           text-transform: uppercase;
           transition: color 0.15s;
         }
-        .olsera-switch-label.active {
+        .pi-switch-label.active {
           color: #0284c7;
         }
         .pi-simple-switch {
@@ -480,8 +480,8 @@ export function CategoriesPage() {
                 <span className="pi-row-desc">Item yang dinon-aktifkan tidak akan muncul di website Anda</span>
               </div>
               <div className="pi-row-input">
-                <div className="olsera-switch-container">
-                  <span className={`olsera-switch-label ${!nonAktifkan ? 'active' : ''}`}>no</span>
+                <div className="pi-switch-container">
+                  <span className={`pi-switch-label ${!nonAktifkan ? 'active' : ''}`}>no</span>
                   <label className="pi-simple-switch">
                     <input 
                       type="checkbox" 
@@ -490,7 +490,7 @@ export function CategoriesPage() {
                     />
                     <span className="pi-simple-slider"></span>
                   </label>
-                  <span className={`olsera-switch-label ${nonAktifkan ? 'active' : ''}`}>yes</span>
+                  <span className={`pi-switch-label ${nonAktifkan ? 'active' : ''}`}>yes</span>
                 </div>
               </div>
             </div>
@@ -501,8 +501,8 @@ export function CategoriesPage() {
                 <span className="pi-row-label">Tidak muncul di Point Of Sale</span>
               </div>
               <div className="pi-row-input">
-                <div className="olsera-switch-container">
-                  <span className={`olsera-switch-label ${!tidakMunculPos ? 'active' : ''}`}>no</span>
+                <div className="pi-switch-container">
+                  <span className={`pi-switch-label ${!tidakMunculPos ? 'active' : ''}`}>no</span>
                   <label className="pi-simple-switch">
                     <input 
                       type="checkbox" 
@@ -511,7 +511,7 @@ export function CategoriesPage() {
                     />
                     <span className="pi-simple-slider"></span>
                   </label>
-                  <span className={`olsera-switch-label ${tidakMunculPos ? 'active' : ''}`}>yes</span>
+                  <span className={`pi-switch-label ${tidakMunculPos ? 'active' : ''}`}>yes</span>
                 </div>
               </div>
             </div>
@@ -522,8 +522,8 @@ export function CategoriesPage() {
                 <span className="pi-row-label">Submenu tidak muncul di Menu/Navigasi website</span>
               </div>
               <div className="pi-row-input">
-                <div className="olsera-switch-container">
-                  <span className={`olsera-switch-label ${!tidakMunculNavWeb ? 'active' : ''}`}>no</span>
+                <div className="pi-switch-container">
+                  <span className={`pi-switch-label ${!tidakMunculNavWeb ? 'active' : ''}`}>no</span>
                   <label className="pi-simple-switch">
                     <input 
                       type="checkbox" 
@@ -532,7 +532,7 @@ export function CategoriesPage() {
                     />
                     <span className="pi-simple-slider"></span>
                   </label>
-                  <span className={`olsera-switch-label ${tidakMunculNavWeb ? 'active' : ''}`}>yes</span>
+                  <span className={`pi-switch-label ${tidakMunculNavWeb ? 'active' : ''}`}>yes</span>
                 </div>
               </div>
             </div>
@@ -649,8 +649,8 @@ export function CategoriesPage() {
                 {/* Non Aktifkan */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 13, color: '#475569' }}>Non Aktifkan</span>
-                  <div className="olsera-switch-container">
-                    <span className={`olsera-switch-label ${!editNonAktifkan ? 'active' : ''}`}>no</span>
+                  <div className="pi-switch-container">
+                    <span className={`pi-switch-label ${!editNonAktifkan ? 'active' : ''}`}>no</span>
                     <label className="pi-simple-switch">
                       <input 
                         type="checkbox" 
@@ -659,15 +659,15 @@ export function CategoriesPage() {
                       />
                       <span className="pi-simple-slider"></span>
                     </label>
-                    <span className={`olsera-switch-label ${editNonAktifkan ? 'active' : ''}`}>yes</span>
+                    <span className={`pi-switch-label ${editNonAktifkan ? 'active' : ''}`}>yes</span>
                   </div>
                 </div>
 
                 {/* Tidak muncul di Point Of Sale */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 13, color: '#475569' }}>Tidak muncul di Point Of Sale</span>
-                  <div className="olsera-switch-container">
-                    <span className={`olsera-switch-label ${!editTidakPos ? 'active' : ''}`}>no</span>
+                  <div className="pi-switch-container">
+                    <span className={`pi-switch-label ${!editTidakPos ? 'active' : ''}`}>no</span>
                     <label className="pi-simple-switch">
                       <input 
                         type="checkbox" 
@@ -676,15 +676,15 @@ export function CategoriesPage() {
                       />
                       <span className="pi-simple-slider"></span>
                     </label>
-                    <span className={`olsera-switch-label ${editTidakPos ? 'active' : ''}`}>yes</span>
+                    <span className={`pi-switch-label ${editTidakPos ? 'active' : ''}`}>yes</span>
                   </div>
                 </div>
 
                 {/* Submenu tidak muncul di Menu/Navigasi Website */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 13, color: '#475569' }}>Submenu tidak muncul di Menu/Navigasi Website</span>
-                  <div className="olsera-switch-container">
-                    <span className={`olsera-switch-label ${!editTidakNavWeb ? 'active' : ''}`}>no</span>
+                  <div className="pi-switch-container">
+                    <span className={`pi-switch-label ${!editTidakNavWeb ? 'active' : ''}`}>no</span>
                     <label className="pi-simple-switch">
                       <input 
                         type="checkbox" 
@@ -693,7 +693,7 @@ export function CategoriesPage() {
                       />
                       <span className="pi-simple-slider"></span>
                     </label>
-                    <span className={`olsera-switch-label ${editTidakNavWeb ? 'active' : ''}`}>yes</span>
+                    <span className={`pi-switch-label ${editTidakNavWeb ? 'active' : ''}`}>yes</span>
                   </div>
                 </div>
               </div>

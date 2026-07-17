@@ -942,7 +942,7 @@ function CustomerSupplierInner() {
               </div>
 
               <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '14px 16px', fontSize: '12px', color: '#92400e' }}>
-                Angka di halaman ini masih ilustratif — Olsera menghitungnya dari survei resi WhatsApp yang diisi pelanggan, integrasi tersebut belum tersedia di sistem ini.
+                Angka di halaman ini masih ilustratif — perhitungannya berasal dari survei resi WhatsApp yang diisi pelanggan, dan integrasi tersebut belum tersedia di sistem ini.
               </div>
 
               <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px' }}>

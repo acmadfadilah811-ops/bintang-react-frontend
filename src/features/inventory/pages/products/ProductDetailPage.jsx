@@ -1382,7 +1382,7 @@ export default function ProductDetailPage({ product, onBack, onUpdated, categori
         />
       ) : activeTab !== 'profil' ? (
         <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
-          Tab ini belum dibangun — kirim contoh tampilannya dari Olsera untuk saya bangun berikutnya.
+          Tab ini belum tersedia.
         </div>
       ) : (
         <>
