@@ -8,6 +8,7 @@ import {
   X, Heart, Edit2,
 } from 'lucide-react';
 import { formatCurrency } from './customerSupplierData';
+import { formatDisplayDate } from '../../../utils/date';
 import apiClient from '../../../api/apiClient';
 import CustomerFilterDrawer, { defaultCustomerFilters } from '../components/CustomerFilterDrawer';
 import CustomerImportModal from '../components/CustomerImportModal';
@@ -571,12 +572,22 @@ function CustomerSupplierInner() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                     <thead>
                       <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569' }}>Nama</th>
-                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569' }}>Telepon</th>
-                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569' }}>Email</th>
-                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569' }}>Tipe</th>
-                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569' }}>Deposit</th>
-                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569' }}>Status</th>
+                        {/* Urutan kolom mengikuti Olsera. "Tanggal Transaksi
+                            Terakhir" belum ada — Order tidak terhubung ke
+                            Customer; lihat catatan di HANDOVER. Kolom "Status"
+                            dipertahankan meski Olsera tidak punya: tanpa itu
+                            pelanggan yang dibekukan tak terlihat. */}
+                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569', whiteSpace: 'nowrap' }}>Nama</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569', whiteSpace: 'nowrap' }}>ID Pelanggan</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569', whiteSpace: 'nowrap' }}>Kode</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569', whiteSpace: 'nowrap' }}>Email</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569', whiteSpace: 'nowrap' }}>Telpon</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569', whiteSpace: 'nowrap' }}>Tipe</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569', whiteSpace: 'nowrap' }}>Jumlah deposit</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569', whiteSpace: 'nowrap' }}>Total Loyalty Point</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569', whiteSpace: 'nowrap' }}>Tanggal Aktif</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569', whiteSpace: 'nowrap' }}>Tanggal Berakhir</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569', whiteSpace: 'nowrap' }}>Status</th>
                         <th style={{ padding: '12px 16px', width: '80px' }}></th>
                       </tr>
                     </thead>
@@ -584,14 +595,21 @@ function CustomerSupplierInner() {
                       {filteredCustomers.map(cust => (
                         <tr key={cust.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '12px 16px', fontWeight: 'bold', color: '#1e293b' }}>{cust.nama}</td>
-                          <td style={{ padding: '12px 16px', color: '#334155' }}>{cust.handphone || '-'}</td>
+                          <td style={{ padding: '12px 16px', color: '#64748b' }}>{cust.id}</td>
+                          <td style={{ padding: '12px 16px', color: '#334155' }}>{cust.kode_pelanggan || '-'}</td>
                           <td style={{ padding: '12px 16px', color: '#64748b' }}>{cust.email || '-'}</td>
+                          <td style={{ padding: '12px 16px', color: '#334155' }}>{cust.handphone || '-'}</td>
                           <td style={{ padding: '12px 16px' }}>
                             {cust.customer_group_nama ? (
                               <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', background: '#dbeafe', color: '#1d4ed8' }}>{cust.customer_group_nama}</span>
                             ) : '-'}
                           </td>
-                          <td style={{ padding: '12px 16px', fontWeight: '600', color: '#16a34a' }}>{formatCurrency(cust.deposit)}</td>
+                          <td style={{ padding: '12px 16px', fontWeight: '600', color: '#16a34a', whiteSpace: 'nowrap' }}>{formatCurrency(cust.deposit)}</td>
+                          <td style={{ padding: '12px 16px', color: '#334155' }}>{cust.loyalty_points ?? 0}</td>
+                          {/* Tanggal Aktif = created_at. Olsera memakai waktu saat
+                              pelanggan dibuat, bukan field yang bisa diubah. */}
+                          <td style={{ padding: '12px 16px', color: '#64748b', whiteSpace: 'nowrap' }}>{formatDisplayDate(cust.created_at)}</td>
+                          <td style={{ padding: '12px 16px', color: '#64748b', whiteSpace: 'nowrap' }}>{formatDisplayDate(cust.tanggal_berakhir)}</td>
                           <td style={{ padding: '12px 16px' }}>
                             <StatusToggle active={cust.is_active} onToggle={() => handleToggleCustomer(cust)} />
                           </td>

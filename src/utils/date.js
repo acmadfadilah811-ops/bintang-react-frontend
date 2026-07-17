@@ -10,6 +10,30 @@
  * Contoh: 16 Juli 2026 pukul 02:00 WIB -> toISOString() memberi "2026-07-15".
  */
 
+const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+/**
+ * "DD-Mmm-YYYY" untuk ditampilkan. Menerima dua bentuk sekaligus:
+ *  - tanggal polos "YYYY-MM-DD" (mis. `tanggal_berakhir`)
+ *  - datetime ISO berzona (mis. `created_at`: "2026-07-17T10:56:19+07:00")
+ *
+ * Yang polos ditambahi "T00:00:00" supaya dibaca sebagai tengah malam LOKAL;
+ * tanpa itu Date membacanya sebagai UTC dan tanggalnya bisa mundur sehari.
+ * Yang berzona dibiarkan apa adanya — Date sudah mengonversinya ke waktu lokal.
+ *
+ * CATATAN: `formatDisplayDate` versi lokal masih tersalin di StockInPage,
+ * StockOutPage, StockProductionPage, StockOpnamePage, dan marketing/format.js.
+ * Menyatukan kelimanya ke sini = tugas tersendiri; ini rumah yang benar untuk
+ * pemakaian baru.
+ */
+export const formatDisplayDate = (value) => {
+  if (!value) return '-';
+  const s = String(value);
+  const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s}T00:00:00` : s);
+  if (Number.isNaN(d.getTime())) return '-';
+  return `${String(d.getDate()).padStart(2, '0')}-${MONTHS_ID[d.getMonth()]}-${d.getFullYear()}`;
+};
+
 /** Ubah objek Date jadi "YYYY-MM-DD" memakai tanggal lokal, bukan UTC. */
 export const toISODate = (date) => {
   const bulan = String(date.getMonth() + 1).padStart(2, '0');
