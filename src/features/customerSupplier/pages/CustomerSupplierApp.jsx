@@ -18,6 +18,7 @@ const TIPE_TANPA_GRUP = '__tanpa_tipe__';
 import CustomerFilterDrawer, { defaultCustomerFilters } from '../components/CustomerFilterDrawer';
 import CustomerImportModal from '../components/CustomerImportModal';
 import AddCustomerModal from '../components/AddCustomerModal';
+import CustomerDetailPage from '../components/CustomerDetailPage';
 import CustomerCombobox from '../components/CustomerCombobox';
 import CustomerNoteModal from '../components/CustomerNoteModal';
 
@@ -114,7 +115,11 @@ function CustomerSupplierInner() {
     setLoadingCustomers(true);
     try {
       const res = await apiClient.get('/customers/');
-      setCustomers(Array.isArray(res.data) ? res.data : res.data?.results || []);
+      const daftar = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      setCustomers(daftar);
+      // Rincian memegang salinan pelanggannya. Tanpa disegarkan di sini, layar
+      // rincian tetap menampilkan data lama setelah Ubah disimpan.
+      setActiveCustomer((prev) => (prev ? daftar.find((c) => c.id === prev.id) || null : null));
     } catch (err) {
       console.error('[CustomerSupplierApp] fetch customers error:', err);
       setError('Gagal memuat daftar pelanggan.');
@@ -143,6 +148,8 @@ function CustomerSupplierInner() {
   // ── Pelanggan (form + toolbar) ───────────────────────────────────
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
+  // Pelanggan yang sedang dibuka rinciannya; null = tampilkan daftar.
+  const [activeCustomer, setActiveCustomer] = useState(null);
   const [customerQuery, setCustomerQuery] = useState('');
   const [selectedGroupFilter, setSelectedGroupFilter] = useState('Semua Tipe');
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
@@ -273,6 +280,12 @@ function CustomerSupplierInner() {
   useEffect(() => {
     if (activeTab === 'notes') { fetchNotes(); fetchNoteTags(); }
   }, [activeTab]);
+
+  // Rincian pelanggan menampilkan catatannya, jadi catatan perlu dimuat juga saat
+  // rincian dibuka — bukan cuma saat tab Catatan aktif.
+  useEffect(() => {
+    if (activeCustomer) fetchNotes();
+  }, [activeCustomer?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openNoteCreate = () => setShowNoteModal(true);
   const openNoteEdit = (note) => setEditingNote(note);
@@ -543,8 +556,22 @@ function CustomerSupplierInner() {
             </div>
           )}
 
-          {/* TAB 1: PELANGGAN */}
-          {activeTab === 'customer' && (
+          {/* TAB 1: PELANGGAN — rincian menggantikan daftar saat nama diklik */}
+          {activeTab === 'customer' && activeCustomer && (
+            <CustomerDetailPage
+              customer={activeCustomer}
+              notes={notes}
+              onBack={() => setActiveCustomer(null)}
+              onEdit={openCustomerEdit}
+              onDelete={async (cust) => {
+                await handleDeleteCustomer(cust);
+                setActiveCustomer(null);
+              }}
+              onAddNote={() => navigate('/customer-supplier/notes')}
+            />
+          )}
+
+          {activeTab === 'customer' && !activeCustomer && (
             <>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: '#ffffff', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '10px', marginBottom: '16px' }}>
                 <button onClick={() => setShowFilterDrawer(true)} style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0 16px', height: '38px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#475569' }}>
@@ -604,13 +631,19 @@ function CustomerSupplierInner() {
                         <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569', whiteSpace: 'nowrap' }}>Tanggal Aktif</th>
                         <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569', whiteSpace: 'nowrap' }}>Tanggal Berakhir</th>
                         <th style={{ padding: '12px 16px', fontWeight: 'bold', color: '#475569', whiteSpace: 'nowrap' }}>Status</th>
-                        <th style={{ padding: '12px 16px', width: '80px' }}></th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredCustomers.map(cust => (
                         <tr key={cust.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '12px 16px', fontWeight: 'bold', color: '#1e293b' }}>{cust.nama}</td>
+                          {/* Kolom Aksi dihapus mengikuti Olsera; Ubah & Hapus
+                              pindah ke halaman rincian yang dibuka dari sini. */}
+                          <td
+                            onClick={() => setActiveCustomer(cust)}
+                            style={{ padding: '12px 16px', fontWeight: 'bold', color: '#2563eb', cursor: 'pointer' }}
+                          >
+                            {cust.nama}
+                          </td>
                           <td style={{ padding: '12px 16px', color: '#64748b' }}>{cust.id}</td>
                           <td style={{ padding: '12px 16px', color: '#334155' }}>{cust.kode_pelanggan || '-'}</td>
                           <td style={{ padding: '12px 16px', color: '#64748b' }}>{cust.email || '-'}</td>
@@ -633,14 +666,10 @@ function CustomerSupplierInner() {
                               pelanggan dibuat, bukan field yang bisa diubah. */}
                           <td style={{ padding: '12px 16px', color: '#64748b', whiteSpace: 'nowrap' }}>{formatDisplayDate(cust.created_at)}</td>
                           <td style={{ padding: '12px 16px', color: '#64748b', whiteSpace: 'nowrap' }}>{formatDisplayDate(cust.tanggal_berakhir)}</td>
+                          {/* Status TIDAK ikut dibuang bersama kolom Aksi: tanpa ini
+                              pelanggan yang dibekukan tak terlihat & tak bisa diaktifkan. */}
                           <td style={{ padding: '12px 16px' }}>
                             <StatusToggle active={cust.is_active} onToggle={() => handleToggleCustomer(cust)} />
-                          </td>
-                          <td style={{ padding: '12px 16px' }}>
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                              <button onClick={() => openCustomerEdit(cust)} style={{ border: 0, background: 'transparent', color: '#2563eb', cursor: 'pointer', padding: '4px' }}><Edit2 size={16} /></button>
-                              <button onClick={() => handleDeleteCustomer(cust)} style={{ border: 0, background: 'transparent', color: '#ef4444', cursor: 'pointer', padding: '4px' }}><Trash2 size={16} /></button>
-                            </div>
                           </td>
                         </tr>
                       ))}
