@@ -10,6 +10,11 @@ import {
 import { formatCurrency } from './customerSupplierData';
 import { formatDisplayDate } from '../../../utils/date';
 import apiClient from '../../../api/apiClient';
+
+// Nilai penanda untuk saringan "Guest" (pelanggan tanpa tipe). Sengaja memakai
+// bentuk yang mustahil jadi nama tipe sungguhan, supaya tidak bentrok dengan
+// isi tab Tipe Pelanggan.
+const TIPE_TANPA_GRUP = '__tanpa_tipe__';
 import CustomerFilterDrawer, { defaultCustomerFilters } from '../components/CustomerFilterDrawer';
 import CustomerImportModal from '../components/CustomerImportModal';
 import AddCustomerModal from '../components/AddCustomerModal';
@@ -213,7 +218,13 @@ function CustomerSupplierInner() {
 
     return customers.filter(c => {
       const matchQuery = `${c.nama} ${c.handphone} ${c.email}`.toLowerCase().includes(customerQuery.toLowerCase());
-      const matchGroup = selectedGroupFilter === 'Semua Tipe' || c.customer_group_nama === selectedGroupFilter;
+      // "Guest" bukan tipe di database — itu pelanggan yang customer_group-nya
+      // kosong, jadi disaring lewat sentinel, bukan dicocokkan namanya.
+      const matchGroup =
+        selectedGroupFilter === 'Semua Tipe' ||
+        (selectedGroupFilter === TIPE_TANPA_GRUP
+          ? !c.customer_group_nama
+          : c.customer_group_nama === selectedGroupFilter);
       const matchFilterGroup = !appliedFilters.customerGroup || String(c.customer_group) === String(appliedFilters.customerGroup);
       const matchStatus =
         appliedFilters.status === 'semua' ||
@@ -539,9 +550,14 @@ function CustomerSupplierInner() {
                 <button onClick={() => setShowFilterDrawer(true)} style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0 16px', height: '38px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#475569' }}>
                   <Filter size={15} /><span>Filter</span>
                 </button>
+                {/* Isinya tipe nyata dari tab Tipe Pelanggan (/customer-groups/),
+                    ditambah "Guest" untuk pelanggan yang belum bertipe — tanpa itu
+                    mereka tidak bisa disaring sama sekali. Kalau nanti ada tipe
+                    sungguhan bernama "Guest", labelnya akan kembar di sini. */}
                 <select value={selectedGroupFilter} onChange={e => setSelectedGroupFilter(e.target.value)} style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0 12px', height: '38px', fontSize: '13px', fontWeight: 'bold', width: '160px', cursor: 'pointer', color: '#475569', outline: 'none' }}>
                   <option value="Semua Tipe">Tipe Pelanggan</option>
                   {groups.map(g => <option key={g.id} value={g.nama}>{g.nama}</option>)}
+                  <option value={TIPE_TANPA_GRUP}>Guest</option>
                 </select>
                 <button
                   onClick={handleDownloadCustomers}
