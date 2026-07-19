@@ -15,7 +15,6 @@ export const inventoryTabs = [
   { id: 'stock-opname', label: 'Stok Opname' },
   { id: 'stock-movement', label: 'Pergerakan Stok' },
   { id: 'stock-alert', label: 'Email Peringatan Stok' },
-  { id: 'stock-outstanding', label: 'Stok Outstanding' },
 ];
 
 export const specialTypeTabs = [

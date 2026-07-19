@@ -15,6 +15,44 @@ import {
 } from 'lucide-react';
 import { Dropdown, DateRangePicker } from '../../../transaksi/components/TransactionScaffold';
 import { PRODUK_REPORTS } from './reportList';
+import apiClient from '../../../../api/apiClient';
+
+/** Format nilai baris sesuai `type` kolom yang dikirim backend. */
+/** 'total_penjualan' -> 'Total Penjualan' (label ringkasan turunan). */
+const humanizeKey = (key) =>
+  String(key)
+    .replace(/_/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+const formatValue = (val, type) => {
+  if (val === null || val === undefined || val === '') return type === 'money' || type === 'qty' ? 0 : '';
+  if (type === 'money') return `Rp ${Number(val || 0).toLocaleString('id-ID')}`;
+  if (type === 'qty') return Number(val || 0).toLocaleString('id-ID');
+  if (type === 'date') {
+    const d = new Date(val);
+    return isNaN(d.getTime())
+      ? val
+      : d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  return val;
+};
+
+const formatRows = (rows, typeByKey) =>
+  (rows || []).map((r) => {
+    const out = {};
+    Object.keys(r).forEach((k) => {
+      out[k] = formatValue(r[k], typeByKey[k]);
+    });
+    return out;
+  });
+
+/** Ubah Date -> 'YYYY-MM-DD' pada zona waktu lokal. */
+const toISODateLocal = (d) => {
+  const dt = new Date(d);
+  dt.setMinutes(dt.getMinutes() - dt.getTimezoneOffset());
+  return dt.toISOString().slice(0, 10);
+};
 
 /**
  * Panel kiri "Daftar Laporan" — bisa disembunyikan.
@@ -242,7 +280,7 @@ const alignCls = (a) =>
  * - `emptyText`: teks empty-state; `null` = baris kosong polos.
  */
 function ReportTable({
-  columns,
+  columns = [],
   groups,
   title,
   rows = [],
@@ -252,9 +290,10 @@ function ReportTable({
   emptyText = 'No Data',
 }) {
   // Kolom daun: dari grup (jika ada) atau langsung dari `columns`.
+  // Default [] agar tabel tidak pernah crash bila pemanggil lupa mengirim kolom.
   const leaf = groups
     ? groups.flatMap((g) => (g.children ? g.children : [{ key: g.key, label: g.label }]))
-    : columns;
+    : (columns || []);
 
   const [pageSize, setPageSize] = useState('50/page');
   const [widths, setWidths] = useState({}); // index kolom -> lebar (px)
@@ -598,6 +637,117 @@ function LaporanDetail({ report, collapsed, onExpand }) {
   // Mode tanggal: 'range' (default), 'single' (satu hari + navigasi), atau 'none'.
   const dateMode = report.dateMode || 'range';
 
+  // --- Data dari backend (hanya bila definisi laporan punya `dataSource`) ---
+  const [fetched, setFetched] = useState({ rows: [], summary: null, columns: [] });
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState('');
+
+  const queryString = useMemo(() => {
+    const p = new URLSearchParams();
+    if (dateMode === 'range' && dateFilter?.preset !== 'all' && dateFilter?.start && dateFilter?.end) {
+      p.append('start', toISODateLocal(dateFilter.start));
+      p.append('end', toISODateLocal(dateFilter.end));
+    } else if (dateMode === 'single') {
+      p.append('start', toISODateLocal(singleDate));
+      p.append('end', toISODateLocal(singleDate));
+    } else if (dateMode === 'datetime') {
+      if (dtStart) p.append('start', dtStart.slice(0, 10));
+      if (dtEnd) p.append('end', dtEnd.slice(0, 10));
+    }
+    if (cari.trim()) p.append('search', cari.trim());
+    if (sortByVal || selectVal) p.append('sort', sortByVal || selectVal);
+    Object.entries(extraVals).forEach(([k, v]) => { if (v) p.append(k, v); });
+    return p.toString();
+  }, [dateMode, dateFilter, singleDate, dtStart, dtEnd, cari, sortByVal, selectVal, extraVals]);
+
+  useEffect(() => {
+    if (!report.dataSource || report.unavailable) return undefined;
+    let cancelled = false;
+    setLoading(true);
+    setFetchError('');
+    // Debounce supaya mengetik di kotak "Cari" tidak membanjiri server.
+    const t = setTimeout(async () => {
+      try {
+        const res = await apiClient.get(`/reports/${report.dataSource}/?${queryString}`);
+        if (!cancelled) {
+          setFetched({
+            rows: res.data.rows || [],
+            summary: res.data.summary || null,
+            columns: res.data.columns || [],
+          });
+        }
+      } catch (err) {
+        if (!cancelled) setFetchError(err.response?.data?.error || 'Gagal memuat data laporan.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [report.dataSource, report.unavailable, queryString]);
+
+  const typeByKey = useMemo(() => {
+    const m = {};
+    (fetched.columns || []).forEach((c) => { m[c.key] = c.type; });
+    return m;
+  }, [fetched.columns]);
+
+  const liveRows = useMemo(() => formatRows(fetched.rows, typeByKey), [fetched.rows, typeByKey]);
+  const effectiveRows = report.dataSource ? liveRows : report.rows;
+
+  const effectiveSummary = useMemo(() => {
+    if (!report.dataSource || !fetched.summary) return report.summary;
+    const s = fetched.summary;
+    if (s.items) {
+      return {
+        ...(report.summary || {}),
+        type: 'list',
+        items: s.items.map((it) => ({ label: it.label, value: formatValue(it.value, it.type || 'money') })),
+      };
+    }
+    if (s.rows) {
+      const rows = formatRows(s.rows, typeByKey);
+      // Bila definisi laporan sudah mendeklarasikan kolom ringkasan, pakai itu.
+      if (report.summary?.columns?.length) {
+        return { ...report.summary, rows };
+      }
+      // Kalau belum, turunkan kolom dari key baris ringkasan supaya ringkasan
+      // tetap tampil (dan tidak merender tabel tanpa kolom yang bikin crash).
+      const contoh = s.rows[0] || {};
+      const columns = Object.keys(contoh).map((k) => ({
+        key: k,
+        label: humanizeKey(k),
+        align: typeof contoh[k] === 'number' ? 'right' : 'left',
+      }));
+      if (!columns.length) return null;
+      return { title: 'Ringkasan', columns, rows };
+    }
+    return report.summary;
+  }, [report.dataSource, report.summary, fetched.summary, typeByKey]);
+
+  const doExport = async (fmt) => {
+    if (!report.dataSource) return;
+    try {
+      const res = await apiClient.get(
+        `/reports/${report.dataSource}/export/?format=${fmt}&${queryString}`,
+        { responseType: 'blob' },
+      );
+      const blob = new Blob([res.data], fmt === 'pdf' ? { type: 'text/html' } : {});
+      const url = URL.createObjectURL(blob);
+      if (fmt === 'pdf') {
+        // Backend mengirim HTML yang otomatis membuka dialog cetak.
+        window.open(url, '_blank');
+      } else {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${report.dataSource}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch {
+      alert('Gagal mengunduh laporan.');
+    }
+  };
+
   // Konfigurasi toolbar per laporan.
   // paket: undefined/true = dropdown "Non Paket" fungsional; 'select' = dropdown
   //   "Select" non-aktif (abu); false = sembunyikan.
@@ -719,13 +869,27 @@ function LaporanDetail({ report, collapsed, onExpand }) {
         ) : null;
       case 'pdf':
         return report.toolbar?.pdf !== false ? (
-          <button key="pdf" type="button" className={outlineBtn}>
+          <button
+            key="pdf"
+            type="button"
+            disabled={!report.dataSource}
+            title={report.dataSource ? 'Cetak / simpan PDF' : 'Laporan ini belum terhubung ke data'}
+            onClick={() => doExport('pdf')}
+            className={`${outlineBtn} disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
             <FileText size={15} className="text-rose-500" /> PDF
           </button>
         ) : null;
       case 'excel':
         return report.toolbar?.excel !== false ? (
-          <button key="excel" type="button" className={outlineBtn}>
+          <button
+            key="excel"
+            type="button"
+            disabled={!report.dataSource}
+            title={report.dataSource ? 'Unduh Excel' : 'Laporan ini belum terhubung ke data'}
+            onClick={() => doExport('xlsx')}
+            className={`${outlineBtn} disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
             <FileSpreadsheet size={15} className="text-emerald-600" /> EXCEL
           </button>
         ) : null;
@@ -850,23 +1014,42 @@ function LaporanDetail({ report, collapsed, onExpand }) {
 
       {/* Tabel */}
       <div ref={tableScrollRef} className="flex-1 overflow-auto px-4 py-3 space-y-3 bg-white">
-        {report.summary &&
-          (report.summary.type === 'list' ? (
+        {/* Laporan yang datanya memang belum dilacak sistem — jelaskan, jangan
+            tampilkan "No Data" yang menyesatkan. */}
+        {report.unavailable && (
+          <div className="flex items-start gap-2.5 border border-amber-200 bg-amber-50 rounded-xl px-4 py-3 text-[13px] text-amber-800">
+            <Info size={16} className="text-amber-500 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-semibold">Laporan ini belum bisa ditampilkan</p>
+              <p className="mt-0.5 text-amber-700">{report.unavailable}</p>
+            </div>
+          </div>
+        )}
+        {fetchError && !report.unavailable && (
+          <div className="border border-rose-200 bg-rose-50 rounded-xl px-4 py-3 text-[13px] text-rose-700">
+            {fetchError}
+          </div>
+        )}
+        {loading && !report.unavailable && (
+          <div className="text-[13px] text-slate-400 px-1 animate-pulse">Memuat data laporan…</div>
+        )}
+        {effectiveSummary && !report.unavailable &&
+          (effectiveSummary.type === 'list' ? (
             <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
               <div className="text-[13px] font-semibold text-slate-600 px-3 py-2.5 bg-slate-50 border-b border-slate-200">
-                {report.summary.title}
+                {effectiveSummary.title}
               </div>
               <div className="space-y-1 text-[13px] text-slate-600 px-3 py-2.5">
-                {report.summary.items.map((it) => (
+                {effectiveSummary.items.map((it) => (
                   <div key={it.label}>
                     {it.label}:{it.value ? ` ${it.value}` : ''}
                   </div>
                 ))}
               </div>
             </div>
-          ) : report.summary.type === 'grid' ? (
+          ) : effectiveSummary.type === 'grid' ? (
             <div className="border border-slate-200 rounded-xl overflow-hidden bg-white grid grid-cols-2 sm:grid-cols-4">
-              {report.summary.items.map((it) => (
+              {effectiveSummary.items.map((it) => (
                 <div key={it.label} className="px-4 py-3 border-r border-b border-slate-200">
                   <div className="text-[11px] text-slate-400">{it.label}</div>
                   <div className="text-sm font-bold text-slate-700 mt-0.5">{it.value}</div>
@@ -875,9 +1058,9 @@ function LaporanDetail({ report, collapsed, onExpand }) {
             </div>
           ) : (
             <ReportTable
-              columns={report.summary.columns}
-              title={report.summary.title}
-              rows={report.summary.rows}
+              columns={effectiveSummary.columns}
+              title={effectiveSummary.title}
+              rows={effectiveSummary.rows}
               emptyText="No Data"
             />
           ))}
@@ -897,7 +1080,7 @@ function LaporanDetail({ report, collapsed, onExpand }) {
             )}
           </div>
         )}
-        {report.linkList ? (
+        {report.unavailable ? null : report.linkList ? (
           <AccordionList items={report.linkList} />
         ) : report.labaRugi ? (
           <LabaRugiTable sections={report.labaRugi} />
@@ -906,7 +1089,7 @@ function LaporanDetail({ report, collapsed, onExpand }) {
             <ReportTable
               columns={report.columns}
               groups={report.groups}
-              rows={report.rows}
+              rows={effectiveRows}
               sort={sort}
               onToggleSort={toggleSort}
               paginated={!!report.paginate}

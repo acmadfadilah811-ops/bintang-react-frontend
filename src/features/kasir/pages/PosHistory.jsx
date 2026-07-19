@@ -15,6 +15,22 @@ export default function PosHistory() {
   const [selectedSale, setSelectedSale] = useState(null);
   const [voiding, setVoiding] = useState(false);
 
+  // Aturan cetak dari Pengaturan POS (Ext Settings).
+  const [aturanCetak, setAturanCetak] = useState({ blokirCetakUlang: false, blokirCetakPengecekan: false });
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiClient.get('/pos/sales/pos-rules/');
+        setAturanCetak({
+          blokirCetakUlang: !!res.data?.blokir_cetak_ulang,
+          blokirCetakPengecekan: !!res.data?.blokir_cetak_pengecekan,
+        });
+      } catch (err) {
+        console.error('Gagal memuat aturan cetak:', err);
+      }
+    })();
+  }, []);
+
   const fetchSales = async () => {
     setLoading(true);
     try {
@@ -325,13 +341,25 @@ export default function PosHistory() {
                   <span>{voiding ? 'Voiding...' : 'Void (Batal)'}</span>
                 </button>
               )}
-              <button
-                onClick={() => window.print()}
-                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-pointer"
-              >
-                <Printer size={12} />
-                <span>Cetak Nota</span>
-              </button>
+              {/* Cetak nota — dibatasi setelan Pengaturan POS:
+                  - "Non-aktifkan Cetak Ulang" memblokir nota yang sudah dibayar
+                  - "Non-aktifkan Cetak untuk pengecekan" memblokir nota belum dibayar (hold) */}
+              {(() => {
+                const terblokir =
+                  (selectedSale.status === 'paid' && aturanCetak.blokirCetakUlang) ||
+                  (selectedSale.status === 'hold' && aturanCetak.blokirCetakPengecekan);
+                return (
+                  <button
+                    onClick={() => window.print()}
+                    disabled={terblokir}
+                    title={terblokir ? 'Cetak nota dinonaktifkan di Pengaturan POS' : 'Cetak nota'}
+                    className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Printer size={12} />
+                    <span>{terblokir ? 'Cetak Dinonaktifkan' : 'Cetak Nota'}</span>
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </div>

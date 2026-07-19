@@ -10,6 +10,7 @@ const TB = { paket: false, cari: false };
 export const PEMBAYARAN_REPORTS = [
   {
     id: 'ringkasan-metode',
+    dataSource: 'ringkasan-metode',
     label: 'Ringkasan Metode Pembayaran',
     toolbar: TB,
     summary: {
@@ -27,6 +28,7 @@ export const PEMBAYARAN_REPORTS = [
   },
   {
     id: 'pembayaran-sudah-lunas',
+    dataSource: 'pembayaran-sudah-lunas',
     label: 'Pembayaran yang sudah lunas',
     toolbar: TB,
     summary: {
@@ -48,13 +50,30 @@ export const PEMBAYARAN_REPORTS = [
   },
   {
     id: 'pembayaran-belum-lunas',
+    dataSource: 'pembayaran-belum-lunas',
     label: 'Pembayaran yang belum lunas',
     dateMode: 'none',
     toolbar: TB,
-    hideTable: true,
+    summary: {
+      title: 'Ringkasan',
+      columns: [
+        { key: 'mata_uang', label: 'Mata Uang' },
+        { key: 'jumlah', label: 'Total Sisa Tagihan', align: 'right' },
+      ],
+    },
+    columns: [
+      { key: 'no_pesanan', label: 'No. Pesanan' },
+      { key: 'tanggal', label: 'Tanggal' },
+      { key: 'pelanggan', label: 'Pelanggan' },
+      { key: 'cara_pembayaran', label: 'Cara Pembayaran' },
+      { key: 'total_penjualan', label: 'Total Penjualan', align: 'right' },
+      { key: 'telah_dibayar', label: 'Telah Dibayar', align: 'right' },
+      { key: 'sisa', label: 'Sisa Tagihan', align: 'right' },
+    ],
   },
   {
     id: 'penjualan-pembayaran-pelanggan',
+    dataSource: 'penjualan-pembayaran-pelanggan',
     label: 'Penjualan berdasarkan Pembayaran Pelanggan',
     toolbar: TB,
     summary: {
@@ -77,6 +96,7 @@ export const PEMBAYARAN_REPORTS = [
   },
   {
     id: 'piutang-tipe-pelanggan',
+    unavailable: 'Pesanan belum tertaut ke master Pelanggan, sehingga piutang tidak bisa dikelompokkan per tipe pelanggan.',
     label: 'Piutang berdasarkan tipe pelanggan',
     toolbar: { paket: false, cari: false, sync: 'Resi Gabungan' },
     hideTable: true,
@@ -84,6 +104,7 @@ export const PEMBAYARAN_REPORTS = [
   },
   {
     id: 'penjualan-hutang-jatuh-tempo',
+    unavailable: 'Penjualan belum memiliki tanggal jatuh tempo.',
     label: 'Penjualan hutang yang jatuh tempo',
     toolbar: TB,
     hideTable: true,

@@ -123,6 +123,20 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [qtyValue, setQtyValue] = useState(1);
+  // Satuan alternatif (UOM); backend mengonversi ke satuan dasar.
+  const [uomKode, setUomKode] = useState('');
+  const [uomAktif, setUomAktif] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiClient.get('/business-settings/');
+        setUomAktif(!!res.data?.uom_multi_enabled);
+      } catch {
+        setUomAktif(false);
+      }
+    })();
+  }, []);
   const [itemSaving, setItemSaving] = useState(false);
   const [searchListQuery, setSearchListQuery] = useState('');
 
@@ -508,6 +522,7 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
         product: selectedProduct.id,
         qty: qtyValue,
         variant: selectedVariant ? selectedVariant.id : null,
+        uom_kode: uomKode || null,
       });
       await fetchDocumentDetail(activeDetailDoc.id);
       setSelectedProduct(null);
@@ -515,6 +530,7 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
       setSearchProduct('');
       setProductOptions([]);
       setQtyValue(1);
+      setUomKode('');
     } catch (err) {
       console.error('[StockOutPage] add item error:', err);
       setValidationError(err.response?.data?.error || 'Gagal menambah produk.');
@@ -2008,8 +2024,35 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
                   </div>
                 </div>
 
+                {/* Satuan (UOM) — bila multi satuan aktif & produk punya satuan alternatif */}
+                {uomAktif && selectedProduct?.uom_enabled
+                  && Array.isArray(selectedProduct.uom_units) && selectedProduct.uom_units.length > 0 && (
+                  <div style={{ minWidth: '170px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>
+                      Satuan
+                    </label>
+                    <select
+                      value={uomKode}
+                      onChange={(e) => setUomKode(e.target.value)}
+                      disabled={activeDetailDoc.status !== 'draft'}
+                      style={{
+                        width: '100%', border: '1px solid #cbd5e1', borderRadius: '4px',
+                        padding: '8px 10px', fontSize: '13px', color: '#334155',
+                        outline: 'none', background: '#ffffff', cursor: 'pointer',
+                      }}
+                    >
+                      <option value="">{selectedProduct.satuan || 'pcs'} (dasar)</option>
+                      {selectedProduct.uom_units.map((u) => (
+                        <option key={u.id || u.kode_satuan} value={u.kode_satuan}>
+                          {u.nama_satuan} — 1 = {u.konverter} {selectedProduct.satuan || 'pcs'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 {/* Plus Blue Button */}
-                <button 
+                <button
                   type="button"
                   onClick={handleAddItem}
                   disabled={activeDetailDoc.status !== 'draft' || !selectedProduct || itemSaving}

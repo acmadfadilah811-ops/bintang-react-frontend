@@ -73,6 +73,31 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
   // Qty Counter State for Detail Product Add
   const [qtyValue, setQtyValue] = useState(1);
   const [productHargaBeli, setProductHargaBeli] = useState('0');
+  // Tanggal kedaluwarsa hanya dipakai pada mode stok "FIFO & Expired".
+  const [kadaluwarsaValue, setKadaluwarsaValue] = useState('');
+  const [stockMode, setStockMode] = useState('average');
+  const [uomAktif, setUomAktif] = useState(false);
+  const [uomKode, setUomKode] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiClient.get('/business-settings/');
+        setStockMode(res.data?.stock_system || 'average');
+        setUomAktif(!!res.data?.uom_multi_enabled);
+      } catch {
+        setStockMode('average');
+        setUomAktif(false);
+      }
+    })();
+  }, []);
+
+  // Satuan alternatif produk terpilih (kosong = hanya satuan dasar).
+  const unitOptions =
+    uomAktif && selectedProduct?.uom_enabled && Array.isArray(selectedProduct.uom_units)
+      ? selectedProduct.uom_units
+      : [];
+  const unitTerpilih = unitOptions.find((u) => u.kode_satuan === uomKode) || null;
 
   // Active Detail Document (for Staging / Detail screen) — dokumen mentah dari API
   const [activeDetailDoc, setActiveDetailDoc] = useState(null);
@@ -489,6 +514,8 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
         product: selectedProduct.id,
         qty: qtyValue,
         harga_beli: parseFloat(productHargaBeli) || 0,
+        tanggal_kadaluwarsa: kadaluwarsaValue || null,
+        uom_kode: uomKode || null,
       });
       await fetchDocumentDetail(activeDetailDoc.id);
       setSelectedProduct(null);
@@ -496,6 +523,8 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
       setProductOptions([]);
       setQtyValue(1);
       setProductHargaBeli('0');
+      setKadaluwarsaValue('');
+      setUomKode('');
     } catch (err) {
       console.error('[StockInPage] add item error:', err);
       setValidationError(err.response?.data?.error || 'Gagal menambah produk.');
@@ -1832,6 +1861,57 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
                     </button>
                   </div>
                 </div>
+
+                {/* Satuan (UOM) — bila multi satuan aktif & produk punya satuan alternatif */}
+                {unitOptions.length > 0 && (
+                  <div style={{ minWidth: '170px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>
+                      Satuan
+                    </label>
+                    <select
+                      value={uomKode}
+                      onChange={(e) => setUomKode(e.target.value)}
+                      disabled={activeDetailDoc.status !== 'draft'}
+                      style={{
+                        width: '100%', border: '1px solid #cbd5e1', borderRadius: '4px',
+                        padding: '8px 10px', fontSize: '13px', color: '#334155',
+                        outline: 'none', background: '#ffffff', cursor: 'pointer',
+                      }}
+                    >
+                      <option value="">{selectedProduct?.satuan || 'pcs'} (dasar)</option>
+                      {unitOptions.map((u) => (
+                        <option key={u.id || u.kode_satuan} value={u.kode_satuan}>
+                          {u.nama_satuan} — 1 = {u.konverter} {selectedProduct?.satuan || 'pcs'}
+                        </option>
+                      ))}
+                    </select>
+                    {unitTerpilih && qtyValue > 0 && (
+                      <span style={{ fontSize: '10px', color: '#2563eb', fontWeight: 'bold' }}>
+                        = {qtyValue * (Number(unitTerpilih.konverter) || 1)} {selectedProduct?.satuan || 'pcs'}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Tanggal Kedaluwarsa — hanya pada mode stok FIFO & Expired */}
+                {stockMode === 'fifo_expired' && (
+                  <div style={{ minWidth: '150px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>
+                      Tgl. Kedaluwarsa
+                    </label>
+                    <input
+                      type="date"
+                      value={kadaluwarsaValue}
+                      onChange={(e) => setKadaluwarsaValue(e.target.value)}
+                      disabled={activeDetailDoc.status !== 'draft'}
+                      style={{
+                        width: '100%', border: '1px solid #cbd5e1', borderRadius: '4px',
+                        padding: '8px 10px', fontSize: '13px', color: '#334155',
+                        outline: 'none', background: '#ffffff',
+                      }}
+                    />
+                  </div>
+                )}
 
                 {/* Plus Blue Button */}
                 <button

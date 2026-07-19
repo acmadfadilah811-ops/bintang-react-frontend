@@ -5,6 +5,10 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: {
+    host: '0.0.0.0',   // Bind ke semua interface — bisa diakses via IP LAN
+    port: 5173,
+  },
   build: {
     rollupOptions: {
       output: {

@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Phone, Plus, Trash2, ShoppingCart, Send, FileText } from 'lucide-react';
 import apiClient from '../../../api/apiClient';
+import ProductMasterPicker from '../../orders/components/ProductMasterPicker';
 
 const emptyItem = () => ({
   id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
   jenis_produk: '',
+  product: null,
+  product_nama: '',
   panjang: 1,
   lebar: 1,
   qty: 1,
@@ -68,6 +71,7 @@ export default function CreateOrderPage() {
         await apiClient.post('/order-items/', {
           order: orderId,
           jenis_produk: it.jenis_produk,
+          product: it.product || null,
           panjang: parseFloat(it.panjang || 0),
           lebar: parseFloat(it.lebar || 0),
           qty: parseInt(it.qty || 1),
@@ -149,6 +153,15 @@ export default function CreateOrderPage() {
                   <tr key={it.id} className="border-b border-slate-100 text-xs font-semibold text-slate-700">
                     <td className="px-4 py-2">
                       <input type="text" value={it.jenis_produk} placeholder="Nama produk / jasa cetak" onChange={(e) => changeItem(idx, 'jenis_produk', e.target.value)} className="w-full bg-transparent border-0 focus:outline-none p-0 text-xs font-bold text-slate-800" />
+                      {/* Tautan opsional ke master Produk untuk laporan penjualan */}
+                      <ProductMasterPicker
+                        value={it.product}
+                        valueLabel={it.product_nama}
+                        onChange={(p) => {
+                          changeItem(idx, 'product', p ? p.id : null);
+                          changeItem(idx, 'product_nama', p ? p.nama : '');
+                        }}
+                      />
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-1">

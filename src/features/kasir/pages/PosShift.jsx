@@ -139,9 +139,11 @@ export default function PosShift() {
 
     setLoadingOpen(true);
     try {
+      // Simpan NAMA shift (bukan id) agar terbaca di laporan & ringkasan.
+      const timing = shiftTimings.find((t) => String(t.id) === String(selectedShiftTiming));
       const payload = {
         kasir: selectedKasir.id,
-        shift: selectedShiftTiming,
+        shift: timing?.judul || String(selectedShiftTiming),
         kas_awal: parseFloat(kasAwal || 0),
         waktu_buka: new Date().toISOString(),
       };
@@ -165,19 +167,31 @@ export default function PosShift() {
 
     setLoadingClose(true);
     try {
-      const payload = {
-        waktu_tutup: new Date().toISOString(),
+      // Endpoint `close` menutup shift SEKALIGUS membuat Ringkasan Shift (V2)
+      // dengan `expected` yang dihitung di server (kas awal + tunai + kas masuk
+      // - kas keluar), lalu mengembalikan rinciannya untuk ditampilkan.
+      const res = await apiClient.post(`/saldo-kas-harian/${shiftAktif.id}/close/`, {
         kas_akhir: parseFloat(kasAkhir || 0),
         catatan: tutupCatatan,
-      };
-      await apiClient.patch(`/saldo-kas-harian/${shiftAktif.id}/`, payload);
+      });
+      const d = res.data?.rincian || {};
+      const rp = (n) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`;
       setShiftAktif(null);
       setKasirQuery('');
       setSelectedKasir(null);
       setKasAwal('0');
       setKasAkhir('0');
       setTutupCatatan('');
-      alert('Shift berhasil ditutup! Ringkasan kas harian telah diperbarui.');
+      alert(
+        'Shift berhasil ditutup!\n\n' +
+        `Kas awal        : ${rp(d.kas_awal)}\n` +
+        `Penjualan tunai : ${rp(d.penjualan_tunai)}\n` +
+        `Kas masuk       : ${rp(d.kas_masuk)}\n` +
+        `Kas keluar      : ${rp(d.kas_keluar)}\n` +
+        `Seharusnya      : ${rp(d.expected)}\n` +
+        `Kas aktual      : ${rp(d.aktual)}\n` +
+        `Selisih         : ${rp(d.selisih)}`
+      );
       checkActiveShift();
     } catch (err) {
       console.error('Error closing shift:', err);

@@ -76,6 +76,16 @@ export function SpecialTypeListPage() {
   const activeProductIds = typeMappings[activeMenu] || [];
   const assignedProducts = productRows.filter(p => activeProductIds.includes(p.id));
 
+  // Produk yang BELUM masuk kategori ini — dipakai modal "Tambah Produk".
+  // Sebelumnya variabel ini dirujuk di modal tapi tidak pernah didefinisikan,
+  // sehingga membuka modal memicu ReferenceError dan halaman crash.
+  const availableProducts = productRows.filter((p) => {
+    if (activeProductIds.includes(p.id)) return false;
+    const q = modalSearchQuery.trim().toLowerCase();
+    if (!q) return true;
+    return `${p.name || ''} ${p.sku || ''}`.toLowerCase().includes(q);
+  });
+
   // Sort assigned products
   let sortedProducts = [...assignedProducts];
   if (sortKey) {

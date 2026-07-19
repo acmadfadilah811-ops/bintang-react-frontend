@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -8,267 +8,25 @@ import {
   ChevronsUpDown,
 } from 'lucide-react';
 import { useTransaksiCrumb } from './TransaksiContext';
+import Dropdown from './Dropdown';
+import DateRangePicker from './DateRangePicker';
+import Pagination from './Pagination';
 
-/** Dropdown kustom (dipakai untuk "Status order" & "Baris per halaman"). */
-export function Dropdown({ options = [], value, onChange, placeholder = 'Pilih', minW = 'min-w-[180px]' }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const onClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, []);
-
-  return (
-    <div className={`relative ${minW}`} ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-2 text-sm border border-slate-200 rounded-lg px-3 py-2.5 bg-white hover:border-slate-300 transition-colors cursor-pointer"
-      >
-        <span className={value ? 'text-slate-700 font-medium' : 'text-slate-400'}>
-          {value || placeholder}
-        </span>
-        <ChevronDown
-          size={16}
-          className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-
-      {open && (
-        <div className="absolute left-0 top-full mt-1 w-full bg-white rounded-lg border border-slate-200 shadow-lg z-30 py-1 max-h-64 overflow-y-auto animate-fade-in">
-          {options.map((opt) => {
-            const isActive = opt === value;
-            return (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => {
-                  onChange?.(opt);
-                  setOpen(false);
-                }}
-                className={`w-full text-left px-4 py-2.5 text-sm transition-colors cursor-pointer ${
-                  isActive
-                    ? 'text-blue-600 font-semibold bg-blue-50/70'
-                    : 'text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                {opt}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-const fmtShort = (d) =>
-  new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: '2-digit' });
-
-/** Hitung rentang tanggal dari preset terpilih. */
-function computePresetRange(preset) {
-  const today = new Date();
-  let start = new Date();
-  let end = new Date();
-  switch (preset) {
-    case 'today':
-      break;
-    case 'yesterday':
-      start.setDate(today.getDate() - 1);
-      end.setDate(today.getDate() - 1);
-      break;
-    case 'last7':
-      start.setDate(today.getDate() - 6);
-      break;
-    case 'last30':
-      start.setDate(today.getDate() - 29);
-      break;
-    case 'thisMonth':
-      start = new Date(today.getFullYear(), today.getMonth(), 1);
-      end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      break;
-    case 'lastMonth':
-      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      end = new Date(today.getFullYear(), today.getMonth(), 0);
-      break;
-    default:
-      return { start: null, end: null };
-  }
-  return { start, end };
-}
-
-const DATE_PRESETS = [
-  { id: 'today', label: 'Today' },
-  { id: 'yesterday', label: 'Yesterday' },
-  { id: 'last7', label: 'Last 7 Days' },
-  { id: 'last30', label: 'Last 30 Days' },
-  { id: 'thisMonth', label: 'This Month' },
-  { id: 'lastMonth', label: 'Last Month' },
-  { id: 'all', label: 'All Time' },
-  { id: 'custom', label: 'Custom Range' },
-];
-
-/** Kontrol rentang tanggal — dropdown preset + custom range yang fungsional. */
-export function DateRangePicker({ value, onChange }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const onClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, []);
-
-  const toISO = (d) => (d ? new Date(d).toISOString().split('T')[0] : '');
-
-  const selectPreset = (id) => {
-    if (id === 'all') {
-      onChange({ preset: 'all', start: null, end: null });
-      setOpen(false);
-      return;
-    }
-    if (id === 'custom') {
-      onChange({ preset: 'custom', start: value.start || new Date(), end: value.end || new Date() });
-      return; // biarkan dropdown terbuka untuk isi tanggal
-    }
-    const { start, end } = computePresetRange(id);
-    onChange({ preset: id, start, end });
-    setOpen(false);
-  };
-
-  // Geser rentang maju/mundur sebesar panjang rentang aktif.
-  const shift = (dir) => {
-    if (!value.start || !value.end) return;
-    const start = new Date(value.start);
-    const end = new Date(value.end);
-    const days = Math.max(1, Math.round((end - start) / 86400000) + 1);
-    start.setDate(start.getDate() + dir * days);
-    end.setDate(end.getDate() + dir * days);
-    onChange({ preset: 'custom', start, end });
-  };
-
-  const isAll = value.preset === 'all' || !value.start || !value.end;
-  const label = isAll ? 'All Time' : `${fmtShort(value.start)} - ${fmtShort(value.end)}`;
-
-  return (
-    <div className="relative" ref={ref}>
-      <div className="flex items-center gap-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-600 bg-white">
-        <button
-          onClick={() => shift(-1)}
-          disabled={isAll}
-          className="p-1 hover:bg-slate-50 rounded text-slate-400 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-1.5 px-2 whitespace-nowrap cursor-pointer hover:text-slate-800"
-        >
-          <Calendar size={15} /> {label}
-          <ChevronDown
-            size={14}
-            className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
-          />
-        </button>
-        <button
-          onClick={() => shift(1)}
-          disabled={isAll}
-          className="p-1 hover:bg-slate-50 rounded text-slate-400 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <ChevronRight size={16} />
-        </button>
-      </div>
-
-      {open && (
-        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-52 bg-white rounded-lg border border-slate-200 shadow-lg z-30 py-1 animate-fade-in">
-          {DATE_PRESETS.map((p) => {
-            const isActive = value.preset === p.id;
-            return (
-              <div key={p.id}>
-                <button
-                  type="button"
-                  onClick={() => selectPreset(p.id)}
-                  className={`w-full text-left px-4 py-2 text-sm transition-colors cursor-pointer ${
-                    isActive
-                      ? 'text-white bg-blue-500 font-semibold'
-                      : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {p.label}
-                </button>
-
-                {p.id === 'custom' && value.preset === 'custom' && (
-                  <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/70 flex flex-col gap-2">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                        Mulai Dari
-                      </label>
-                      <input
-                        type="date"
-                        value={toISO(value.start)}
-                        onChange={(e) =>
-                          onChange({
-                            preset: 'custom',
-                            start: e.target.value ? new Date(e.target.value) : null,
-                            end: value.end,
-                          })
-                        }
-                        className="w-full border border-slate-200 rounded-md px-2 py-1 text-xs outline-none focus:border-blue-300"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                        Sampai Dengan
-                      </label>
-                      <input
-                        type="date"
-                        value={toISO(value.end)}
-                        onChange={(e) =>
-                          onChange({
-                            preset: 'custom',
-                            start: value.start,
-                            end: e.target.value ? new Date(e.target.value) : null,
-                          })
-                        }
-                        className="w-full border border-slate-200 rounded-md px-2 py-1 text-xs outline-none focus:border-blue-300"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setOpen(false)}
-                      className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-md py-1.5 mt-1 cursor-pointer transition-colors"
-                    >
-                      Terapkan
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
+export { Dropdown, DateRangePicker, Pagination };
 
 /** Tabel data dengan header ber-sort + baris "No Data" saat kosong. */
-function DataTableView({ columns, rows }) {
+function DataTableView({ columns, rows, colWidths = {}, onMouseDownResize }) {
   return (
-    <div className="border border-slate-200 rounded-xl overflow-hidden">
+    <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
+        <table className="w-full text-sm border-collapse table-fixed">
           <thead>
             <tr className="bg-slate-50/70 border-b border-slate-200">
               {columns.map((c) => (
                 <th
                   key={c.key}
-                  className="px-4 py-3.5 text-left font-semibold text-slate-600 whitespace-nowrap border-r border-slate-200 last:border-r-0"
+                  style={{ width: colWidths[c.key] ? `${colWidths[c.key]}px` : undefined }}
+                  className="px-4 py-3.5 text-left font-semibold text-slate-600 whitespace-nowrap border-r border-slate-200 last:border-r-0 relative group"
                 >
                   <span className="inline-flex items-center gap-1">
                     {c.label}
@@ -276,6 +34,11 @@ function DataTableView({ columns, rows }) {
                       <ChevronsUpDown size={13} className="text-slate-400" />
                     )}
                   </span>
+                  {/* Resize divider */}
+                  <div
+                    onMouseDown={(e) => onMouseDownResize && onMouseDownResize(e, c.key)}
+                    className="absolute right-0 top-0 bottom-0 w-1.5 hover:bg-blue-400 active:bg-blue-500 cursor-col-resize select-none z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                  />
                 </th>
               ))}
             </tr>
@@ -293,7 +56,8 @@ function DataTableView({ columns, rows }) {
                   {columns.map((c) => (
                     <td
                       key={c.key}
-                      className="px-4 py-3 text-slate-700 whitespace-nowrap border-r border-slate-100 last:border-r-0"
+                      style={{ width: colWidths[c.key] ? `${colWidths[c.key]}px` : undefined }}
+                      className="px-4 py-3 text-slate-700 truncate border-r border-slate-100 last:border-r-0"
                     >
                       {c.render ? c.render(row) : row[c.key]}
                     </td>
@@ -303,46 +67,6 @@ function DataTableView({ columns, rows }) {
             )}
           </tbody>
         </table>
-      </div>
-    </div>
-  );
-}
-
-/** Pagination (visual) — baris/halaman di kiri (opsional), navigasi di kanan. */
-function Pagination({ rowsPerPage, onRowsPerPageChange, showRows = true }) {
-  return (
-    <div
-      className={`flex items-center gap-5 px-1 py-4 text-sm text-slate-500 ${
-        showRows ? 'justify-between' : ''
-      }`}
-    >
-      {showRows && (
-        <Dropdown
-          options={['10 Baris', '20 Baris', '50 Baris', '100 Baris']}
-          value={rowsPerPage}
-          onChange={onRowsPerPageChange}
-          minW="min-w-[140px]"
-        />
-      )}
-      <div className="flex items-center gap-5">
-        <div className="flex items-center gap-1">
-          <button className="p-1.5 rounded hover:bg-slate-100 text-slate-400 cursor-pointer">
-            <ChevronLeft size={16} />
-          </button>
-          <button className="w-7 h-7 rounded-md text-blue-600 font-semibold hover:bg-blue-50 cursor-pointer">
-            1
-          </button>
-          <button className="p-1.5 rounded hover:bg-slate-100 text-slate-400 cursor-pointer">
-            <ChevronRight size={16} />
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <span>Go to</span>
-          <input
-            defaultValue="1"
-            className="w-12 text-center border border-slate-200 rounded-md py-1 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
-          />
-        </div>
       </div>
     </div>
   );
@@ -403,27 +127,64 @@ export default function TransactionScaffold({
   rows = [],
   children,
   onTabChange,
+  search: searchProp,
+  onSearchChange,
 }) {
   const [activeTab, setActiveTab] = useState(tabs[0]?.id);
-  const [search, setSearch] = useState('');
+  const [internalSearch, setInternalSearch] = useState('');
+  const isSearchControlled = searchProp !== undefined;
+  const search = isSearchControlled ? searchProp : internalSearch;
+  const setSearch = isSearchControlled ? onSearchChange : setInternalSearch;
+
+  const [colWidths, setColWidths] = useState({});
+
+  const handleMouseDown = (e, colKey) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = colWidths[colKey] || e.currentTarget.parentElement.getBoundingClientRect().width;
+
+    const handleMouseMove = (moveEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = Math.max(50, startWidth + deltaX);
+      setColWidths((prev) => ({
+        ...prev,
+        [colKey]: newWidth,
+      }));
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
   const [status, setStatus] = useState('');
   const [payment, setPayment] = useState('');
   const [rowsPerPage, setRowsPerPage] = useState('20 Baris');
   const [dateFilter, setDateFilter] = useState({ preset: 'all', start: null, end: null });
+  const [currentPage, setCurrentPage] = useState(1);
   const { setSubtitle } = useTransaksiCrumb();
+
   const current = tabs.find((t) => t.id === activeTab) || tabs[0];
   const variant = current?.variant || 'empty';
   const cols = current?.columns || columns;
   const dateKey = current?.dateKey || 'tanggal';
-  const statusOpts = current?.statusOptions || statusOptions; // status bisa di-override per tab
-  const paymentOptions = current?.paymentOptions; // filter "Pembayaran" hanya bila tab menyediakannya
-  const rowsTop = !!current?.rowsTop; // baris/halaman di toolbar (tanpa status), mis. tab Dibatalkan
+  const statusOpts = current?.statusOptions || statusOptions;
+  const paymentOptions = current?.paymentOptions;
+  const rowsTop = !!current?.rowsTop;
 
   useEffect(() => {
     if (!children) setSubtitle(current?.title || '');
   }, [current?.title, children, setSubtitle]);
 
-  // Filter rentang tanggal — baris tanpa tanggal valid tetap ditampilkan.
+  // Reset pagination page on filter/search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, status, payment, dateFilter, rowsPerPage, activeTab]);
+
   const inDateRange = (r) => {
     if (dateFilter.preset === 'all' || !dateFilter.start || !dateFilter.end) return true;
     const raw = r[dateKey];
@@ -437,7 +198,79 @@ export default function TransactionScaffold({
     return d >= s && d <= e;
   };
 
-  const filteredRows = rows.filter((r) => (!current?.match || current.match(r)) && inDateRange(r));
+  const matchesSearch = (r) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+
+    // 1. Match IDs (Raw, ORD-, OLYYMMDD..., SRYYMMDD...)
+    const dateVal = r.waktu || r.tanggal || r.returDate || new Date();
+    const date = new Date(dateVal);
+    const yy = isNaN(date.getTime()) ? '' : String(date.getFullYear()).slice(-2);
+    const mm = isNaN(date.getTime()) ? '' : String(date.getMonth() + 1).padStart(2, '0');
+    const dd = isNaN(date.getTime()) ? '' : String(date.getDate()).padStart(2, '0');
+    const paddedId = String(r.id || '').padStart(7, '0');
+
+    const rawId = String(r.id || r.no || r.noPembelian || r.noRetur || '').toLowerCase();
+    const ordId = `ord-${r.id}`.toLowerCase();
+    const olId = yy ? `ol${yy}${mm}${dd}${paddedId}`.toLowerCase() : '';
+    const srId = yy ? `sr${yy}${mm}${dd}${paddedId}`.toLowerCase() : '';
+
+    const idMatch =
+      rawId.includes(q) ||
+      ordId.includes(q) ||
+      (olId && olId.includes(q)) ||
+      (srId && srId.includes(q));
+
+    // 2. Match Contacts
+    const nameMatch = String(r.nama || r.pelanggan || r.supplier || '').toLowerCase().includes(q);
+    const waMatch = String(r.nomor_wa || r.telpon || '').toLowerCase().includes(q);
+
+    // 3. Match Notes / Destination Address
+    const notesMatch = String(r.catatan_pelanggan || r.catatan || r.tujuan || r.tujuan_pengiriman || '').toLowerCase().includes(q);
+
+    // 4. Match Status (both DB codes and display labels)
+    const sMap = {
+      review: 'tunda',
+      desain: 'dikonfirmasi',
+      proses: 'dikirim',
+      ready: 'terkirim',
+      selesai: 'selesai',
+      batal: 'batal'
+    };
+    const statusDb = String(r.status_global || r.status || '').toLowerCase();
+    const statusLabel = sMap[statusDb] || statusDb;
+    const statusMatch = statusDb.includes(q) || statusLabel.includes(q);
+
+    return idMatch || nameMatch || waMatch || notesMatch || statusMatch;
+  };
+
+  const matchesStatus = (r) => {
+    if (!status || status === 'Semua') return true;
+    const sMap = {
+      'Tunda': 'review',
+      'Dikonfirmasi': 'desain',
+      'Dikirim': 'proses',
+      'Terkirim': 'ready',
+      'Selesai': 'selesai',
+      'Batal': 'batal'
+    };
+    const targetStatus = sMap[status] || status.toLowerCase();
+    const currentStatus = String(r.status_global || r.status || '').toLowerCase();
+    return currentStatus === targetStatus;
+  };
+
+  const filteredRows = rows.filter(
+    (r) => 
+      (!current?.match || current.match(r)) && 
+      inDateRange(r) && 
+      matchesSearch(r) && 
+      matchesStatus(r)
+  );
+
+  const limit = parseInt(rowsPerPage) || 20;
+  const totalPages = Math.ceil(filteredRows.length / limit) || 1;
+  const startIndex = (currentPage - 1) * limit;
+  const paginatedRows = filteredRows.slice(startIndex, startIndex + limit);
 
   const handleTab = (id) => {
     setActiveTab(id);
@@ -446,7 +279,7 @@ export default function TransactionScaffold({
 
   return (
     <div className="flex flex-col flex-1 bg-white">
-      {/* Tabs — lebar sama, tersebar penuh ke samping */}
+      {/* Tabs */}
       <div className="flex border-b border-slate-200 shrink-0">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTab;
@@ -483,9 +316,8 @@ export default function TransactionScaffold({
             {actions && <div className="flex items-center gap-2">{actions}</div>}
           </div>
 
-          {/* Toolbar — dua gaya: dengan filter "Pembayaran" (mis. Retur) atau dengan rentang tanggal. */}
+          {/* Toolbar */}
           {paymentOptions ? (
-            /* Gaya filter: Status + Pembayaran di kiri, kolom cari memanjang. */
             <div className="flex items-center gap-3 px-6 py-4 shrink-0">
               <Dropdown
                 options={statusOpts}
@@ -512,7 +344,6 @@ export default function TransactionScaffold({
               </label>
             </div>
           ) : (
-            /* Gaya default & "rows": kiri (status / baris) — tanggal (tengah) — cari (kanan). */
             <div className="grid grid-cols-3 items-center gap-3 px-6 py-4 shrink-0">
               <div className="justify-self-start">
                 {rowsTop ? (
@@ -550,51 +381,83 @@ export default function TransactionScaffold({
 
           {/* Body */}
           {variant === 'table' ? (
-            <div className="px-6 pb-6">
-              <DataTableView columns={cols} rows={filteredRows} />
+            <div className="px-6 pb-6 flex flex-col h-full min-h-0 justify-between">
+              <div className="overflow-auto flex-1">
+                <DataTableView
+                  columns={cols}
+                  rows={paginatedRows}
+                  colWidths={colWidths}
+                  onMouseDownResize={handleMouseDown}
+                />
+              </div>
               <Pagination
                 rowsPerPage={rowsPerPage}
                 onRowsPerPageChange={setRowsPerPage}
                 showRows={!rowsTop}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
               />
             </div>
           ) : (
-            <div className="flex-1 px-6 pb-6 min-h-0">
-              <div className="h-full rounded-xl bg-slate-50/50 border border-slate-100 flex items-center justify-center overflow-auto">
-                {filteredRows.length === 0 ? (
+            <div className="flex-1 px-6 pb-6 min-h-0 flex flex-col justify-between h-full">
+              <div className="h-full rounded-xl bg-slate-50/50 border border-slate-100 flex flex-col items-center justify-center overflow-hidden">
+                {paginatedRows.length === 0 ? (
                   <EmptyState
-                    icon={emptyIcon}
-                    art={emptyArt}
-                    title={current?.emptyTitle}
-                    description={current?.emptyDesc}
+                     icon={emptyIcon}
+                     art={emptyArt}
+                     title={current?.emptyTitle}
+                     description={current?.emptyDesc}
                   />
                 ) : (
-                  <div className="w-full self-stretch">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-white text-slate-500 text-left border-b border-slate-100">
-                          {cols.map((c) => (
-                            <th key={c.key} className="px-4 py-3 font-semibold whitespace-nowrap">
-                              {c.label}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 bg-white">
-                        {filteredRows.map((row, i) => (
-                          <tr key={row.id || i} className="hover:bg-slate-50/60">
+                  <div className="w-full self-stretch flex flex-col justify-between h-full">
+                    <div className="overflow-auto flex-1 bg-white">
+                      <table className="w-full text-sm table-fixed border-collapse">
+                        <thead>
+                          <tr className="bg-white text-slate-500 text-left border-b border-slate-100">
                             {cols.map((c) => (
-                              <td
+                              <th
                                 key={c.key}
-                                className="px-4 py-3 text-slate-700 whitespace-nowrap"
+                                style={{ width: colWidths[c.key] ? `${colWidths[c.key]}px` : undefined }}
+                                className="px-4 py-3 font-semibold whitespace-nowrap relative group"
                               >
-                                {c.render ? c.render(row) : row[c.key]}
-                              </td>
+                                {c.label}
+                                {/* Resize divider */}
+                                <div
+                                  onMouseDown={(e) => handleMouseDown(e, c.key)}
+                                  className="absolute right-0 top-0 bottom-0 w-1.5 hover:bg-blue-400 active:bg-blue-500 cursor-col-resize select-none z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                />
+                              </th>
                             ))}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 bg-white">
+                          {paginatedRows.map((row, i) => (
+                            <tr key={row.id || i} className="hover:bg-slate-50/60">
+                              {cols.map((c) => (
+                                <td
+                                  key={c.key}
+                                  style={{ width: colWidths[c.key] ? `${colWidths[c.key]}px` : undefined }}
+                                  className="px-4 py-3 text-slate-700 truncate"
+                                >
+                                  {c.render ? c.render(row) : row[c.key]}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="px-4 border-t border-slate-100 bg-white">
+                      <Pagination
+                        rowsPerPage={rowsPerPage}
+                        onRowsPerPageChange={setRowsPerPage}
+                        showRows={true}
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                      />
+                    </div>
                   </div>
                 )}
               </div>

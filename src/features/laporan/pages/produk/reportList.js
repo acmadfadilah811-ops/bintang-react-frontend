@@ -35,11 +35,13 @@ const COL = {
 export const PRODUK_REPORTS = [
   {
     id: 'sku',
+    dataSource: 'sku',
     label: 'Penjualan berdasarkan SKU',
     columns: [COL.produk, COL.namaAlt, COL.variant, COL.grup, COL.sku, COL.barcode, COL.qtyJual, COL.totalJual, COL.laba],
   },
   {
     id: 'kategori',
+    dataSource: 'kategori',
     label: 'Penjualan berdasarkan Kategori',
     toolbar: {
       paket: 'select',
@@ -50,6 +52,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'sku-makanan',
+    unavailable: 'Sistem tidak memiliki data pengiriman makanan (integrasi food delivery).',
     label: 'Penjualan berdasarkan SKU Pengiriman Makanan',
     toolbar: { paket: false, cari: false },
     columns: [
@@ -64,6 +67,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'brand',
+    dataSource: 'brand',
     label: 'Penjualan produk berdasarkan Brand',
     toolbar: {
       paket: 'select',
@@ -80,6 +84,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'koleksi',
+    dataSource: 'koleksi',
     label: 'Penjualan berdasarkan Koleksi',
     toolbar: {
       paket: 'select',
@@ -90,6 +95,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'addon',
+    unavailable: 'Penjualan add-on tidak pernah dicatat pada baris penjualan — yang ada hanya master Add-On.',
     label: 'Penjualan Add-On Per Item',
     toolbar: {
       paket: 'select',
@@ -104,6 +110,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'material',
+    dataSource: 'material',
     label: 'Produk Material',
     toolbar: { paket: false, cari: false },
     columns: [
@@ -119,6 +126,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'qty-terjual',
+    dataSource: 'qty-terjual',
     label: 'Qty Produk Terjual',
     toolbar: { paket: false, cari: false },
     summary: {
@@ -142,6 +150,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'qty-stok-tanggal',
+    dataSource: 'qty-stok-tanggal',
     label: 'Qty stok berdasarkan tanggal',
     dateMode: 'single',
     toolbar: { paket: false, cari: false },
@@ -167,6 +176,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'qty-stok-syncron',
+    dataSource: 'qty-stok-syncron',
     label: 'Qty stok per tanggal manual syncron',
     dateMode: 'single',
     toolbar: { paket: false, cari: 'left', sync: true },
@@ -187,6 +197,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'tidak-laku',
+    dataSource: 'tidak-laku',
     label: 'Produk Tidak Laku',
     toolbar: {
       paket: 'select',
@@ -205,6 +216,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'sisa-uom',
+    dataSource: 'sisa-uom',
     label: 'Sisa stok berdasarkan satuan (UOM)',
     dateMode: 'none',
     toolbar: { paket: false, cari: false },
@@ -229,6 +241,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'sisa-grup',
+    dataSource: 'sisa-grup',
     label: 'Sisa Stok Grup Produk',
     dateMode: 'none',
     toolbar: { paket: false, cari: false },
@@ -247,6 +260,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'produk-status',
+    dataSource: 'produk-status',
     label: 'Produk Status',
     toolbar: {
       paket: 'select',
@@ -265,6 +279,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'sisa-produk',
+    dataSource: 'sisa-produk',
     label: 'Sisa Stok Produk',
     dateMode: 'none',
     toolbar: {
@@ -301,6 +316,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'stok-masuk',
+    dataSource: 'stok-masuk',
     label: 'Stok Masuk',
     toolbar: {
       paket: 'select',
@@ -328,6 +344,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'stok-keluar',
+    dataSource: 'stok-keluar',
     label: 'Stok Keluar',
     toolbar: {
       paket: 'select',
@@ -366,6 +383,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'qty-keluar',
+    dataSource: 'qty-keluar',
     label: 'Qty Produk Keluar',
     toolbar: { paket: false, cari: false },
     summary: {
@@ -386,6 +404,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'usia-stok',
+    dataSource: 'usia-stok',
     label: 'Usia Stok Produk',
     toolbar: {
       paket: 'select',
@@ -411,6 +430,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'peringatan-stok',
+    dataSource: 'peringatan-stok',
     label: 'Peringatan Sisa Stok',
     dateMode: 'none',
     toolbar: {
@@ -435,6 +455,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'tingkatan-harga',
+    dataSource: 'tingkatan-harga',
     label: 'Tingkatan Harga',
     dateMode: 'none',
     toolbar: {
@@ -453,6 +474,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'penjualan-paket',
+    unavailable: 'Baris penjualan tidak menyimpan referensi paket, sehingga penjualan paket tidak dapat dihitung.',
     label: 'Penjualan Paket',
     toolbar: {
       paket: 'select',
@@ -467,6 +489,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'rincian-paket',
+    unavailable: 'Baris penjualan tidak menyimpan referensi paket, sehingga rincian penjualan paket tidak tersedia.',
     label: 'Rincian Penjualan Paket',
     toolbar: {
       paket: 'select',
@@ -484,6 +507,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'sisa-paket',
+    unavailable: 'Stok paket tidak dilacak tersendiri; yang punya stok hanya produk komponennya.',
     label: 'Sisa Stok Paket',
     dateMode: 'none',
     toolbar: {
@@ -498,6 +522,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'pergerakan-stok',
+    dataSource: 'pergerakan-stok',
     label: 'Pergerakan Stok',
     toolbar: { paket: false, cariPlaceholder: 'No. Ref' },
     columns: [
@@ -514,6 +539,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'value-pergerakan',
+    dataSource: 'value-pergerakan',
     label: 'Value Pergerakan berdasarkan tanggal',
     toolbar: { paket: false, cari: false, pdf: false },
     columns: [
@@ -524,6 +550,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'produk-dihapus',
+    unavailable: 'Produk dihapus permanen dari database (tidak ada soft-delete), sehingga tidak bisa dilaporkan.',
     label: 'Produk dihapus',
     toolbar: { paket: false },
     columns: [
@@ -540,6 +567,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'stok-kedaluwarsa',
+    dataSource: 'stok-kedaluwarsa',
     label: 'Stok Kedaluwarsa',
     toolbar: {
       paket: false,
@@ -569,6 +597,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'stok-fifo',
+    dataSource: 'stok-fifo',
     label: 'Stok FIFO',
     toolbar: {
       paket: false,
@@ -598,6 +627,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'pergerakan-fifo',
+    dataSource: 'pergerakan-fifo',
     label: 'Pergerakan Stok Kedaluwarsa & FIFO',
     toolbar: {
       paket: 'select',
@@ -620,6 +650,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'banding-fifo',
+    dataSource: 'banding-fifo',
     label: 'Perbandingan Stok & Stok FIFO',
     dateMode: 'none',
     toolbar: { paket: false, cari: 'left', cariPlaceholder: 'Cari produk' },
@@ -627,10 +658,12 @@ export const PRODUK_REPORTS = [
       { key: 'produk', label: 'Produk' },
       { key: 'stok', label: 'Stok', align: 'right' },
       { key: 'stok_fifo', label: 'Stok FIFO', align: 'right' },
+      { key: 'selisih', label: 'Selisih', align: 'right' },
     ],
   },
   {
     id: 'serial-stok',
+    unavailable: 'Nomor seri tersimpan sebagai daftar bebas pada produk dan tidak tertaut ke stok maupun penjualan.',
     label: 'Product dan Serial stok',
     dateMode: 'none',
     toolbar: {
@@ -668,6 +701,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'kiosk-produk',
+    unavailable: 'Fitur Kiosk belum ada di sistem.',
     label: 'Rincian Produk Kiosk',
     toolbar: {
       paket: false,
@@ -688,6 +722,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'perubahan-harga',
+    unavailable: 'Riwayat harga hanya tersimpan sebagai teks bebas di log aktivitas, tanpa kolom harga lama/baru terstruktur.',
     label: 'Perubahan Harga',
     toolbar: { paket: false, cari: false },
     groups: [
@@ -725,6 +760,7 @@ export const PRODUK_REPORTS = [
   },
   {
     id: 'kiosk-pelanggan',
+    unavailable: 'Fitur Kiosk belum ada di sistem.',
     label: 'Rincian Pelanggan Kiosk',
     toolbar: {
       paket: false,

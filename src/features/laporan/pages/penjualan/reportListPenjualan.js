@@ -171,6 +171,7 @@ export const PENJUALAN_REPORTS = [
   },
   {
     id: 'rincian-penjualan',
+    dataSource: 'rincian-penjualan',
     label: 'Rincian Penjualan',
     toolbar: {
       paket: 'select',
@@ -532,6 +533,7 @@ export const PENJUALAN_REPORTS = [
   },
   {
     id: 'item-penjualan-tanggal',
+    dataSource: 'item-penjualan-tanggal',
     label: 'Item Penjualan berdasarkan Tanggal',
     toolbar: {
       paket: 'select',
@@ -570,6 +572,7 @@ export const PENJUALAN_REPORTS = [
   },
   {
     id: 'item-brand',
+    dataSource: 'item-brand',
     label: 'Item Penjualan Berdasarkan Brand',
     toolbar: {
       paket: 'select',
@@ -635,6 +638,7 @@ export const PENJUALAN_REPORTS = [
   },
   {
     id: 'pelunasan-kredit',
+    dataSource: 'pelunasan-kredit',
     label: 'Item Penjualan berdasarkan Pelunasan Kredit',
     toolbar: TB,
     paginate: false,

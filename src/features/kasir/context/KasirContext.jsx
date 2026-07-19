@@ -1,9 +1,11 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import apiClient from '../../../api/apiClient';
+import { useAuth } from '../../../context/AuthContext';
 
 const KasirContext = createContext(null);
 
 export function KasirProvider({ children }) {
+  const { user } = useAuth();
   const [shiftAktif, setShiftAktif] = useState(null);
   const [loadingShift, setLoadingShift] = useState(true);
   const [cart, setCart] = useState([]);
@@ -22,12 +24,18 @@ export function KasirProvider({ children }) {
       // Filter for today / active shift
       // Let's assume the API returns list or has an active flag.
       // Usually, it lists today's records. Let's find one that is active or use the last one.
-      const list = response.data || [];
-      // Shift terbuka = kas_akhir belum diisi (null). Model SaldoKasHarian tak punya `waktu_tutup`.
+      const list = response.data.results || response.data || [];
+      // Shift terbuka = kas_akhir belum diisi DAN belum ditutup.
       const todayStr = new Date().toISOString().slice(0, 10);
-      const isOpen = (item) => item.kas_akhir === null || item.kas_akhir === undefined;
+      const isOpen = (item) =>
+        (item.kas_akhir === null || item.kas_akhir === undefined) && !item.waktu_tutup;
+      // Dahulukan shift milik pengguna yang login, lalu shift hari ini, baru
+      // shift terbuka mana pun — supaya kasir tidak "meminjam" shift kasir lain.
+      const milikSaya = (item) => user?.id && String(item.kasir) === String(user.id);
       const active =
-        list.find((item) => item.tanggal === todayStr && isOpen(item)) ||
+        list.find((item) => isOpen(item) && milikSaya(item) && item.tanggal === todayStr) ||
+        list.find((item) => isOpen(item) && milikSaya(item)) ||
+        list.find((item) => isOpen(item) && item.tanggal === todayStr) ||
         list.find(isOpen) ||
         null;
       setShiftAktif(active);
@@ -42,6 +50,32 @@ export function KasirProvider({ children }) {
   useEffect(() => {
     checkActiveShift();
   }, []);
+
+  /**
+   * Ganti satuan (UOM) sebuah baris keranjang. Harga ikut menyesuaikan ke harga
+   * satuan tersebut; qty dibiarkan apa adanya karena diinput dalam satuan itu.
+   * Backend yang mengonversi ke satuan dasar saat transaksi disimpan.
+   */
+  const setCartItemUom = (key, kode) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.key !== key) return item;
+        const units = Array.isArray(item.product?.uom_units) ? item.product.uom_units : [];
+        const unit = units.find((u) => u.kode_satuan === kode);
+        if (!unit) {
+          // Kembali ke satuan dasar.
+          const dasar = item.variant
+            ? (item.variant.harga ?? 0)
+            : (item.product?.harga_jual_toko || 0);
+          return { ...item, uomKode: '', harga: Number(dasar) };
+        }
+        const hargaUnit =
+          Number(unit.harga_jual_toko) ||
+          Number(item.product?.harga_jual_toko || 0) * (Number(unit.konverter) || 1);
+        return { ...item, uomKode: kode, harga: Number(hargaUnit) };
+      })
+    );
+  };
 
   const addToCart = (product, variant = null) => {
     setCart((prev) => {
@@ -68,6 +102,27 @@ export function KasirProvider({ children }) {
           harga: Number(price),
           qty: 1,
           catatan: '',
+          // Satuan alternatif (UOM); '' = satuan dasar produk.
+          uomKode: '',
+        },
+      ];
+    });
+  };
+
+  const addCustomToCart = (nama, harga, qty = 1, catatan = '') => {
+    setCart((prev) => {
+      const key = `custom-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      return [
+        ...prev,
+        {
+          key,
+          product: null,
+          variant: null,
+          nama,
+          harga: Number(harga),
+          qty: Number(qty),
+          catatan,
+          uomKode: '',
         },
       ];
     });
@@ -101,6 +156,24 @@ export function KasirProvider({ children }) {
     setTaxPercent(0);
   };
 
+  const removeItemsFromCart = (itemsToRemove) => {
+    setCart((prev) => {
+      let updated = prev.map(item => ({ ...item }));
+      itemsToRemove.forEach((toRemove) => {
+        const idx = updated.findIndex(item => item.key === toRemove.key);
+        if (idx !== -1) {
+          const newQty = updated[idx].qty - toRemove.qty;
+          if (newQty <= 0) {
+            updated = updated.filter(item => item.key !== toRemove.key);
+          } else {
+            updated[idx].qty = newQty;
+          }
+        }
+      });
+      return updated;
+    });
+  };
+
   const getSubtotal = () => {
     return cart.reduce((sum, item) => sum + item.harga * item.qty, 0);
   };
@@ -127,7 +200,10 @@ export function KasirProvider({ children }) {
         checkActiveShift,
         cart,
         addToCart,
+        addCustomToCart,
+        setCartItemUom,
         removeFromCart,
+        removeItemsFromCart,
         updateCartQty,
         updateCartItemNote,
         clearCart,

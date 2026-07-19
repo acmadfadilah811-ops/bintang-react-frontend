@@ -11,6 +11,7 @@ import {
   Search,
   Timer,
   Users,
+  RefreshCw,
   GripVertical,
   Plus,
   Trash2,
@@ -54,30 +55,30 @@ const EXT_SETTINGS_KEYS = [
   { key: 'pos_custom_resi_windows', title: 'Resi POS custom untuk Windows', desc: 'Resi custom disesuaikan untuk kertas A4 atau kertas karbon rangkap 3' },
   { key: 'disable_print_checking', title: 'Non-aktifkan Cetak untuk pengecekan', desc: 'Aktifkan jika tidak perbolehkan cetak resi yang belum dibayar untuk tujuan pengecekan' },
   { key: 'disable_reprint', title: 'Non-aktifkan Cetak Ulang', desc: 'Aktifkan jika tidak perbolehkan cetak ulang resi yang sudah dibayar' },
-  { key: 'disable_drawer_reprint', title: 'Non-aktifkan Buka Laci ketika Cetak Ulang', desc: 'Aktifkan jika tidak perbolehkan buka laci ketika cetak ulang resi melalui riwayat transaksi' },
+  { key: 'disable_drawer_reprint', notApplicable: 'laci kas', title: 'Non-aktifkan Buka Laci ketika Cetak Ulang', desc: 'Aktifkan jika tidak perbolehkan buka laci ketika cetak ulang resi melalui riwayat transaksi' },
   { key: 'disable_hold_queue', title: 'Tidak diperbolehkan tahan/antri pesanan', desc: 'Aktifkan jika pesanan harus diselesaikan (dibayar/dikirimkan ke dapur) sebelum mulai pesanan berikutnya' },
   { key: 'hide_other_device_online_tx', title: 'Sembunyikan Transaksi Perangkat Lain/Online', desc: 'Aktifkan jika tidak ingin pengguna POS melihat transaksi dari perangkat POS lain dan online' },
-  { key: 'disable_auto_change_qty_view', title: 'Non-aktifkan otomatis ke tampilan ubah qty item', desc: 'Aktifkan jika tidak ingin otomatis lanjut tampilan ubah qty item setelah menambahkan ke keranjang' },
+  { key: 'disable_auto_change_qty_view', notApplicable: 'alur ubah qty', title: 'Non-aktifkan otomatis ke tampilan ubah qty item', desc: 'Aktifkan jika tidak ingin otomatis lanjut tampilan ubah qty item setelah menambahkan ke keranjang' },
   { key: 'disable_add_cash_io_type', title: 'Tidak diperbolehkan menambah tipe Kas Masuk/Keluar', desc: 'Aktifkan jika ingin memblokir kasir untuk menambahkan tipe Kas Masuk/Keluar yang baru' },
-  { key: 'enable_waiter_tracking', title: 'Aktifkan lacak Pelayan', desc: 'Setelah diaktifkan, Anda perlu atur user/staff yang menjadi pelayan di POS.' },
+  { key: 'enable_waiter_tracking', notApplicable: 'pelayan', title: 'Aktifkan lacak Pelayan', desc: 'Setelah diaktifkan, Anda perlu atur user/staff yang menjadi pelayan di POS.' },
   { key: 'block_sell_less_than_buy_price', title: 'POS blokir harga jual < harga beli', desc: 'POS tidak memperbolehkan harga jual di bawah harga beli' },
-  { key: 'credit_payment_check_balance', title: 'Pembayaran Kredit harus cek saldo', desc: 'Pastikan saldo kredit pelanggan mencukupi sebelum memproses' },
+  { key: 'credit_payment_check_balance', notApplicable: 'saldo kredit pelanggan', title: 'Pembayaran Kredit harus cek saldo', desc: 'Pastikan saldo kredit pelanggan mencukupi sebelum memproses' },
   { key: 'disable_add_custom_item', title: 'Tidak diperbolehkan menambah Item Custom', desc: 'Aktifkan jika ingin memblokir kasir untuk menambahkan Item Custom' },
   { key: 'staff_only_see_same_day_tx', title: 'Staff POS hanya bisa lihat transaksi di hari yg sama', desc: 'Aktifkan jika Anda tidak ingin kasir melihat transaksi hari sebelumnya' },
   { key: 'hide_remaining_stock', title: 'Sembunyikan sisa stok di POS', desc: '' },
   { key: 'hide_customer_list', title: 'Sembunyikan daftar pelanggan', desc: 'Daftar Pelanggan tidak dimunculkan, Kasir harus memasukkan kode/mobile untuk memilih pelanggan' },
-  { key: 'disable_dine_in_take_away', title: 'Non-aktifkan Dine-In/Take-Away', desc: 'Aktifkan jika tidak membutuhkan penanda Dine-In/Take-Away di transaksi penjualan' },
+  { key: 'disable_dine_in_take_away', notApplicable: 'dine-in/take-away', title: 'Non-aktifkan Dine-In/Take-Away', desc: 'Aktifkan jika tidak membutuhkan penanda Dine-In/Take-Away di transaksi penjualan' },
   { key: 'must_select_table', title: 'Harus memilih Meja', desc: 'Aktifkan jika meja harus dipilih terlebih dahulu sebelum menambahkan item pesanan' },
   { key: 'kitchen_print_normal_font', title: 'Cetakan ke Dapur/Bar dalam font normal', desc: 'Aktifkan jika tidak ingin cetakan ke Dapur/Bar dalam tulisan berukuran besar' },
-  { key: 'block_same_order_multi_waiter', title: 'Blokir pesanan yang sama dilayani beberapa pelayan dalam waktu yang sama', desc: '' },
-  { key: 'enable_take_feature', title: 'Aktifkan fitur pengambilan', desc: '' },
+  { key: 'block_same_order_multi_waiter', notApplicable: 'pelayan', title: 'Blokir pesanan yang sama dilayani beberapa pelayan dalam waktu yang sama', desc: '' },
+  { key: 'enable_take_feature', notApplicable: 'fitur pengambilan', title: 'Aktifkan fitur pengambilan', desc: '' },
   { key: 'enable_paper_saving', title: 'Aktifkan fitur hemat kertas', desc: '' },
   { key: 'order_no_reset_daily', title: 'No. Order reset setiap hari', desc: '' },
   { key: 'hide_splitbill', title: 'Sembunyikan Splitbill di POS', desc: '' },
-  { key: 'allow_offline_tx', title: 'Perbolehkan transaksi POS Offline', desc: '' },
-  { key: 'allow_backdate_online_tx', title: 'Perbolehkan transaksi Backdate saat POS Online', desc: '' },
-  { key: 'log_cancelled_pos_items', title: 'Log Item POS Dibatalkan', desc: '' },
-  { key: 'different_customers_same_no', title: 'Pelanggan berbeda dapat memiliki nomor yang sama', desc: '' }
+  { key: 'allow_offline_tx', notApplicable: 'mode offline', title: 'Perbolehkan transaksi POS Offline', desc: '' },
+  { key: 'allow_backdate_online_tx', notApplicable: 'transaksi backdate', title: 'Perbolehkan transaksi Backdate saat POS Online', desc: '' },
+  { key: 'log_cancelled_pos_items', notApplicable: 'log item dibatalkan', title: 'Log Item POS Dibatalkan', desc: '' },
+  { key: 'different_customers_same_no', notApplicable: 'validasi nomor pelanggan', title: 'Pelanggan berbeda dapat memiliki nomor yang sama', desc: '' }
 ];
 
 const METODE_OPTIONS = [
@@ -113,11 +114,8 @@ export default function PointOfSale() {
     return name || user.username || '';
   };
 
-  // State untuk data Cara Pembayaran
-  const [payments, setPayments] = useState([
-    { id: '1', type: 'Tunai', name: 'CASH', feeName: 'None', feeValue: '0' },
-    { id: '2', type: 'QRIS', name: 'QRIS GPN', feeName: 'MDR', feeValue: '0.7' },
-  ]);
+  // Cara Pembayaran — tersimpan di backend (/pos-payment-methods/).
+  const [payments, setPayments] = useState([]);
 
   // Form state
   const [formType, setFormType] = useState('Tunai');
@@ -133,65 +131,84 @@ export default function PointOfSale() {
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  const handleAddPayment = (e) => {
+  const fetchPayments = async () => {
+    try {
+      const res = await apiClient.get('/pos-payment-methods/');
+      setPayments(res.data.results || res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch payment methods:', err);
+      triggerToast('Gagal memuat cara pembayaran.');
+    }
+  };
+
+  const handleAddPayment = async (e) => {
     e.preventDefault();
     if (!formType || !formName) {
       triggerToast('Tipe dan Nama pembayaran wajib diisi!');
       return;
     }
-    const newPayment = {
-      id: String(Date.now()),
-      type: formType,
-      name: formName,
-      feeName: formFeeName || 'Biaya Layanan',
-      feeValue: formFeeValue || '0',
-    };
-    setPayments([...payments, newPayment]);
-    setFormName('');
-    setFormFeeName('');
-    setFormFeeValue('');
-    triggerToast(`Metode pembayaran "${formName}" berhasil ditambahkan!`);
+    try {
+      await apiClient.post('/pos-payment-methods/', {
+        tipe: formType,
+        nama: formName,
+        nama_biaya: formFeeName || '',
+        nilai_biaya: parseFloat(formFeeValue || 0),
+        urutan: payments.length,
+      });
+      setFormName('');
+      setFormFeeName('');
+      setFormFeeValue('');
+      await fetchPayments();
+      triggerToast(`Metode pembayaran "${formName}" berhasil ditambahkan!`);
+    } catch (err) {
+      console.error('Failed to add payment method:', err);
+      triggerToast(err.response?.data?.error || 'Gagal menambahkan cara pembayaran.');
+    }
   };
 
-  const handleDeletePayment = (id, name) => {
-    setPayments(payments.filter((p) => p.id !== id));
-    triggerToast(`Metode "${name}" berhasil dihapus.`);
+  const handleDeletePayment = async (id, name) => {
+    try {
+      await apiClient.delete(`/pos-payment-methods/${id}/`);
+      await fetchPayments();
+      triggerToast(`Metode "${name}" berhasil dihapus.`);
+    } catch (err) {
+      console.error('Failed to delete payment method:', err);
+      triggerToast('Gagal menghapus cara pembayaran.');
+    }
   };
   // State & tindakan untuk Perangkat POS (dari Sesi Aktif di Backend)
   const [devices, setDevices] = useState([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
-
-  // Helper untuk membuat Serial Number unik (Hex 16 karakter) yang stabil dari session ID
-  const getStableSerial = (id) => {
-    let hash = 0;
-    const str = "DEVICE_SESSION_SALT_" + id;
-    for (let i = 0; i < str.length; i++) {
-      hash = (hash << 5) - hash + str.charCodeAt(i);
-      hash = hash & hash; // Convert to 32bit integer
-    }
-    const hex = Math.abs(hash).toString(16).toUpperCase();
-    return hex.padStart(16, 'ABCDE0123456789F').substring(0, 16);
-  };
+  const [deviceError, setDeviceError] = useState(null);
 
   const fetchDevices = async () => {
     setLoadingDevices(true);
+    setDeviceError(null);
     try {
       const res = await apiClient.get('/security/sessions/');
-      // Map sessions ke model perangkat
-      const mapped = res.data.map((sess) => ({
-        id: sess.id,
-        name: sess.device_name || '',
-        serial: getStableSerial(sess.id),
-        username: sess.username,
-      }));
-      setDevices(mapped);
+      const list = res.data.results || res.data || [];
+      // Perangkat = sesi login aktif (SessionToken). Tampilkan data apa adanya;
+      // tidak ada nomor seri yang dikarang.
+      setDevices(
+        list
+          .filter((s) => s.is_active && !s.is_expired)
+          .map((s) => ({
+            id: s.id,
+            name: s.device_name || '',
+            username: s.username,
+            ip: s.ip_address || '',
+            userAgent: s.user_agent || '',
+            lastUsed: s.last_used_at,
+          }))
+      );
     } catch (err) {
       console.error('Failed to fetch POS devices:', err);
-      // Fallback ke data mock jika error 403 (bukan owner) atau server mati
-      setDevices([
-        { id: 'mock-1', name: '', serial: '354C36112CBF6736', username: 'admin' },
-        { id: 'mock-2', name: '', serial: '482AE39C8CFE', username: 'staff_kasir' },
-      ]);
+      setDevices([]);
+      setDeviceError(
+        err.response?.status === 403
+          ? 'Butuh akses Owner/Manager untuk melihat perangkat yang terhubung.'
+          : 'Gagal memuat daftar perangkat.'
+      );
     } finally {
       setLoadingDevices(false);
     }
@@ -204,33 +221,22 @@ export default function PointOfSale() {
     }
   }, [activeMenu]);
 
-  const handleRevokeDevice = async (id, serial) => {
+  const handleRevokeDevice = async (id, label) => {
+    if (!window.confirm(`Cabut akses perangkat "${label}"? Pengguna akan otomatis logout.`)) return;
     try {
       await apiClient.delete(`/security/sessions/${id}/`);
-      setDevices(devices.filter((d) => d.id !== id));
-      triggerToast(`Akses perangkat dengan seri "${serial}" telah dicabut!`);
+      await fetchDevices();
+      triggerToast(`Akses perangkat "${label}" telah dicabut.`);
     } catch (err) {
       console.error('Failed to revoke device access:', err);
-      // Jika mock, hapus secara lokal
-      setDevices(devices.filter((d) => d.id !== id));
-      triggerToast(`Akses perangkat "${serial}" dicabut secara lokal.`);
+      // Jangan hapus dari tampilan kalau server menolak — nanti terlihat
+      // seolah berhasil padahal sesi masih aktif.
+      triggerToast(
+        err.response?.status === 403
+          ? 'Butuh akses Owner/Manager untuk mencabut sesi.'
+          : 'Gagal mencabut akses perangkat.'
+      );
     }
-  };
-
-  const handleRegisterMockDevice = () => {
-    const chars = '0123456789ABCDEF';
-    let serial = '';
-    for (let i = 0; i < 16; i++) {
-      serial += chars[Math.floor(Math.random() * 16)];
-    }
-    const newDev = {
-      id: 'mock-' + Date.now(),
-      name: 'POS Terminal ' + (devices.length + 1),
-      serial: serial,
-      username: 'simulation',
-    };
-    setDevices([...devices, newDev]);
-    triggerToast(`Perangkat simulasi "${newDev.name}" berhasil ditambahkan!`);
   };
 
   // State & tindakan untuk Catatan Resi, Email Laporan, & POS Pass Key (dari Backend)
@@ -462,6 +468,8 @@ export default function PointOfSale() {
       fetchShiftTimings();
       setIsAddingShiftTiming(false);
       setEditingShiftTimingId(null);
+    } else if (activeMenu === 'pembayaran') {
+      fetchPayments();
     }
   }, [activeMenu]);
 
@@ -1093,15 +1101,18 @@ export default function PointOfSale() {
                                 </div>
                                 <div className="min-w-0">
                                   <p className="text-xs font-extrabold text-slate-800 truncate">
-                                    {pay.name}
+                                    {pay.nama}
                                   </p>
                                   <p className="text-[10px] text-slate-400 font-semibold uppercase">
-                                    {pay.type} {Number(pay.feeValue) > 0 ? `• Fee +${pay.feeValue}%` : ''}
+                                    {pay.tipe}
+                                    {Number(pay.nilai_biaya) > 0
+                                      ? ` • ${pay.nama_biaya || 'Biaya'} +${Number(pay.nilai_biaya)}%`
+                                      : ''}
                                   </p>
                                 </div>
                               </div>
                               <button
-                                onClick={() => handleDeletePayment(pay.id, pay.name)}
+                                onClick={() => handleDeletePayment(pay.id, pay.nama)}
                                 className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
                                 title="Hapus cara pembayaran"
                               >
@@ -1123,18 +1134,20 @@ export default function PointOfSale() {
                         Perangkat POS Aktif
                       </h3>
                       <p className="text-[11px] text-slate-400">
-                        Kelola perangkat kasir tablet/smartphone yang terhubung ke sistem POS Anda.
+                        Perangkat terdaftar otomatis saat pengguna login. Cabut akses untuk
+                        memaksa logout perangkat tersebut.
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
                       <button
-                        onClick={handleRegisterMockDevice}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow flex items-center gap-1.5 cursor-pointer"
+                        onClick={fetchDevices}
+                        disabled={loadingDevices}
+                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                       >
-                        <Plus size={14} /> Daftarkan Perangkat
+                        <RefreshCw size={14} className={loadingDevices ? 'animate-spin' : ''} /> Muat ulang
                       </button>
                       <span className="bg-slate-100 text-slate-700 border border-slate-200 px-3 py-2 rounded-lg text-xs font-bold">
-                        Perangkat terdaftar ({devices.length})
+                        Sesi aktif ({devices.length})
                       </span>
                     </div>
                   </div>
@@ -1144,47 +1157,57 @@ export default function PointOfSale() {
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="border-b border-slate-200 bg-slate-50/50">
-                          <th className="py-3 px-4 text-xs font-bold text-slate-500 w-1/3">Nama</th>
-                          <th className="py-3 px-4 text-xs font-bold text-slate-500 w-1/3">Seri</th>
-                          <th className="py-3 px-4 text-xs font-bold text-slate-500 w-1/3 text-right">Aksi</th>
+                          <th className="py-3 px-4 text-xs font-bold text-slate-500">Perangkat &amp; Operator</th>
+                          <th className="py-3 px-4 text-xs font-bold text-slate-500">Alamat IP</th>
+                          <th className="py-3 px-4 text-xs font-bold text-slate-500">Terakhir Dipakai</th>
+                          <th className="py-3 px-4 text-xs font-bold text-slate-500 text-right">Aksi</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {loadingDevices ? (
                           <tr>
-                            <td colSpan="3" className="py-16 text-center text-slate-400 text-xs font-bold">
+                            <td colSpan="4" className="py-16 text-center text-slate-400 text-xs font-bold">
                               <div className="flex items-center justify-center gap-2">
                                 <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                                 <span>Memuat data perangkat aktif...</span>
                               </div>
                             </td>
                           </tr>
+                        ) : deviceError ? (
+                          <tr>
+                            <td colSpan="4" className="py-16 text-center text-amber-600 text-xs font-bold">
+                              {deviceError}
+                            </td>
+                          </tr>
                         ) : devices.length === 0 ? (
                           <tr>
-                            <td colSpan="3" className="py-16 text-center text-slate-400 text-xs font-bold">
-                              Tidak ada perangkat aktif terdaftar.
+                            <td colSpan="4" className="py-16 text-center text-slate-400 text-xs font-bold">
+                              Tidak ada sesi perangkat yang aktif.
                             </td>
                           </tr>
                         ) : (
                           devices.map((dev) => (
                             <tr key={dev.id} className="hover:bg-slate-50/40 transition-colors">
                               <td className="py-4 px-4 text-xs font-bold text-slate-800">
-                                <div>
-                                  <span className="block text-slate-800">{dev.name || '-'}</span>
-                                  {dev.username && (
-                                    <span className="block text-[10px] text-slate-400 font-semibold mt-0.5">
-                                      Operator: {dev.username}
-                                    </span>
-                                  )}
-                                </div>
+                                <span className="block text-slate-800">
+                                  {dev.name || dev.userAgent?.slice(0, 48) || 'Perangkat tidak dikenal'}
+                                </span>
+                                {dev.username && (
+                                  <span className="block text-[10px] text-slate-400 font-semibold mt-0.5">
+                                    Operator: {dev.username}
+                                  </span>
+                                )}
                               </td>
-                              <td className="py-4 px-4 text-xs font-mono text-slate-650 select-all">
-                                {dev.serial}
+                              <td className="py-4 px-4 text-xs font-mono text-slate-600 select-all">
+                                {dev.ip || '-'}
+                              </td>
+                              <td className="py-4 px-4 text-xs text-slate-500 font-semibold">
+                                {dev.lastUsed ? new Date(dev.lastUsed).toLocaleString('id-ID') : '-'}
                               </td>
                               <td className="py-4 px-4 text-right">
                                 <button
-                                  onClick={() => handleRevokeDevice(dev.id, dev.serial)}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-200 hover:border-red-550 hover:bg-red-50 text-red-600 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                                  onClick={() => handleRevokeDevice(dev.id, dev.name || dev.username || dev.ip)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-200 hover:bg-red-50 text-red-600 rounded-lg text-xs font-bold transition-all cursor-pointer"
                                 >
                                   <Trash2 size={13} /> Cabut akses
                                 </button>
@@ -1920,6 +1943,11 @@ export default function PointOfSale() {
                                 {item.desc && (
                                   <span className="text-[10px] text-slate-400 font-semibold block mt-0.5 leading-relaxed">
                                     {item.desc}
+                                  </span>
+                                )}
+                                {item.notApplicable && (
+                                  <span className="text-[10px] text-amber-600 font-bold block mt-1 leading-relaxed">
+                                    Belum berpengaruh — fitur {item.notApplicable} belum ada di aplikasi ini.
                                   </span>
                                 )}
                               </div>

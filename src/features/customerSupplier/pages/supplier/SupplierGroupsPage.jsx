@@ -1,73 +1,49 @@
-import { useMemo, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
-import DataTable from '../../../inventory/pages/components/DataTable';
-import { Button, PageHeader, Toolbar } from '../../../inventory/pages/components/PageShell';
-import { supplierGroupSeed } from '../customerSupplierData';
+/**
+ * ============================================================================
+ * VERSI LAMA — TIDAK DIPAKAI APLIKASI
+ * ============================================================================
+ * File ini sisa rancangan awal modul Pelanggan & Supplier dan **tidak dirender
+ * di mana pun**. Barrel `CustomerPages.jsx` / `SupplierPages.jsx` yang
+ * mengekspornya sudah tidak diimpor oleh file mana pun.
+ *
+ * Halaman yang BENAR-BENAR dipakai: `pages/CustomerSupplierApp.jsx`
+ * (rute `/customer-supplier/*` di App.jsx), yang sudah terhubung ke API asli.
+ *
+ * Jangan jadikan file ini acuan kondisi aplikasi — mengubahnya tidak
+ * berpengaruh apa pun ke layar yang dilihat pengguna. Aman untuk dihapus.
+ * ============================================================================
+ */
+import { AlertCircle } from 'lucide-react';
+import { PageHeader } from '../../../inventory/pages/components/PageShell';
 
+/**
+ * Grup Supplier belum tersedia: backend tidak punya model SupplierGroup, dan
+ * model Supplier pun belum punya kolom grup. Sebelumnya halaman ini menampilkan
+ * data contoh yang tersimpan hanya di memori — terlihat berfungsi padahal hilang
+ * saat halaman dimuat ulang. Lebih baik menyatakannya apa adanya.
+ */
 export function SupplierGroupsPage() {
-  const [groups, setGroups] = useState(supplierGroupSeed);
-  const [query, setQuery] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [name, setName] = useState('');
-
-  const filtered = useMemo(
-    () => groups.filter((g) => g.name.toLowerCase().includes(query.trim().toLowerCase())),
-    [groups, query],
-  );
-
-  const handleAdd = (e) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      window.alert('Nama grup wajib diisi.');
-      return;
-    }
-    setGroups((prev) => [...prev, { id: `SG-${String(prev.length + 1).padStart(2, '0')}`, name: name.trim(), members: 0 }]);
-    setName('');
-    setShowForm(false);
-  };
-
-  const handleDelete = (id) => {
-    if (window.confirm('Hapus grup ini?')) setGroups((prev) => prev.filter((g) => g.id !== id));
-  };
-
   return (
     <>
       <PageHeader
         title="Grup Supplier"
         description="Kelompokkan supplier berdasarkan jenis pasokan."
-        actions={
-          <Button variant="success" onClick={() => setShowForm((s) => !s)}>
-            <Plus size={15} /> {showForm ? 'Tutup' : 'Tambah Grup'}
-          </Button>
-        }
       />
-      {showForm && (
-        <form className="pi-inline-form" onSubmit={handleAdd}>
-          <div className="pi-form-group">
-            <label>Nama Grup</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama grup" />
-          </div>
-          <Button type="submit" variant="primary">Simpan</Button>
-        </form>
-      )}
-      <Toolbar searchPlaceholder="Cari grup" searchValue={query} onSearchChange={setQuery} />
-      <DataTable
-        rows={filtered}
-        emptyText="Belum ada grup supplier"
-        columns={[
-          { key: 'name', label: 'Nama Grup' },
-          { key: 'members', label: 'Jumlah Supplier' },
-          {
-            key: 'aksi',
-            label: '',
-            render: (r) => (
-              <button type="button" className="pi-icon-button" onClick={() => handleDelete(r.id)} aria-label="Hapus">
-                <Trash2 size={16} />
-              </button>
-            ),
-          },
-        ]}
-      />
+      <div
+        style={{
+          display: 'flex', gap: 12, alignItems: 'flex-start',
+          border: '1px solid #fde68a', background: '#fffbeb',
+          borderRadius: 12, padding: '16px 18px', margin: '8px 0',
+        }}
+      >
+        <AlertCircle size={18} style={{ color: '#d97706', flexShrink: 0, marginTop: 2 }} />
+        <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.6 }}>
+          <strong style={{ display: 'block', marginBottom: 4 }}>Belum tersedia</strong>
+          Pengelompokan supplier membutuhkan tabel grup di database dan kolom grup pada data
+          supplier — keduanya belum ada. Daftar supplier sendiri sudah berfungsi penuh di menu{' '}
+          <strong>Supplier</strong>.
+        </div>
+      </div>
     </>
   );
 }

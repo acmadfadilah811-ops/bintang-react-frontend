@@ -30,7 +30,7 @@ function DetailRow({ icon: Icon, label, value, valClass = "text-slate-800" }) {
   );
 }
 
-export default function CustomerDetailPage({ customer, notes = [], onBack, onEdit, onDelete, onAddNote }) {
+export default function CustomerDetailPage({ customer, notes = [], onBack, onEdit, onDelete, onAddNote, onEditNote }) {
   const [activeTab, setActiveTab] = useState('profil'); // 'profil', 'alamat', 'catatan'
   const c = customer;
   const catatanPelanggan = notes.filter((n) => String(n.customer) === String(c.id));
@@ -276,7 +276,17 @@ export default function CustomerDetailPage({ customer, notes = [], onBack, onEdi
                     <div className="bg-slate-50 rounded-xl p-4 hover:bg-slate-100/50 transition-colors border border-slate-100">
                       <div className="flex items-center justify-between gap-3 flex-wrap">
                         <span className="text-sm font-bold text-slate-800">{n.judul || '(Tanpa Judul)'}</span>
-                        <span className="text-xs text-slate-400 font-medium bg-white px-2 py-0.5 rounded border border-slate-100">{formatDisplayDate(n.tanggal)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-400 font-medium bg-white px-2 py-0.5 rounded border border-slate-100">{formatDisplayDate(n.tanggal)}</span>
+                          <button
+                            type="button"
+                            onClick={() => onEditNote?.(n)}
+                            className="text-blue-600 hover:text-blue-800 p-1 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                            title="Ubah Catatan"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                        </div>
                       </div>
                       
                       {n.entries?.length > 0 ? (

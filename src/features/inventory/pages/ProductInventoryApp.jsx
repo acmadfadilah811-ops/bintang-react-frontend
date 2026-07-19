@@ -13,7 +13,6 @@ import {
   StockOpnamePage,
   StockOutPage,
   StockProductionPage,
-  StockOutstandingPage,
 } from './inventory/InventoryPages';
 import {
   BarcodePage,
@@ -92,7 +91,6 @@ const pageMap = {
   'price-label-products': PriceLabelProductsPage,
   'price-label-settings': PriceLabelSettingsPage,
   deposit: DepositPage,
-  'stock-outstanding': StockOutstandingPage,
   'product-others': ProductOthersPage,
   'pos-stock-mode': PosStockModePage,
   'merge-stocks': MergeStocksPage,

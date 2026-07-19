@@ -4,4 +4,3 @@ export { StockProductionPage } from './StockProductionPage';
 export { StockOpnamePage } from './StockOpnamePage';
 export { StockMovementPage } from './StockMovementPage';
 export { StockAlertPage } from './StockAlertPage';
-export { StockOutstandingPage } from './StockOutstandingPage';

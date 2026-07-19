@@ -11,6 +11,7 @@ import {
   CreditCard,
 } from 'lucide-react';
 import apiClient from '../../../api/apiClient';
+import ProductMasterPicker from './ProductMasterPicker';
 
 export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,6 +59,8 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
         items: [
           {
             jenis_produk: '',
+            product: null,
+            product_nama: '',
             bahan: '',
             panjang: 0,
             lebar: 0,
@@ -129,6 +132,8 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
     items: [
       {
         jenis_produk: '',
+        product: null,
+        product_nama: '',
         bahan: '',
         panjang: 0,
         lebar: 0,
@@ -149,6 +154,8 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
         ...formData.items,
         {
           jenis_produk: '',
+          product: null,
+          product_nama: '',
           bahan: '',
           panjang: 0,
           lebar: 0,
@@ -246,6 +253,7 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
         return apiClient.post('/order-items/', {
           order: orderId,
           jenis_produk: item.jenis_produk,
+          product: item.product || null,
           bahan: item.bahan,
           panjang: p,
           lebar: l,
@@ -414,6 +422,16 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
                           >
                             Cari Harga
                           </button>
+                          {/* Tautan ke master Produk — opsional, dipakai laporan penjualan
+                              per SKU/Kategori/Brand. */}
+                          <ProductMasterPicker
+                            value={item.product}
+                            valueLabel={item.product_nama}
+                            onChange={(p) => {
+                              handleItemChange(idx, 'product', p ? p.id : null);
+                              handleItemChange(idx, 'product_nama', p ? p.nama : '');
+                            }}
+                          />
                         </div>
 
                         {/* 2. Kalkulasi */}

@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Minus, Trash2, User, CreditCard, ShoppingBag, Percent, AlertCircle, X } from 'lucide-react';
 import { useKasir } from '../context/KasirContext';
 import apiClient from '../../../api/apiClient';
+import CustomItemModal from '../components/CustomItemModal';
+import SplitBillModal from '../components/SplitBillModal';
+import ReceiptPrint from '../components/ReceiptPrint';
 
 export default function PosTerminal() {
   const navigate = useNavigate();
@@ -10,7 +13,10 @@ export default function PosTerminal() {
     shiftAktif,
     cart,
     addToCart,
+    addCustomToCart,
+    setCartItemUom,
     removeFromCart,
+    removeItemsFromCart,
     updateCartQty,
     updateCartItemNote,
     clearCart,
@@ -29,6 +35,61 @@ export default function PosTerminal() {
   } = useKasir();
 
   // Catalog States
+  // Pengaturan POS yang memengaruhi perilaku kasir. Penegakan sesungguhnya ada
+  // di server; ini hanya cermin agar kasir dapat umpan balik lebih awal.
+  const [uomAktif, setUomAktif] = useState(false);
+  const [fullSettings, setFullSettings] = useState(null);
+  const [aturanPos, setAturanPos] = useState({
+    blokirStokKosong: true,
+    sembunyikanStok: false,
+    sembunyikanDaftarPelanggan: false,
+    disableAddCustomItem: false,
+    hideSplitbill: false,
+    passkey: {},
+  });
+  useEffect(() => {
+    (async () => {
+      try {
+        const [bs, rules] = await Promise.all([
+          apiClient.get('/business-settings/'),
+          apiClient.get('/pos/sales/pos-rules/'),
+        ]);
+        setUomAktif(!!bs.data?.uom_multi_enabled);
+        setFullSettings(bs.data);
+        setAturanPos({
+          blokirStokKosong: !!rules.data?.blokir_stok_kosong,
+          sembunyikanStok: !!rules.data?.sembunyikan_stok,
+          sembunyikanDaftarPelanggan: !!rules.data?.sembunyikan_daftar_pelanggan,
+          disableAddCustomItem: !!rules.data?.disable_add_custom_item,
+          hideSplitbill: !!rules.data?.hide_splitbill,
+          passkey: rules.data?.passkey || {},
+        });
+      } catch (err) {
+        console.error('Gagal memuat aturan POS:', err);
+      }
+    })();
+  }, []);
+
+  /**
+   * Minta PIN PassKey untuk tindakan sensitif (diskon / pilih pelanggan).
+   * Verifikasi dilakukan di server; UI hanya menampung input.
+   * Mengembalikan true bila boleh lanjut.
+   */
+  const mintaPasskey = async (aksi) => {
+    if (!aturanPos.passkey?.[aksi]) return true;
+    const pin = window.prompt('Masukkan PIN PassKey untuk melanjutkan:');
+    if (pin === null) return false;
+    try {
+      const res = await apiClient.post('/pos/sales/verify-passkey/', { aksi, pin });
+      if (res.data?.ok) return true;
+      alert('PIN salah.');
+      return false;
+    } catch (err) {
+      alert(err.response?.data?.error || 'PIN salah.');
+      return false;
+    }
+  };
+
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [products, setProducts] = useState([]);
@@ -37,6 +98,12 @@ export default function PosTerminal() {
 
   // Variant Picker Modal State
   const [activeProductForVariant, setActiveProductForVariant] = useState(null);
+
+  // Custom Item Modal State
+  const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+
+  // Split Bill Modal State
+  const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
 
   // Customer Select States
   const [contacts, setContacts] = useState([]);
@@ -178,12 +245,13 @@ export default function PosTerminal() {
         catatan: cartNotes,
         status: 'paid',
         items: cart.map(item => ({
-          product_id: item.product.id,
+          product_id: item.product ? item.product.id : null,
           variant_id: item.variant ? item.variant.id : null,
           nama: item.nama,
           harga: item.harga,
           qty: item.qty,
           catatan: item.catatan,
+          uom_kode: item.uomKode || null,
         })),
       };
 
@@ -239,6 +307,15 @@ export default function PosTerminal() {
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
             />
           </div>
+          {!aturanPos.disableAddCustomItem && (
+            <button
+              onClick={() => setIsCustomModalOpen(true)}
+              className="px-4 py-2.5 bg-indigo-650 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-indigo-500/10 flex items-center gap-1 transition-all cursor-pointer shrink-0"
+            >
+              <Plus size={14} />
+              <span>Item Kustom</span>
+            </button>
+          )}
         </div>
 
         {/* Kategori Horizontal Scroll */}
@@ -284,7 +361,10 @@ export default function PosTerminal() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 pb-8">
             {products.map((product) => {
-              const hasStock = !product.lacak_inventori || product.qty_stok > 0;
+              // Produk tanpa stok hanya dikunci bila aturan "blokir jual saat
+              // stok kosong" aktif — cerminan aturan yang ditegakkan server.
+              const stokHabis = product.lacak_inventori && product.qty_stok <= 0;
+              const hasStock = !stokHabis || !aturanPos.blokirStokKosong;
               return (
                 <button
                   key={product.id}
@@ -317,8 +397,8 @@ export default function PosTerminal() {
                       </span>
                     </div>
 
-                    {/* Stock badge */}
-                    {product.lacak_inventori ? (
+                    {/* Stock badge — disembunyikan bila setelan "Sembunyikan sisa stok di POS" aktif */}
+                    {aturanPos.sembunyikanStok ? null : product.lacak_inventori ? (
                       <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
                         product.qty_stok > 10
                           ? 'bg-emerald-50 text-emerald-600'
@@ -388,13 +468,16 @@ export default function PosTerminal() {
               )}
             </div>
 
-            {/* Suggestions Dropdown */}
-            {showContactDropdown && contacts.length > 0 && (
+            {/* Suggestions Dropdown — disembunyikan bila setelan
+                "Sembunyikan daftar pelanggan" aktif (kasir harus ketik kode/nomor persis) */}
+            {showContactDropdown && contacts.length > 0 && !aturanPos.sembunyikanDaftarPelanggan && (
               <div className="absolute inset-x-0 top-full mt-1 bg-white rounded-xl border border-slate-200 shadow-xl z-50 overflow-hidden max-h-48 overflow-y-auto">
                 {contacts.map((contact) => (
                   <button
                     key={contact.id}
-                    onClick={() => {
+                    onClick={async () => {
+                      // PassKey pelanggan: minta PIN sebelum menautkan pelanggan.
+                      if (!(await mintaPasskey('pelanggan'))) return;
                       setSelectedContact(contact);
                       setShowContactDropdown(false);
                     }}
@@ -438,6 +521,23 @@ export default function PosTerminal() {
                     <Trash2 size={14} />
                   </button>
                 </div>
+
+                {/* Pemilih Satuan (UOM) — muncul bila produk punya satuan alternatif */}
+                {uomAktif && item.product?.uom_enabled
+                  && Array.isArray(item.product.uom_units) && item.product.uom_units.length > 0 && (
+                  <select
+                    value={item.uomKode || ''}
+                    onChange={(e) => setCartItemUom(item.key, e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-700 bg-white cursor-pointer focus:outline-none"
+                  >
+                    <option value="">{item.product.satuan || 'pcs'} (satuan dasar)</option>
+                    {item.product.uom_units.map((u) => (
+                      <option key={u.id || u.kode_satuan} value={u.kode_satuan}>
+                        {u.nama_satuan} — 1 = {u.konverter} {item.product.satuan || 'pcs'}
+                      </option>
+                    ))}
+                  </select>
+                )}
 
                 <div className="flex items-center justify-between mt-1">
                   {/* Quantity Controls */}
@@ -495,7 +595,12 @@ export default function PosTerminal() {
                 min="0"
                 max="100"
                 value={discountPercent || ''}
-                onChange={(e) => setDiscountPercent(parseFloat(e.target.value) || 0)}
+                onChange={async (e) => {
+                  const nilai = parseFloat(e.target.value) || 0;
+                  // PassKey diskon: minta PIN saat kasir mulai memberi diskon.
+                  if (nilai > 0 && !discountPercent && !(await mintaPasskey('diskon'))) return;
+                  setDiscountPercent(nilai);
+                }}
                 className="w-16 text-right px-2 py-0.5 border border-slate-200 rounded-md font-bold focus:outline-none text-slate-700"
               />
             </div>
@@ -533,6 +638,15 @@ export default function PosTerminal() {
             >
               Batal
             </button>
+            {!aturanPos.hideSplitbill && (
+              <button
+                onClick={() => setIsSplitModalOpen(true)}
+                disabled={cart.length === 0}
+                className="flex-1 py-2.5 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-xl disabled:opacity-50 cursor-pointer text-center"
+              >
+                Split Bill
+              </button>
+            )}
             <button
               onClick={handlePayClick}
               disabled={!shiftAktif || cart.length === 0}
@@ -560,7 +674,9 @@ export default function PosTerminal() {
 
             <div className="space-y-2 max-h-60 overflow-y-auto">
               {activeProductForVariant.variants.map((v) => {
-                const isOutOfStock = activeProductForVariant.lacak_inventori && v.qty_stok <= 0;
+                const isOutOfStock =
+                  activeProductForVariant.lacak_inventori && v.qty_stok <= 0
+                  && aturanPos.blokirStokKosong;
                 return (
                   <button
                     key={v.id}
@@ -574,7 +690,7 @@ export default function PosTerminal() {
                     </div>
                     <div className="text-right">
                       <span className="font-black text-slate-900 text-xs block">{formatCurrency(v.harga)}</span>
-                      {activeProductForVariant.lacak_inventori && (
+                      {activeProductForVariant.lacak_inventori && !aturanPos.sembunyikanStok && (
                         <span className="text-[10px] text-slate-500 font-bold">Stok: {v.qty_stok}</span>
                       )}
                     </div>
@@ -783,6 +899,30 @@ export default function PosTerminal() {
           </div>
         </div>
       )}
+
+      {/* Modal & Print Sub-components */}
+      <CustomItemModal
+        isOpen={isCustomModalOpen}
+        onClose={() => setIsCustomModalOpen(false)}
+        onAdd={addCustomToCart}
+      />
+
+      <SplitBillModal
+        isOpen={isSplitModalOpen}
+        onClose={() => setIsSplitModalOpen(false)}
+        cart={cart}
+        selectedContact={selectedContact}
+        discountPercent={discountPercent}
+        taxPercent={taxPercent}
+        cartNotes={cartNotes}
+        onSplitSuccess={removeItemsFromCart}
+        settings={fullSettings}
+      />
+
+      <ReceiptPrint
+        receipt={lastReceipt}
+        settings={fullSettings}
+      />
     </div>
   );
 }

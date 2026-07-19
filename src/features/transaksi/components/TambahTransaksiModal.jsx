@@ -1,33 +1,52 @@
-import { useRef, useState } from 'react';
-import { Clock, Plus, FileText } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Plus, FileText } from 'lucide-react';
+import apiClient from '../../../api/apiClient';
 
 const inputClass =
   'w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 text-slate-700 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300';
 
-const fmtNow = () => {
-  const now = new Date();
-  const tgl = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-  const jam = now.toLocaleTimeString('en-GB', { hour12: false });
-  return `${tgl} | ${jam}`;
+const nowLocal = () => {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16); // untuk <input type="datetime-local">
 };
 
 /**
  * Modal "Tambah Pengeluaran" / "Tambah Pendapatan".
- * `mode` = 'pengeluaran' | 'pendapatan'. Untuk pengeluaran, staff default ke
- * pengguna aktif; untuk pendapatan, staff dipilih manual.
+ * `mode` = 'pengeluaran' | 'pendapatan'. Tipe transaksi dipilih dari master
+ * (difilter sesuai mode), staff dipilih dari daftar user.
  */
-export default function TambahTransaksiModal({ mode = 'pengeluaran', staffName = '', onClose, onSave }) {
+export default function TambahTransaksiModal({ mode = 'pengeluaran', currentUserId = '', onClose, onSave }) {
   const isPengeluaran = mode === 'pengeluaran';
   const fileRef = useRef(null);
-  const [cents, setCents] = useState(0); // jumlah dalam sen agar input mata uang rapi
-  const [tipe, setTipe] = useState('');
-  const [staff, setStaff] = useState(isPengeluaran ? staffName : '');
+  const [cents, setCents] = useState(0);
+  const [tipeId, setTipeId] = useState('');
+  const [staffId, setStaffId] = useState(currentUserId ? String(currentUserId) : '');
   const [catatan, setCatatan] = useState('');
   const [files, setFiles] = useState([]);
-  const [waktu] = useState(fmtNow);
+  const [waktu, setWaktu] = useState(nowLocal);
+  const [saving, setSaving] = useState(false);
+
+  const [tipeOptions, setTipeOptions] = useState([]);
+  const [staffOptions, setStaffOptions] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [tRes, uRes] = await Promise.all([
+          apiClient.get(`/cash-transaction-types/?tipe=${mode}`),
+          apiClient.get('/users/'),
+        ]);
+        setTipeOptions(tRes.data.results || tRes.data || []);
+        setStaffOptions(uRes.data.results || uRes.data || []);
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+  }, [mode]);
 
   const jumlah = 'Rp. ' + (cents / 100).toLocaleString('id-ID', { minimumFractionDigits: 2 });
-  const canSave = cents > 0 && tipe.trim().length > 0 && staff.trim().length > 0;
+  const canSave = cents > 0 && tipeId && staffId && !saving;
 
   const onAmountChange = (e) => {
     const digits = e.target.value.replace(/\D/g, '');
@@ -37,6 +56,23 @@ export default function TambahTransaksiModal({ mode = 'pengeluaran', staffName =
   const addFiles = (list) => {
     if (!list?.length) return;
     setFiles((prev) => [...prev, ...Array.from(list)]);
+  };
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    try {
+      await onSave?.({
+        tipe_transaksi: tipeId,
+        staff: staffId,
+        jumlah: cents / 100,
+        waktu: new Date(waktu).toISOString(),
+        catatan,
+        files,
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -58,7 +94,7 @@ export default function TambahTransaksiModal({ mode = 'pengeluaran', staffName =
             <button
               type="button"
               disabled={!canSave}
-              onClick={() => onSave?.({ mode, cents, tipe, staff, catatan, waktu, files })}
+              onClick={handleSave}
               className={`text-sm font-semibold rounded-lg px-5 py-2 transition-colors ${
                 canSave
                   ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer shadow-sm'
@@ -72,49 +108,52 @@ export default function TambahTransaksiModal({ mode = 'pengeluaran', staffName =
 
         {/* Body */}
         <div className="px-6 py-5 space-y-4">
-          {/* Jumlah Transaksi */}
           <div>
             <label className="block text-sm text-slate-600 mb-1.5">Jumlah Transaksi</label>
             <input value={jumlah} onChange={onAmountChange} inputMode="numeric" className={inputClass} />
           </div>
 
-          {/* Tipe Transaksi */}
           <div>
             <label className="block text-sm text-slate-600 mb-1.5">Tipe Transaksi</label>
-            <input
-              value={tipe}
-              onChange={(e) => setTipe(e.target.value)}
-              placeholder="Cari"
-              className={inputClass}
-            />
+            <select
+              value={tipeId}
+              onChange={(e) => setTipeId(e.target.value)}
+              className={`${inputClass} cursor-pointer ${tipeId ? '' : 'text-slate-400'}`}
+            >
+              <option value="">
+                {tipeOptions.length ? 'Pilih tipe transaksi' : `Belum ada tipe ${mode} — tambahkan di tab Tipe Transaksi`}
+              </option>
+              {tipeOptions.map((t) => (
+                <option key={t.id} value={t.id}>{t.nama}</option>
+              ))}
+            </select>
           </div>
 
-          {/* Staff & Tgl Transaksi */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-slate-600 mb-1.5">Staff</label>
               <select
-                value={staff}
-                onChange={(e) => setStaff(e.target.value)}
-                className={`${inputClass} cursor-pointer ${staff ? '' : 'text-slate-400'}`}
+                value={staffId}
+                onChange={(e) => setStaffId(e.target.value)}
+                className={`${inputClass} cursor-pointer ${staffId ? '' : 'text-slate-400'}`}
               >
                 <option value="">Pilih salah satu</option>
-                {staffName && <option value={staffName}>{staffName}</option>}
+                {staffOptions.map((u) => (
+                  <option key={u.id} value={u.id}>{u.username}</option>
+                ))}
               </select>
             </div>
             <div>
               <label className="block text-sm text-slate-600 mb-1.5">Tgl Transaksi</label>
-              <div className="relative">
-                <Clock
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                />
-                <input value={waktu} readOnly className={`${inputClass} pl-9 bg-slate-50`} />
-              </div>
+              <input
+                type="datetime-local"
+                value={waktu}
+                onChange={(e) => setWaktu(e.target.value)}
+                className={inputClass}
+              />
             </div>
           </div>
 
-          {/* Catatan */}
           <div>
             <label className="block text-sm text-slate-600 mb-1.5">Catatan</label>
             <textarea
