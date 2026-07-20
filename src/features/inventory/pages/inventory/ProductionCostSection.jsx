@@ -17,11 +17,12 @@ const formatRp = (v) =>
  * Kalau diambil di awal, staff/kasir yang cuma melihat rincian akan kena 403.
  * Untuk menampilkan, nama akun sudah ikut di payload biaya (akun_nama).
  */
-export function ProductionCostSection({ documentId, isDraft, biaya = [], totalBiaya, onChanged }) {
+export function ProductionCostSection({ documentId, isDraft, biaya = [], totalBiaya, serapKeHpp, onChanged }) {
   const [masterList, setMasterList] = useState([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [savingSerap, setSavingSerap] = useState(false);
 
   // Form "Buat baru"
   const [showBuatBaru, setShowBuatBaru] = useState(false);
@@ -109,6 +110,23 @@ export function ProductionCostSection({ documentId, isDraft, biaya = [], totalBi
       onChanged?.();
     } catch (err) {
       setError(err.response?.data?.error || 'Gagal menyimpan nilai.');
+    }
+  };
+
+  // Menyimpan langsung ke dokumen (bukan ke baris biaya), karena flag-nya milik
+  // header dokumen. Backend menolak PATCH bila dokumen bukan draft.
+  const handleToggleSerap = async (checked) => {
+    setError('');
+    setSavingSerap(true);
+    try {
+      await apiClient.patch(`/stock-production-documents/${documentId}/`, {
+        serap_biaya_ke_hpp: checked,
+      });
+      onChanged?.();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Gagal mengubah opsi penyerapan HPP.');
+    } finally {
+      setSavingSerap(false);
     }
   };
 
@@ -325,6 +343,30 @@ export function ProductionCostSection({ documentId, isDraft, biaya = [], totalBi
           </tfoot>
         </table>
       )}
+
+      <div style={{ padding: '16px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: isDraft ? 'pointer' : 'default' }}>
+          <input
+            type="checkbox"
+            checked={!!serapKeHpp}
+            disabled={!isDraft || savingSerap}
+            onChange={(e) => handleToggleSerap(e.target.checked)}
+            style={{ marginTop: '2px', width: '16px', height: '16px', flexShrink: 0, cursor: isDraft ? 'pointer' : 'default' }}
+          />
+          <span>
+            <span style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
+              Serap biaya produksi ke HPP barang jadi
+            </span>
+            <span style={{ display: 'block', fontSize: '12px', color: '#64748b', marginTop: '4px', lineHeight: 1.5 }}>
+              Bila aktif, total biaya di atas dibebankan ke harga pokok barang jadi saat dokumen
+              diposting, dibagi proporsional terhadap nilai bahan tiap produk (harga beli x qty) —
+              produk yang bahannya lebih mahal menyerap biaya lebih besar. Bila nonaktif, biaya
+              tetap tercatat sebagai rincian dokumen tapi HPP hanya memakai harga beli produk.
+              Pilihan ini hanya bisa diubah selama dokumen berstatus draft.
+            </span>
+          </span>
+        </label>
+      </div>
     </div>
   );
 }

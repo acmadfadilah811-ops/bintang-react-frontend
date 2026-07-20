@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { hasMenuAccess } from '../utils/permissions';
 import {
   LayoutDashboard,
+  LineChart,
   ShoppingCart,
   Kanban,
   Package,
@@ -52,6 +53,8 @@ const PENGATURAN_GROUP = {
 
 const groupedMenuOwnerManager = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, isGroup: false },
+  // Hanya di menu owner/manager — endpoint-nya juga dibatasi IsOwnerOrManager.
+  { path: '/dashboard-eksekutif', label: 'Dashboard Eksekutif', icon: LineChart, isGroup: false },
   {
     id: 'produk_inventori',
     label: 'Produk & Inventori',

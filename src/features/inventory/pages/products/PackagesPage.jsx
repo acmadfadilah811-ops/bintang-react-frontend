@@ -77,6 +77,7 @@ export function PackagesPage({ onToggleCreate }) {
   // Form states - General
   const [namaPaket, setNamaPaket] = useState('');
   const [sku, setSku] = useState('');
+  const [barcode, setBarcode] = useState('');
   const [deskripsi, setDeskripsi] = useState('');
   const [hargaBeli, setHargaBeli] = useState('Rp. 0,00');
   const [hargaPasar, setHargaPasar] = useState('Rp. 0,00');
@@ -202,6 +203,7 @@ export function PackagesPage({ onToggleCreate }) {
   const resetForm = () => {
     setNamaPaket('');
     setSku('');
+    setBarcode('');
     setDeskripsi('');
     setHargaBeli('Rp. 0,00');
     setHargaPasar('Rp. 0,00');
@@ -294,7 +296,11 @@ export function PackagesPage({ onToggleCreate }) {
     try {
       const fd = new FormData();
       fd.append('nama', namaPaket);
-      if (sku) fd.append('sku', sku);
+      // Selalu dikirim (bukan hanya saat terisi) supaya SKU/barcode bisa
+      // dikosongkan lagi saat edit. Serializer mengubah '' menjadi NULL agar
+      // tidak bentrok dengan unique constraint.
+      fd.append('sku', sku);
+      fd.append('barcode', barcode);
       if (deskripsi) fd.append('deskripsi', deskripsi);
       fd.append('harga_beli', String(parseRupiah(hargaBeli)));
       fd.append('harga_pasar', String(parseRupiah(hargaPasar)));
@@ -341,6 +347,7 @@ export function PackagesPage({ onToggleCreate }) {
     setViewingPackage(pkg);
     setNamaPaket(pkg.nama || '');
     setSku(pkg.sku || '');
+    setBarcode(pkg.barcode || '');
     setDeskripsi(pkg.deskripsi || '');
     setHargaBeli(formatToRupiahInput(pkg.harga_beli));
     setHargaPasar(formatToRupiahInput(pkg.harga_pasar));
@@ -373,7 +380,11 @@ export function PackagesPage({ onToggleCreate }) {
     try {
       const fd = new FormData();
       fd.append('nama', namaPaket);
-      if (sku) fd.append('sku', sku);
+      // Selalu dikirim (bukan hanya saat terisi) supaya SKU/barcode bisa
+      // dikosongkan lagi saat edit. Serializer mengubah '' menjadi NULL agar
+      // tidak bentrok dengan unique constraint.
+      fd.append('sku', sku);
+      fd.append('barcode', barcode);
       if (deskripsi) fd.append('deskripsi', deskripsi);
       fd.append('harga_beli', String(parseRupiah(hargaBeli)));
       fd.append('harga_pasar', String(parseRupiah(hargaPasar)));
@@ -838,6 +849,11 @@ export function PackagesPage({ onToggleCreate }) {
                       </div>
 
                       <div>
+                        <label className="form-group-label">Barcode</label>
+                        <input type="text" className="pi-input-text w-full" value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="Kosongkan untuk memakai SKU saat cetak barcode" />
+                      </div>
+
+                      <div>
                         <label className="form-group-label">Deskripsi</label>
                         <textarea className="pi-input-text w-full" style={{ height: '60px', resize: 'vertical' }} value={deskripsi} onChange={(e) => setDeskripsi(e.target.value)} />
                       </div>
@@ -960,6 +976,10 @@ export function PackagesPage({ onToggleCreate }) {
                       <div className="detail-row-item">
                         <span className="detail-row-label">SKU</span>
                         <span className="detail-row-value">{viewingPackage.sku || '-'}</span>
+                      </div>
+                      <div className="detail-row-item">
+                        <span className="detail-row-label">Barcode</span>
+                        <span className="detail-row-value">{viewingPackage.barcode || '-'}</span>
                       </div>
                       <div className="detail-row-item">
                         <span className="detail-row-label">Deskripsi</span>
@@ -1468,13 +1488,20 @@ export function PackagesPage({ onToggleCreate }) {
                     <span className="pi-row-label">SKU / Barcode</span>
                     <span className="pi-row-desc">SKU (Stock Keeping Unit) atau Barcode dapat dipergunakan untuk pencarian produk</span>
                   </div>
-                  <div className="pi-row-input">
-                    <input 
-                      type="text" 
-                      className="pi-input-text w-full" 
-                      placeholder="Masukkan SKU / Barcode" 
-                      value={sku} 
-                      onChange={(e) => setSku(e.target.value)} 
+                  <div className="pi-row-input" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <input
+                      type="text"
+                      className="pi-input-text w-full"
+                      placeholder="Masukkan SKU"
+                      value={sku}
+                      onChange={(e) => setSku(e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      className="pi-input-text w-full"
+                      placeholder="Masukkan Barcode (kosongkan untuk memakai SKU)"
+                      value={barcode}
+                      onChange={(e) => setBarcode(e.target.value)}
                     />
                   </div>
                 </div>

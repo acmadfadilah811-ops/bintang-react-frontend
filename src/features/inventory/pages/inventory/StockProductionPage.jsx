@@ -37,6 +37,7 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
   }, [propViewState]);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showSerapWarning, setShowSerapWarning] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importing, setImporting] = useState(false);
@@ -261,6 +262,19 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
   };
 
   const handlePost = async () => {
+    // Posting tidak bisa dibatalkan, dan setelahnya biaya tidak bisa lagi
+    // dimasukkan ke HPP. Kalau dokumen punya biaya tapi penyerapan tidak
+    // dicentang, pastikan dulu itu memang disengaja.
+    const adaBiaya = (activeDoc?.biaya?.length || 0) > 0;
+    if (adaBiaya && !activeDoc?.serap_biaya_ke_hpp) {
+      setShowSerapWarning(true);
+      return;
+    }
+    await doPost();
+  };
+
+  const doPost = async () => {
+    setShowSerapWarning(false);
     try {
       await apiClient.post(`/stock-production-documents/${activeDoc.id}/post-document/`);
       handleStateChange('list');
@@ -849,8 +863,37 @@ export function StockProductionPage({ onToggleCreate, viewState: propViewState }
             isDraft={activeDoc.status === 'draft'}
             biaya={activeDoc.biaya || []}
             totalBiaya={activeDoc.total_biaya || 0}
+            serapKeHpp={activeDoc.serap_biaya_ke_hpp}
             onChanged={() => fetchDocDetail(activeDoc.id)}
           />
+        </div>
+      )}
+
+      {/* Konfirmasi: dokumen punya biaya tapi tidak diserap ke HPP */}
+      {showSerapWarning && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div onClick={() => setShowSerapWarning(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(4px)' }}></div>
+          <div style={{ position: 'relative', width: '100%', maxWidth: '460px', background: '#ffffff', borderRadius: '16px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', overflow: 'hidden', border: '1px solid #e2e8f0', margin: 'auto' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>Biaya produksi tidak masuk HPP</h3>
+            </div>
+            <div style={{ padding: '20px 24px', fontSize: '13px', color: '#475569', lineHeight: 1.6 }}>
+              Dokumen ini punya biaya produksi, tapi opsi <strong>&ldquo;Serap biaya produksi ke HPP&rdquo;</strong> tidak dicentang.
+              Artinya harga pokok barang jadi hanya memakai harga beli produk, dan biaya tersebut tidak akan
+              tercermin di laporan laba.
+              <div style={{ marginTop: '12px', padding: '10px 12px', background: '#fef3c7', borderRadius: '8px', color: '#92400e' }}>
+                Dokumen yang sudah diposting tidak bisa diubah lagi. Pastikan ini memang disengaja.
+              </div>
+            </div>
+            <div style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button onClick={() => setShowSerapWarning(false)} style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                Kembali &amp; centang dulu
+              </button>
+              <button onClick={doPost} style={{ padding: '9px 16px', borderRadius: '8px', border: 0, background: '#2783de', color: '#ffffff', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                Ya, posting tanpa serap
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

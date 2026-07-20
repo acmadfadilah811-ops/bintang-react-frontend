@@ -8,12 +8,13 @@ const defaultSettings = {
   marginRight: 10,
   paperWidth: 210,
   labelsPerLine: 2,
-  padding: 12,
-  labelWidth: 240,
-  labelHeight: 120,
+  padding: 8,
+  labelWidth: 90,
+  labelHeight: 45,
   useAltName: true,
   showBarcode: true,
   showWeight: true,
+  showPromo: true,
   storeName: 'Bintang Advertising'
 };
 
@@ -325,6 +326,10 @@ export function PriceLabelSettingsPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>Tampilkan berat produk</span>
                 <SwitchToggle checked={settings.showWeight} onChange={(val) => handleChange('showWeight', val)} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>Desain promo untuk harga diskon</span>
+                <SwitchToggle checked={settings.showPromo} onChange={(val) => handleChange('showPromo', val)} />
               </div>
             </div>
           </div>

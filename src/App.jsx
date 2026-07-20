@@ -10,6 +10,7 @@ import Login from './features/auth/pages/Login';
 import Dashboard from './features/dashboard/pages/Dashboard';
 import AdminDashboard from './features/dashboard/pages/AdminDashboard';
 import StaffDashboard from './features/dashboard/pages/StaffDashboard';
+import ExecutiveDashboard from './features/dashboard/pages/ExecutiveDashboard';
 import Orders from './features/orders/pages/Orders';
 import Inventory from './features/inventory/pages/Inventory';
 import Customers from './features/customerSupplier/pages/CustomersPageLegacy';
@@ -124,6 +125,8 @@ function App() {
                 {/* Dashboard */}
                 <Route path="/dashboard" element={<DashboardRouter />} />
                 <Route path="/staff-dashboard" element={<StaffDashboard />} />
+                {/* Backend membatasi ke owner/manager; route ini hanya jalur masuknya. */}
+                <Route path="/dashboard-eksekutif" element={<ExecutiveDashboard />} />
 
                 {/* Operasional */}
                 <Route path="/orders" element={<Orders />} />
