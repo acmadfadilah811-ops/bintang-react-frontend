@@ -401,13 +401,13 @@ export default function PosTerminal() {
                   key={product.id}
                   disabled={!shiftAktif || !hasStock}
                   onClick={() => handleProductClick(product)}
-                  className={`group bg-white rounded-xl border border-slate-200 p-2.5 text-left hover:shadow-md hover:border-indigo-300 transition-all flex items-center gap-3 cursor-pointer ${
+                  className={`group bg-white rounded-xl border border-slate-200 p-2.5 text-left hover:shadow-md hover:border-indigo-300 transition-all flex items-center gap-2.5 cursor-pointer overflow-hidden ${
                     (!shiftAktif || !hasStock) && 'opacity-60 cursor-not-allowed'
                   }`}
                 >
                   {/* Thumbnail Image / Icon */}
                   {fotoUtama ? (
-                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-slate-100 shrink-0 border border-slate-150">
+                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-100 shrink-0 border border-slate-150">
                       <img
                         src={fotoUtama}
                         alt={product.nama}
@@ -416,15 +416,15 @@ export default function PosTerminal() {
                       />
                     </div>
                   ) : (
-                    <div className="w-14 h-14 rounded-lg bg-indigo-50/80 border border-indigo-100/60 shrink-0 flex items-center justify-center text-indigo-500">
-                      <ShoppingBag size={22} />
+                    <div className="w-12 h-12 rounded-lg bg-indigo-50/80 border border-indigo-100/60 shrink-0 flex items-center justify-center text-indigo-500">
+                      <ShoppingBag size={20} />
                     </div>
                   )}
 
                   {/* Details */}
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 overflow-hidden">
                     <div className="flex items-center justify-between gap-1 mb-1">
-                      <span className="text-[9px] bg-slate-100 text-slate-500 font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider truncate max-w-[100px]">
+                      <span className="text-[9px] bg-slate-100 text-slate-500 font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider truncate max-w-[75px]">
                         {product.kategori_nama || 'Produk'}
                       </span>
                       {aturanPos.sembunyikanStok ? null : product.lacak_inventori ? (
@@ -444,16 +444,16 @@ export default function PosTerminal() {
                       )}
                     </div>
 
-                    <h6 className="font-extrabold text-slate-800 text-xs leading-snug truncate">
+                    <h6 className="font-extrabold text-slate-800 text-xs leading-snug truncate" title={product.nama}>
                       {product.nama}
                     </h6>
 
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-xs font-black text-slate-900">
+                    <div className="flex items-center justify-between mt-1 gap-1">
+                      <span className="text-xs font-black text-slate-900 truncate">
                         {formatCurrency(product.harga_jual_toko)}
                       </span>
                       {product.satuan && (
-                        <span className="text-[9px] text-slate-400 font-bold">
+                        <span className="text-[9px] text-slate-400 font-bold shrink-0">
                           /{product.satuan}
                         </span>
                       )}

@@ -397,10 +397,10 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
                           key={product.id}
                           type="button"
                           onClick={() => addProductToOrder(product)}
-                          className="group bg-white rounded-xl border border-slate-200 p-2 text-left hover:shadow-md hover:border-indigo-300 transition-all flex items-center gap-2 cursor-pointer"
+                          className="group bg-white rounded-xl border border-slate-200 p-2 text-left hover:shadow-md hover:border-indigo-300 transition-all flex items-center gap-2 cursor-pointer overflow-hidden min-w-0"
                         >
                           {fotoUtama ? (
-                            <div className="w-11 h-11 rounded-lg overflow-hidden bg-slate-100 shrink-0 border border-slate-150">
+                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 shrink-0 border border-slate-150">
                               <img
                                 src={fotoUtama}
                                 alt={product.nama}
@@ -416,11 +416,11 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
                             </div>
                           )}
 
-                          <div className="flex-1 min-w-0">
-                            <h6 className="font-extrabold text-slate-800 text-xs truncate leading-snug">
+                          <div className="flex-1 min-w-0 overflow-hidden">
+                            <h6 className="font-extrabold text-slate-800 text-xs truncate leading-snug" title={product.nama}>
                               {product.nama}
                             </h6>
-                            <span className="text-[11px] font-black text-indigo-600 block mt-0.5">
+                            <span className="text-[11px] font-black text-indigo-600 block mt-0.5 truncate">
                               {formatCurrency(product.harga_jual_toko)}
                             </span>
                           </div>
