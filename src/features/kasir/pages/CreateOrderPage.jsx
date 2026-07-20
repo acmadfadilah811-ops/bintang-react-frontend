@@ -37,6 +37,9 @@ export default function CreateOrderPage() {
   const changeItem = (idx, field, value) => {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [field]: value } : it)));
   };
+  const updateItem = (idx, patch) => {
+    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  };
   const addItem = () => setItems((prev) => [...prev, emptyItem()]);
   const removeItem = (idx) => setItems((prev) => prev.filter((_, i) => i !== idx));
 
@@ -182,8 +185,20 @@ export default function CreateOrderPage() {
                         value={it.product}
                         valueLabel={it.product_nama}
                         onChange={(p) => {
-                          changeItem(idx, 'product', p ? p.id : null);
-                          changeItem(idx, 'product_nama', p ? p.nama : '');
+                          if (p) {
+                            const detectedPrice = p.harga_jual_toko ?? p.harga_jual ?? 0;
+                            updateItem(idx, {
+                              product: p.id,
+                              product_nama: p.nama,
+                              jenis_produk: it.jenis_produk ? it.jenis_produk : p.nama,
+                              harga_jual: detectedPrice > 0 ? detectedPrice : it.harga_jual,
+                            });
+                          } else {
+                            updateItem(idx, {
+                              product: null,
+                              product_nama: '',
+                            });
+                          }
                         }}
                       />
                     </td>
