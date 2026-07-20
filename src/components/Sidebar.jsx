@@ -161,6 +161,7 @@ const menuKasir = [
   { path: '/kasir/antrean-wa', label: 'Antrean WA', icon: MessageSquare, isGroup: false },
   { path: '/kasir/riwayat', label: 'Riwayat Transaksi', icon: History, isGroup: false },
   { path: '/kasir/shift', label: 'Shift & Kas', icon: Wallet, isGroup: false },
+  { path: '/attendance', label: 'Absensi Kehadiran', icon: CalendarClock, isGroup: false },
   { path: '/kasir/pengaturan-wa', label: 'Pengaturan WA', icon: Settings, isGroup: false },
   { path: '/profile', label: 'Profil', icon: User, isGroup: false },
 ];

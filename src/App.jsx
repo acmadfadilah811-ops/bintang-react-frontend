@@ -50,6 +50,7 @@ function HomeRedirect() {
 function DashboardRouter() {
   const { user } = useAuth();
   const role = user?.role?.toLowerCase();
+  if (role === 'kasir') return <Navigate to="/kasir/dashboard" replace />;
   if (role === 'admin') return <AdminDashboard />;
   return <Dashboard />;
 }
