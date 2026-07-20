@@ -4,6 +4,7 @@ import { Search, Plus, Minus, Trash2, User, CreditCard, ShoppingBag, Percent, Al
 import { useKasir } from '../context/KasirContext';
 import apiClient from '../../../api/apiClient';
 import CustomItemModal from '../components/CustomItemModal';
+import SpkPublishModal from '../components/SpkPublishModal';
 import SplitBillModal from '../components/SplitBillModal';
 import ReceiptPrint from '../components/ReceiptPrint';
 
@@ -116,6 +117,8 @@ export default function PosTerminal() {
   const [amountPaid, setAmountPaid] = useState('');
   const [isSubmittingTrans, setIsSubmittingTrans] = useState(false);
   const [lastReceipt, setLastReceipt] = useState(null);
+  // Nota yang sedang diterbitkan SPK-nya (pesanan custom yang perlu produksi).
+  const [spkUntukNota, setSpkUntukNota] = useState(null);
 
   const contactDropdownRef = useRef(null);
 
@@ -265,6 +268,12 @@ export default function PosTerminal() {
     } finally {
       setIsSubmittingTrans(false);
     }
+  };
+
+  const terbitkanSpkNota = async (payload) => {
+    await apiClient.post(`/pos/sales/${spkUntukNota.id}/terbitkan-spk/`, payload);
+    setSpkUntukNota(null);
+    alert('SPK produksi berhasil diterbitkan.');
   };
 
   return (
@@ -815,6 +824,14 @@ export default function PosTerminal() {
       )}
 
       {/* Modal Receipt Preview / Printer Simulation */}
+      {spkUntukNota && (
+        <SpkPublishModal
+          judul={`Terbitkan SPK — Nota ${spkUntukNota.nomor}`}
+          keterangan="Item pada nota ini akan masuk papan kerja produksi sesuai divisi yang dipilih."
+          onTerbitkan={terbitkanSpkNota}
+          onClose={() => setSpkUntukNota(null)}
+        />
+      )}
       {lastReceipt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl border border-slate-100 max-w-sm w-full p-6 relative flex flex-col shadow-2xl">
@@ -896,6 +913,14 @@ export default function PosTerminal() {
                 Tutup
               </button>
             </div>
+            {/* Pesanan custom di terminal tetap perlu dikerjakan divisi
+                produksi — SPK-nya diterbitkan dari nota ini. */}
+            <button
+              onClick={() => setSpkUntukNota(lastReceipt)}
+              className="w-full mt-2 py-2 border border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-bold text-xs rounded-xl text-center cursor-pointer"
+            >
+              Terbitkan SPK Produksi
+            </button>
           </div>
         </div>
       )}

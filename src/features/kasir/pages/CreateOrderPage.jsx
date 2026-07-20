@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { User, Phone, Plus, Trash2, ShoppingCart, Send, FileText } from 'lucide-react';
 import apiClient from '../../../api/apiClient';
 import ProductMasterPicker from '../../orders/components/ProductMasterPicker';
+import SpkPublishModal from '../components/SpkPublishModal';
 
 const emptyItem = () => ({
   id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -17,6 +18,9 @@ const emptyItem = () => ({
 
 export default function CreateOrderPage() {
   const navigate = useNavigate();
+  // Order yang baru dibuat, ditahan sebentar supaya kasir bisa langsung
+  // mengarahkannya ke divisi tanpa berpindah halaman dulu.
+  const [orderBaru, setOrderBaru] = useState(null);
 
   const [nama, setNama] = useState('');
   const [nomorWa, setNomorWa] = useState('');
@@ -79,8 +83,9 @@ export default function CreateOrderPage() {
         });
       }
 
-      alert(`Order ${orderId} berhasil dibuat dan masuk daftar pesanan untuk diverifikasi.`);
-      navigate('/kasir/antrean-wa');
+      // Tawarkan penerbitan SPK di sini juga — kalau kasir sudah tahu
+      // divisinya, pesanan tidak perlu menunggu diproses lewat antrean WA.
+      setOrderBaru({ id: orderId, nama });
     } catch (err) {
       console.error('Gagal membuat order:', err);
       alert('Gagal membuat order: ' + (err.response?.data?.detail || err.message));
@@ -92,8 +97,27 @@ export default function CreateOrderPage() {
   const inputCls =
     'w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent';
 
+  const terbitkanSpk = async (payload) => {
+    await apiClient.post(`/orders/${orderBaru.id}/assign/`, payload);
+    alert(`Order ${orderBaru.id} dibuat dan SPK-nya sudah diterbitkan ke produksi.`);
+    navigate('/kasir/antrean-wa');
+  };
+
+  const lewatiSpk = () => {
+    alert(`Order ${orderBaru.id} berhasil dibuat dan masuk daftar pesanan untuk diverifikasi.`);
+    navigate('/kasir/antrean-wa');
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-6 bg-[#F4F7FE]">
+      {orderBaru && (
+        <SpkPublishModal
+          judul={`Terbitkan SPK — Order ${orderBaru.id}`}
+          keterangan={`Order untuk ${orderBaru.nama} sudah tersimpan. Arahkan langsung ke divisi produksi, atau lewati untuk memprosesnya nanti lewat antrean WA.`}
+          onTerbitkan={terbitkanSpk}
+          onClose={lewatiSpk}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center gap-2 mb-5">
         <div className="bg-emerald-100 text-emerald-600 p-2 rounded-xl">
