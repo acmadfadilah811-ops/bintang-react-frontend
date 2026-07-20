@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Calendar, ChevronDown } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Calendar, ChevronDown, Search } from 'lucide-react';
+import apiClient from '../../../api/apiClient';
 
 const inputClass =
   'w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 text-slate-700 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300';
@@ -12,9 +13,28 @@ const inputClass =
 export default function PembelianBaruModal({ onClose, onSave }) {
   const today = new Date().toISOString().slice(0, 10);
   const [supplier, setSupplier] = useState('');
+  const [supplierOptions, setSupplierOptions] = useState([]);
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [tanggal, setTanggal] = useState(today);
   const [mataUang, setMataUang] = useState('Rupiah');
   const [catatan, setCatatan] = useState('');
+
+  useEffect(() => {
+    if (!supplier.trim() || selectedSupplier) {
+      setSupplierOptions([]);
+      return;
+    }
+    const delayDebounce = setTimeout(async () => {
+      try {
+        const res = await apiClient.get(`/suppliers/?search=${encodeURIComponent(supplier)}`);
+        setSupplierOptions(res.data.results || res.data || []);
+      } catch (err) {
+        console.error(err);
+      }
+    }, 300);
+    return () => clearTimeout(delayDebounce);
+  }, [supplier, selectedSupplier]);
+
   const canSave = supplier.trim().length > 0;
 
   return (
@@ -49,14 +69,39 @@ export default function PembelianBaruModal({ onClose, onSave }) {
         {/* Body */}
         <div className="px-6 py-5 space-y-4">
           {/* Supplier */}
-          <div>
+          <div className="relative">
             <label className="block text-sm text-slate-600 mb-1.5">Supplier</label>
-            <input
-              value={supplier}
-              onChange={(e) => setSupplier(e.target.value)}
-              placeholder="Cari Supplier"
-              className={inputClass}
-            />
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                value={supplier}
+                onChange={(e) => {
+                  setSupplier(e.target.value);
+                  setSelectedSupplier(null);
+                }}
+                placeholder="Cari / Ketik Nama Supplier"
+                className={`${inputClass} pl-9`}
+              />
+            </div>
+            {supplierOptions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto divide-y divide-slate-50">
+                {supplierOptions.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedSupplier(s);
+                      setSupplier(s.nama);
+                      setSupplierOptions([]);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-xs hover:bg-slate-50 text-slate-700 cursor-pointer block font-semibold"
+                  >
+                    <span>{s.nama}</span>
+                    {s.nomor_wa && <span className="text-[10px] text-slate-400 block font-mono">{s.nomor_wa}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Empty-state: pilih supplier dahulu */}
