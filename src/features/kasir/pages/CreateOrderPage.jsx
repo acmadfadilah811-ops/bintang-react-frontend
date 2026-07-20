@@ -163,7 +163,7 @@ export default function CreateOrderPage() {
             </button>
           </div>
 
-          <div className="border border-slate-200 rounded-xl overflow-x-auto">
+          <div className="border border-slate-200 rounded-xl overflow-x-auto pb-28">
             <table className="w-full text-left border-collapse min-w-[640px]">
               <thead>
                 <tr className="bg-slate-50 text-[10px] font-black uppercase text-slate-500 tracking-wider border-b border-slate-200">
@@ -177,7 +177,7 @@ export default function CreateOrderPage() {
               </thead>
               <tbody>
                 {items.map((it, idx) => (
-                  <tr key={it.id} className="border-b border-slate-100 text-xs font-semibold text-slate-700">
+                  <tr key={it.id} style={{ position: 'relative', zIndex: 50 - idx }} className="border-b border-slate-100 text-xs font-semibold text-slate-700">
                     <td className="px-4 py-2">
                       <input type="text" value={it.jenis_produk} placeholder="Nama produk / jasa cetak" onChange={(e) => changeItem(idx, 'jenis_produk', e.target.value)} className="w-full bg-transparent border-0 focus:outline-none p-0 text-xs font-bold text-slate-800" />
                       {/* Tautan opsional ke master Produk untuk laporan penjualan */}

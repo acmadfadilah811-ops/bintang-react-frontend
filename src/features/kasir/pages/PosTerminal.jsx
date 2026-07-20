@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Minus, Trash2, User, CreditCard, ShoppingBag, Percent, AlertCircle, X } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, User, CreditCard, ShoppingBag, Percent, AlertCircle, X, Factory } from 'lucide-react';
 import { useKasir } from '../context/KasirContext';
 import apiClient from '../../../api/apiClient';
 import CustomItemModal from '../components/CustomItemModal';
@@ -226,7 +226,7 @@ export default function PosTerminal() {
     setAmountPaid(amt.toString());
   };
 
-  const submitTransaction = async () => {
+  const submitTransaction = async (autoPublishSpk = false) => {
     const paidVal = parseFloat(amountPaid || 0);
     const totalVal = getTotal();
     if (paidVal < totalVal) {
@@ -259,9 +259,13 @@ export default function PosTerminal() {
       };
 
       const res = await apiClient.post('/pos/sales/', payload);
-      setLastReceipt(res.data);
       clearCart();
       setShowPaymentModal(false);
+      if (autoPublishSpk) {
+        setSpkUntukNota(res.data);
+      } else {
+        setLastReceipt(res.data);
+      }
     } catch (err) {
       console.error('Error saving transaction:', err);
       alert('Gagal memproses transaksi: ' + (err.response?.data?.error || err.message));
@@ -805,20 +809,39 @@ export default function PosTerminal() {
             </div>
 
             {/* Action buttons */}
-            <button
-              onClick={submitTransaction}
-              disabled={isSubmittingTrans || parseFloat(amountPaid || 0) < getTotal()}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm rounded-xl shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
-            >
-              {isSubmittingTrans ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              ) : (
-                <>
-                  <CreditCard size={16} />
-                  <span>Proses Transaksi & Cetak</span>
-                </>
-              )}
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => submitTransaction(false)}
+                disabled={isSubmittingTrans || parseFloat(amountPaid || 0) < getTotal()}
+                className="py-3 bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                {isSubmittingTrans ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <>
+                    <CreditCard size={15} />
+                    <span>Bayar (Biasa)</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => submitTransaction(true)}
+                disabled={isSubmittingTrans || parseFloat(amountPaid || 0) < getTotal()}
+                className="py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                {isSubmittingTrans ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <>
+                    <Factory size={15} />
+                    <span>Bayar & Terbitkan SPK</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
