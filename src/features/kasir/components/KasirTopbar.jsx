@@ -10,8 +10,8 @@ import {
   Settings,
   MessageCircle,
   LayoutDashboard,
-  ShoppingCart,
   Package,
+  PackageCheck,
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useDynamicIsland } from '../../../context/DynamicIslandContext';
@@ -87,6 +87,7 @@ export default function KasirTopbar() {
     { path: '/kasir/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/kasir/terminal', label: 'Terminal', icon: CreditCard },
     { path: '/kasir/produk', label: 'Produk', icon: Package },
+    { path: '/kasir/pesanan', label: 'Pesanan', icon: PackageCheck },
     { path: '/kasir/antrean-wa', label: 'Antrean WA', icon: MessageCircle, badge: waOrderCount },
     { path: '/kasir/riwayat', label: 'Riwayat', icon: History },
     { path: '/kasir/shift', label: 'Kas & Shift', icon: Wallet },

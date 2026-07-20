@@ -165,11 +165,6 @@ export default function KasirDashboard() {
         })}
       </div>
 
-      {/* Pesanan siap diambil & progres produksi */}
-      <div className="mb-8">
-        <SiapDiambilPanel />
-      </div>
-
       {/* Quick actions */}
       <h2 className="text-sm font-extrabold text-slate-700 mb-3 flex items-center gap-2">
         <Clock size={16} className="text-slate-400" /> Aksi Cepat
@@ -199,6 +194,10 @@ export default function KasirDashboard() {
             </button>
           );
         })}
+
+        {/* Ringkasan pesanan produksi — rinciannya ada di halaman Pesanan,
+            sengaja tidak dibentangkan di dashboard. */}
+        <SiapDiambilPanel ringkas />
       </div>
     </div>
   );

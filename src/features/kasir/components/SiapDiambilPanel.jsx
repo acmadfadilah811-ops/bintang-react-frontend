@@ -1,7 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Clock, Loader2, PackageCheck, RefreshCw, Wallet } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  ArrowRight,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  FileText,
+  Loader2,
+  PackageCheck,
+  RefreshCw,
+  Wallet,
+} from 'lucide-react';
 import apiClient from '../../../api/apiClient';
 import PelunasanModal from './PelunasanModal';
+import InvoiceModal from './InvoiceModal';
 
 /**
  * Papan pesanan produksi untuk meja kasir.
@@ -9,9 +22,13 @@ import PelunasanModal from './PelunasanModal';
  * Dua kelompok:
  *   - SIAP DIAMBIL  : status_global 'ready' — seluruh item selesai diproduksi,
  *                     backend menandainya otomatis di api/views/jobs.py.
- *   - MASIH PROSES  : status_global 'desain'/'proses', ditampilkan beserta
- *                     progres tiap item per divisi supaya kasir bisa menjawab
- *                     pelanggan yang menanyakan pesanannya.
+ *   - MASIH PROSES  : status_global 'desain'/'proses', dengan progres tiap item
+ *                     per divisi.
+ *
+ * Dua mode tampilan. `ringkas` dipakai di dashboard: hanya angka dan tautan,
+ * karena rincian per divisi terlalu panjang untuk ditumpuk di layar depan.
+ * Mode penuh dipakai halaman Pesanan tersendiri, dan di sana pun rincian per
+ * divisi baru terbuka saat barisnya diklik.
  *
  * Progres per divisi dibaca dari items[].jobs[] yang sudah disertakan
  * OrderSerializer (lihat prefetch di OrderViewSet.get_queryset) — tidak ada
@@ -53,6 +70,16 @@ const waktuSelesaiProduksi = (order) => {
   return waktu.length ? waktu[waktu.length - 1] : null;
 };
 
+/** Ringkasan "3/5 item selesai" untuk baris yang belum dibuka. */
+const ringkasProgres = (order) => {
+  const items = order.items || [];
+  const tuntas = items.filter((it) => {
+    const jobs = it.jobs || [];
+    return jobs.length > 0 && jobs.every((j) => j.status_pekerjaan === 'selesai');
+  }).length;
+  return { tuntas, total: items.length };
+};
+
 function ProgresItem({ item }) {
   const jobs = item.jobs || [];
 
@@ -85,12 +112,16 @@ function ProgresItem({ item }) {
   );
 }
 
-export default function SiapDiambilPanel() {
+export default function SiapDiambilPanel({ ringkas = false }) {
+  const navigate = useNavigate();
+
   const [siap, setSiap] = useState([]);
   const [proses, setProses] = useState([]);
   const [memuat, setMemuat] = useState(true);
   const [error, setError] = useState('');
   const [orderDibayar, setOrderDibayar] = useState(null);
+  const [orderFaktur, setOrderFaktur] = useState(null);
+  const [terbuka, setTerbuka] = useState({});
 
   const muat = useCallback(async (tampilkanSpinner = false) => {
     if (tampilkanSpinner) setMemuat(true);
@@ -122,11 +153,53 @@ export default function SiapDiambilPanel() {
     [siap]
   );
 
+  const toggle = (id) => setTerbuka((prev) => ({ ...prev, [id]: !prev[id] }));
+
   const setelahBayar = () => {
     setOrderDibayar(null);
     muat(false);
   };
 
+  /* ---------- Mode ringkas: kartu kecil untuk dashboard ---------- */
+  if (ringkas) {
+    return (
+      <button
+        type="button"
+        onClick={() => navigate('/kasir/pesanan')}
+        className="w-full bg-white rounded-2xl border border-slate-200 p-4 shadow-sm text-left transition-all hover:shadow-lg hover:border-emerald-300 cursor-pointer group"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            Pesanan Produksi
+          </span>
+          <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+            <PackageCheck size={16} />
+          </span>
+        </div>
+
+        {memuat ? (
+          <Loader2 size={18} className="animate-spin text-slate-300" />
+        ) : (
+          <>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-black text-slate-800 leading-none">{siap.length}</span>
+              <span className="text-[11px] font-bold text-slate-500">siap diambil</span>
+            </div>
+            <p className="text-[11px] font-semibold text-slate-400 mt-1.5">
+              {proses.length} pesanan masih diproses
+              {totalTagihanSiap > 0 && ` · tagihan ${formatCurrency(totalTagihanSiap)}`}
+            </p>
+          </>
+        )}
+
+        <span className="flex items-center gap-1 text-[11px] font-bold text-slate-400 mt-3 group-hover:text-emerald-600">
+          Buka daftar <ArrowRight size={12} />
+        </span>
+      </button>
+    );
+  }
+
+  /* ---------- Mode penuh: halaman Pesanan ---------- */
   return (
     <>
       {orderDibayar && (
@@ -136,8 +209,9 @@ export default function SiapDiambilPanel() {
           onSelesai={setelahBayar}
         />
       )}
+      {orderFaktur && <InvoiceModal order={orderFaktur} onClose={() => setOrderFaktur(null)} />}
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <PackageCheck size={16} className="text-emerald-600" />
@@ -190,7 +264,7 @@ export default function SiapDiambilPanel() {
                     return (
                       <div
                         key={order.id}
-                        className="border border-emerald-200 bg-emerald-50/40 rounded-xl p-3 flex items-center justify-between gap-3"
+                        className="border border-emerald-200 bg-emerald-50/40 rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap"
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
@@ -204,8 +278,8 @@ export default function SiapDiambilPanel() {
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-3 shrink-0">
-                          <div className="text-right">
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="text-right mr-1">
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                               {sisa > 0 ? 'Sisa' : 'Status'}
                             </p>
@@ -215,14 +289,25 @@ export default function SiapDiambilPanel() {
                               {sisa > 0 ? formatCurrency(sisa) : 'LUNAS'}
                             </p>
                           </div>
+
                           <button
                             type="button"
-                            onClick={() => setOrderDibayar(order)}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-black rounded-lg flex items-center gap-1 transition-all cursor-pointer shadow-sm"
+                            onClick={() => setOrderFaktur(order)}
+                            className="px-2.5 py-1.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-bold rounded-lg flex items-center gap-1 transition-all cursor-pointer"
+                            title="Lihat & cetak faktur"
                           >
-                            <Wallet size={12} />
-                            {sisa > 0 ? 'Lunasi & Faktur' : 'Cetak Faktur'}
+                            <FileText size={12} /> Faktur
                           </button>
+
+                          {sisa > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setOrderDibayar(order)}
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-black rounded-lg flex items-center gap-1 transition-all cursor-pointer shadow-sm"
+                            >
+                              <Wallet size={12} /> Lunasi
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -231,7 +316,7 @@ export default function SiapDiambilPanel() {
               )}
             </div>
 
-            {/* Masih diproses */}
+            {/* Masih diproses — rincian per divisi baru terbuka saat diklik */}
             <div>
               <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5 mb-2">
                 <Clock size={13} /> Masih Proses ({proses.length})
@@ -242,20 +327,43 @@ export default function SiapDiambilPanel() {
                   Tidak ada pesanan yang sedang dikerjakan.
                 </p>
               ) : (
-                <div className="space-y-2">
-                  {proses.map((order) => (
-                    <div key={order.id} className="border border-slate-200 rounded-xl p-3">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-black text-slate-800">{order.id}</span>
-                        <span className="text-[11px] font-semibold text-slate-500">{order.nama}</span>
+                <div className="space-y-1.5">
+                  {proses.map((order) => {
+                    const { tuntas, total } = ringkasProgres(order);
+                    const isTerbuka = !!terbuka[order.id];
+                    return (
+                      <div key={order.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => toggle(order.id)}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-slate-50 transition-colors cursor-pointer text-left"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {isTerbuka ? (
+                              <ChevronDown size={14} className="text-slate-400 shrink-0" />
+                            ) : (
+                              <ChevronRight size={14} className="text-slate-400 shrink-0" />
+                            )}
+                            <span className="text-xs font-black text-slate-800">{order.id}</span>
+                            <span className="text-[11px] font-semibold text-slate-500 truncate">
+                              {order.nama}
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-bold text-slate-400 shrink-0">
+                            {tuntas}/{total} item selesai
+                          </span>
+                        </button>
+
+                        {isTerbuka && (
+                          <div className="px-3 pb-3 pt-1 space-y-1 border-t border-slate-100 bg-slate-50/50">
+                            {(order.items || []).map((item) => (
+                              <ProgresItem key={item.id} item={item} />
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <div className="space-y-1 pl-1">
-                        {(order.items || []).map((item) => (
-                          <ProgresItem key={item.id} item={item} />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

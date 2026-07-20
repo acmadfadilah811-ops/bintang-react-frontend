@@ -10,6 +10,7 @@ import WaOrderQueue from '../components/WaOrderQueue';
 import KasirDashboard from './KasirDashboard';
 import ProductListPage from './ProductListPage';
 import CreateOrderPage from './CreateOrderPage';
+import PesananPage from './PesananPage';
 
 export default function KasirApp() {
   return (
@@ -22,6 +23,7 @@ export default function KasirApp() {
             <Route path="terminal" element={<PosTerminal />} />
             <Route path="buat-order" element={<Navigate to="/kasir/terminal" replace />} />
             <Route path="produk" element={<ProductListPage />} />
+            <Route path="pesanan" element={<PesananPage />} />
             <Route path="antrean-wa" element={<WaOrderQueue />} />
             <Route path="riwayat" element={<PosHistory />} />
             <Route path="shift" element={<PosShift />} />
