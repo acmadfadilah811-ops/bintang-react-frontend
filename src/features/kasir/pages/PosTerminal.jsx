@@ -4,9 +4,11 @@ import { Search, Plus, Minus, Trash2, User, CreditCard, ShoppingBag, Percent, Al
 import { useKasir } from '../context/KasirContext';
 import apiClient from '../../../api/apiClient';
 import CustomItemModal from '../components/CustomItemModal';
+import CreateOrderModal from '../components/CreateOrderModal';
 import SpkPublishModal from '../components/SpkPublishModal';
 import SplitBillModal from '../components/SplitBillModal';
 import ReceiptPrint from '../components/ReceiptPrint';
+import NumericInput from '../../../components/NumericInput';
 
 export default function PosTerminal() {
   const navigate = useNavigate();
@@ -83,10 +85,10 @@ export default function PosTerminal() {
     try {
       const res = await apiClient.post('/pos/sales/verify-passkey/', { aksi, pin });
       if (res.data?.ok) return true;
-      alert('PIN salah.');
+      alert('PIN PassKey tidak sesuai. Transaksi tidak dapat dilanjutkan.');
       return false;
     } catch (err) {
-      alert(err.response?.data?.error || 'PIN salah.');
+      alert(err.response?.data?.error || 'PIN PassKey tidak sesuai. Transaksi tidak dapat dilanjutkan.');
       return false;
     }
   };
@@ -102,6 +104,9 @@ export default function PosTerminal() {
 
   // Custom Item Modal State
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+
+  // Create Order Modal State
+  const [isCreateOrderModalOpen, setIsCreateOrderModalOpen] = useState(false);
 
   // Split Bill Modal State
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
@@ -163,22 +168,20 @@ export default function PosTerminal() {
   }, [selectedCategory, searchTerm]);
 
   // Fetch Contacts for Customer autocomplete
-  useEffect(() => {
-    if (contactSearch.length < 2) {
-      setContacts([]);
-      return;
+  const fetchContactsList = async (query = '') => {
+    try {
+      const params = query ? { search: query } : {};
+      const res = await apiClient.get('/contacts/', { params });
+      setContacts(res.data || []);
+    } catch (err) {
+      console.error('Error fetching contacts:', err);
     }
-    const fetchContacts = async () => {
-      try {
-        const res = await apiClient.get('/contacts/', {
-          params: { search: contactSearch },
-        });
-        setContacts(res.data || []);
-      } catch (err) {
-        console.error('Error fetching contacts:', err);
-      }
-    };
-    const delayDebounce = setTimeout(fetchContacts, 300);
+  };
+
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      fetchContactsList(contactSearch);
+    }, contactSearch ? 300 : 0);
     return () => clearTimeout(delayDebounce);
   }, [contactSearch]);
 
@@ -230,7 +233,7 @@ export default function PosTerminal() {
     const paidVal = parseFloat(amountPaid || 0);
     const totalVal = getTotal();
     if (paidVal < totalVal) {
-      alert('Jumlah bayar kurang dari total belanja.');
+      alert('Jumlah pembayaran belum mencukupi total tagihan.');
       return;
     }
 
@@ -277,7 +280,7 @@ export default function PosTerminal() {
   const terbitkanSpkNota = async (payload) => {
     await apiClient.post(`/pos/sales/${spkUntukNota.id}/terbitkan-spk/`, payload);
     setSpkUntukNota(null);
-    alert('SPK produksi berhasil diterbitkan.');
+    alert('SPK produksi berhasil diterbitkan ke divisi yang dipilih.');
   };
 
   return (
@@ -321,13 +324,28 @@ export default function PosTerminal() {
             />
           </div>
           {!aturanPos.disableAddCustomItem && (
-            <button
-              onClick={() => setIsCustomModalOpen(true)}
-              className="px-4 py-2.5 bg-indigo-650 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-indigo-500/10 flex items-center gap-1 transition-all cursor-pointer shrink-0"
-            >
-              <Plus size={14} />
-              <span>Item Kustom</span>
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => {
+                  if (!shiftAktif) {
+                    alert('Shift kasir belum dibuka.\n\nBuka shift melalui menu "Kas & Shift" terlebih dahulu sebelum membuat order.');
+                    return;
+                  }
+                  setIsCreateOrderModalOpen(true);
+                }}
+                className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-emerald-500/10 flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Plus size={14} />
+                <span>Buat Order (SPK)</span>
+              </button>
+              <button
+                onClick={() => setIsCustomModalOpen(true)}
+                className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-indigo-500/10 flex items-center gap-1 transition-all cursor-pointer"
+              >
+                <Plus size={14} />
+                <span>Item Kustom</span>
+              </button>
+            </div>
           )}
         </div>
 
@@ -358,7 +376,7 @@ export default function PosTerminal() {
           ))}
         </div>
 
-        {/* Grid Produk */}
+        {/* Grid Produk Compact */}
         {loadingProducts ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -372,60 +390,74 @@ export default function PosTerminal() {
             <p className="text-xs text-slate-400 font-semibold max-w-xs mt-1">Coba gunakan kata kunci lain atau pilih kategori yang berbeda.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 pb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-8">
             {products.map((product) => {
-              // Produk tanpa stok hanya dikunci bila aturan "blokir jual saat
-              // stok kosong" aktif — cerminan aturan yang ditegakkan server.
               const stokHabis = product.lacak_inventori && product.qty_stok <= 0;
               const hasStock = !stokHabis || !aturanPos.blokirStokKosong;
+              const fotoUtama = product.fotos?.find(f => f.is_primary)?.foto || product.fotos?.[0]?.foto || product.gambar || product.foto || null;
+
               return (
                 <button
                   key={product.id}
                   disabled={!shiftAktif || !hasStock}
                   onClick={() => handleProductClick(product)}
-                  className={`bg-white rounded-2xl border border-slate-200 p-3 text-left hover:shadow-lg hover:border-indigo-200 transition-all flex flex-col justify-between h-48 cursor-pointer ${
+                  className={`group bg-white rounded-xl border border-slate-200 p-2.5 text-left hover:shadow-md hover:border-indigo-300 transition-all flex items-center gap-3 cursor-pointer ${
                     (!shiftAktif || !hasStock) && 'opacity-60 cursor-not-allowed'
                   }`}
                 >
-                  <div className="w-full">
-                    {/* Category Label */}
-                    <span className="text-[10px] bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-md uppercase tracking-wider block w-max mb-1.5">
-                      {product.kategori_nama || 'Produk'}
-                    </span>
-                    <h6 className="font-extrabold text-slate-800 text-xs leading-snug line-clamp-2">
+                  {/* Thumbnail Image / Icon */}
+                  {fotoUtama ? (
+                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-slate-100 shrink-0 border border-slate-150">
+                      <img
+                        src={fotoUtama}
+                        alt={product.nama}
+                        className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                        onError={(e) => { e.target.parentElement.style.display = 'none'; }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-14 h-14 rounded-lg bg-indigo-50/80 border border-indigo-100/60 shrink-0 flex items-center justify-center text-indigo-500">
+                      <ShoppingBag size={22} />
+                    </div>
+                  )}
+
+                  {/* Details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-[9px] bg-slate-100 text-slate-500 font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider truncate max-w-[100px]">
+                        {product.kategori_nama || 'Produk'}
+                      </span>
+                      {aturanPos.sembunyikanStok ? null : product.lacak_inventori ? (
+                        <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 ${
+                          product.qty_stok > 10
+                            ? 'bg-emerald-50 text-emerald-600'
+                            : product.qty_stok > 0
+                            ? 'bg-amber-50 text-amber-600'
+                            : 'bg-rose-50 text-rose-600'
+                        }`}>
+                          Stok: {product.qty_stok}
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">
+                          Stok ∞
+                        </span>
+                      )}
+                    </div>
+
+                    <h6 className="font-extrabold text-slate-800 text-xs leading-snug truncate">
                       {product.nama}
                     </h6>
-                    {product.sku && (
-                      <span className="text-[10px] text-slate-400 font-semibold tracking-tight block mt-0.5">
-                        SKU: {product.sku}
-                      </span>
-                    )}
-                  </div>
-                  
-                  <div className="mt-3 w-full flex items-end justify-between">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 block leading-none mb-0.5">Harga</span>
+
+                    <div className="flex items-center justify-between mt-1">
                       <span className="text-xs font-black text-slate-900">
                         {formatCurrency(product.harga_jual_toko)}
                       </span>
+                      {product.satuan && (
+                        <span className="text-[9px] text-slate-400 font-bold">
+                          /{product.satuan}
+                        </span>
+                      )}
                     </div>
-
-                    {/* Stock badge — disembunyikan bila setelan "Sembunyikan sisa stok di POS" aktif */}
-                    {aturanPos.sembunyikanStok ? null : product.lacak_inventori ? (
-                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                        product.qty_stok > 10
-                          ? 'bg-emerald-50 text-emerald-600'
-                          : product.qty_stok > 0
-                          ? 'bg-amber-50 text-amber-600'
-                          : 'bg-rose-50 text-rose-600'
-                      }`}>
-                        Stok: {product.qty_stok}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
-                        Stok ∞
-                      </span>
-                    )}
                   </div>
                 </button>
               );
@@ -603,13 +635,13 @@ export default function PosTerminal() {
               <span className="flex items-center gap-1">
                 <Percent size={12} /> Diskon (%)
               </span>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={discountPercent || ''}
-                onChange={async (e) => {
-                  const nilai = parseFloat(e.target.value) || 0;
+              <NumericInput
+                min={0}
+                max={100}
+                allowDecimal={true}
+                value={discountPercent || 0}
+                onChange={async (val) => {
+                  const nilai = val || 0;
                   // PassKey diskon: minta PIN saat kasir mulai memberi diskon.
                   if (nilai > 0 && !discountPercent && !(await mintaPasskey('diskon'))) return;
                   setDiscountPercent(nilai);
@@ -621,12 +653,12 @@ export default function PosTerminal() {
             {/* Tax Section */}
             <div className="flex items-center justify-between text-slate-500">
               <span>Pajak (%)</span>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={taxPercent || ''}
-                onChange={(e) => setTaxPercent(parseFloat(e.target.value) || 0)}
+              <NumericInput
+                min={0}
+                max={100}
+                allowDecimal={true}
+                value={taxPercent || 0}
+                onChange={(val) => setTaxPercent(val || 0)}
                 className="w-16 text-right px-2 py-0.5 border border-slate-200 rounded-md font-bold focus:outline-none text-slate-700"
               />
             </div>
@@ -642,7 +674,7 @@ export default function PosTerminal() {
           <div className="flex gap-2">
             <button
               onClick={() => {
-                if (window.confirm('Batalkan transaksi keranjang?')) {
+                if (window.confirm('Kosongkan keranjang? Seluruh item pada transaksi berjalan akan dihapus.')) {
                   clearCart();
                 }
               }}
@@ -755,11 +787,10 @@ export default function PosTerminal() {
 
                 <div>
                   <label className="text-xs font-extrabold text-slate-600 block mb-1">Jumlah Bayar (Rp.)</label>
-                  <input
-                    type="number"
+                  <NumericInput
                     value={amountPaid}
-                    onChange={(e) => setAmountPaid(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-black focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    onChange={(val) => setAmountPaid(val)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-black focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-right"
                   />
                 </div>
               </div>
@@ -850,7 +881,7 @@ export default function PosTerminal() {
       {spkUntukNota && (
         <SpkPublishModal
           judul={`Terbitkan SPK — Nota ${spkUntukNota.nomor}`}
-          keterangan="Item pada nota ini akan masuk papan kerja produksi sesuai divisi yang dipilih."
+          keterangan="Seluruh item pada nota ini akan diteruskan ke papan kerja produksi sesuai divisi yang dipilih."
           onTerbitkan={terbitkanSpkNota}
           onClose={() => setSpkUntukNota(null)}
         />
@@ -949,6 +980,14 @@ export default function PosTerminal() {
       )}
 
       {/* Modal & Print Sub-components */}
+      <CreateOrderModal
+        isOpen={isCreateOrderModalOpen}
+        onClose={() => setIsCreateOrderModalOpen(false)}
+        onSuccess={() => setIsCreateOrderModalOpen(false)}
+        initialCustomer={selectedContact}
+        initialCart={cart}
+      />
+
       <CustomItemModal
         isOpen={isCustomModalOpen}
         onClose={() => setIsCustomModalOpen(false)}

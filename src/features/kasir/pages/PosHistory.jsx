@@ -86,13 +86,13 @@ export default function PosHistory() {
   }, [statusFilter, dateFilter, searchTerm]);
 
   const handleVoidTransaction = async (saleId) => {
-    if (!window.confirm('Apakah Anda yakin ingin membatalkan transaksi (Void) ini? Tindakan ini akan mengembalikan stok barang dan mengubah status nota menjadi Void.')) {
+    if (!window.confirm('Batalkan (void) transaksi ini? Stok barang akan dikembalikan dan status nota berubah menjadi Void secara permanen.')) {
       return;
     }
     setVoiding(true);
     try {
       await apiClient.post(`/pos/sales/${saleId}/void/`);
-      alert('Transaksi berhasil dibatalkan (Void)!');
+      alert('Transaksi berhasil dibatalkan. Status nota kini Void dan stok telah dikembalikan.');
       setSelectedSale(null);
       fetchSales();
     } catch (err) {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Factory, Loader2, X } from 'lucide-react';
 import apiClient from '../../../api/apiClient';
+import { useAuth } from '../../../context/AuthContext';
 
 /**
  * Modal penerbitan SPK produksi — dipakai bersama oleh alur order (Kasir >
@@ -11,8 +12,15 @@ import apiClient from '../../../api/apiClient';
  *   - order    : POST /orders/{id}/assign/
  *   - transaksi: POST /pos/sales/{id}/terbitkan-spk/
  * Bentuk payload-nya sengaja sama supaya keduanya tidak menyimpang.
+ *
+ * Akun kasir hanya boleh menujukan SPK ke antrean divisi; penunjukan staff
+ * tertentu adalah wewenang kepala divisi/manager. Pembatasan ini juga
+ * ditegakkan backend di api/spk.py — UI hanya menyembunyikan opsinya.
  */
 export default function SpkPublishModal({ judul, keterangan, onTerbitkan, onClose }) {
+  const { user } = useAuth();
+  const bolehPilihStaff = (user?.role || '').toLowerCase() !== 'kasir';
+
   const [divisiList, setDivisiList] = useState([]);
   const [staffList, setStaffList] = useState([]);
   const [tahapList, setTahapList] = useState([]);
@@ -30,41 +38,51 @@ export default function SpkPublishModal({ judul, keterangan, onTerbitkan, onClos
     let batal = false;
     (async () => {
       try {
-        const [resDivisi, resStaff, resTahap] = await Promise.all([
+        // Kasir tidak boleh menunjuk staff, jadi daftar staff tidak diambil
+        // sama sekali — endpoint /users/ juga tertutup untuk peran ini.
+        const [resDivisi, resStaff, resTahap] = await Promise.allSettled([
           apiClient.get('/divisi/'),
-          apiClient.get('/users/', { params: { role: 'staff' } }),
+          bolehPilihStaff
+            ? apiClient.get('/users/', { params: { role: 'staff' } })
+            : Promise.resolve({ data: [] }),
           apiClient.get('/tahap-proses/'),
         ]);
         if (batal) return;
-        const divisi = resDivisi.data || [];
+
+        const divisi = resDivisi.status === 'fulfilled' ? (resDivisi.value.data || []) : [];
+        const staff = resStaff.status === 'fulfilled' ? (resStaff.value.data || []) : [];
+        const tahap = resTahap.status === 'fulfilled' ? (resTahap.value.data || []) : [];
+
         setDivisiList(divisi);
-        setStaffList(resStaff.data || []);
-        setTahapList(resTahap.data || []);
+        setStaffList(staff);
+        setTahapList(tahap);
         if (divisi.length) setDivisiId(String(divisi[0].id));
       } catch {
-        if (!batal) setError('Gagal memuat daftar divisi dan staff.');
+        if (!batal) setError('Gagal memuat daftar divisi.');
       } finally {
         if (!batal) setMemuat(false);
       }
     })();
     return () => { batal = true; };
-  }, []);
+  }, [bolehPilihStaff]);
 
   // Tahap dibatasi pada divisi terpilih; kalau kosong, backend memakai tahap
   // pertama divisi tersebut.
   const tahapTersedia = useMemo(() => {
-    if (tipe !== 'divisi' || !divisiId) return [];
+    if (tipeEfektif !== 'divisi' || !divisiId) return [];
     return tahapList.filter((t) => String(t.divisi) === String(divisiId));
-  }, [tahapList, tipe, divisiId]);
+  }, [tahapList, tipeEfektif, divisiId]);
 
-  useEffect(() => { setTahapId(''); }, [divisiId, tipe]);
+  useEffect(() => { setTahapId(''); }, [divisiId, tipeEfektif]);
 
-  const bisaKirim = tipe === 'divisi' ? !!divisiId : !!staffId;
+  // `tipe` efektif — kasir selalu dikunci ke divisi, apa pun isi state-nya.
+  const tipeEfektif = bolehPilihStaff ? tipe : 'divisi';
+  const bisaKirim = tipeEfektif === 'divisi' ? !!divisiId : !!staffId;
 
   const kirim = async () => {
     if (!bisaKirim || mengirim) return;
     setMengirim(true); setError('');
-    const payload = tipe === 'staff' ? { staff_id: staffId } : { divisi_id: divisiId };
+    const payload = tipeEfektif === 'staff' ? { staff_id: staffId } : { divisi_id: divisiId };
     if (tahapId) payload.tahap_id = tahapId;
     try {
       await onTerbitkan(payload);
@@ -92,19 +110,28 @@ export default function SpkPublishModal({ judul, keterangan, onTerbitkan, onClos
           {keterangan && <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#64748b', lineHeight: 1.55 }}>{keterangan}</p>}
 
           {memuat ? (
-            <div style={{ padding: 28, textAlign: 'center', color: '#64748b', fontSize: 13 }}>Memuat divisi dan staff…</div>
+            <div style={{ padding: 28, textAlign: 'center', color: '#64748b', fontSize: 13 }}>
+              {bolehPilihStaff ? 'Memuat divisi dan staff…' : 'Memuat daftar divisi…'}
+            </div>
           ) : (
             <div style={{ display: 'grid', gap: 13 }}>
-              <label style={{ display: 'block' }}>
-                <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 5 }}>Tujukan SPK ke</span>
-                <select value={tipe} onChange={(e) => setTipe(e.target.value)}
-                  style={{ width: '100%', padding: 9, border: '1px solid #cbd5e1', borderRadius: 8 }}>
-                  <option value="divisi">Divisi (antrean bersama)</option>
-                  <option value="staff">Staff tertentu</option>
-                </select>
-              </label>
+              {bolehPilihStaff ? (
+                <label style={{ display: 'block' }}>
+                  <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 5 }}>Tujukan SPK ke</span>
+                  <select value={tipe} onChange={(e) => setTipe(e.target.value)}
+                    style={{ width: '100%', padding: 9, border: '1px solid #cbd5e1', borderRadius: 8 }}>
+                    <option value="divisi">Divisi (antrean bersama)</option>
+                    <option value="staff">Staff tertentu</option>
+                  </select>
+                </label>
+              ) : (
+                <p style={{ margin: 0, padding: '9px 11px', borderRadius: 8, background: '#f1f5f9', color: '#475569', fontSize: 12, lineHeight: 1.5 }}>
+                  SPK diterbitkan ke <strong>antrean divisi</strong>. Pembagian tugas ke staff
+                  dilakukan oleh kepala divisi pada papan kerja produksi.
+                </p>
+              )}
 
-              {tipe === 'divisi' ? (
+              {tipeEfektif === 'divisi' ? (
                 <>
                   <label style={{ display: 'block' }}>
                     <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 5 }}>Divisi</span>

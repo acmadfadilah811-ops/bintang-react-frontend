@@ -71,7 +71,7 @@ export default function ProductMasterPicker({ value, valueLabel = '', onChange }
         />
       </div>
       {open && options.length > 0 && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-slate-100 min-w-[220px]">
+        <div className="absolute left-0 right-0 top-full mt-1 z-[99] bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto divide-y divide-slate-100 min-w-[280px]">
           {options.map((p) => {
             const harga = p.harga_jual_toko ?? p.harga_jual ?? 0;
             return (

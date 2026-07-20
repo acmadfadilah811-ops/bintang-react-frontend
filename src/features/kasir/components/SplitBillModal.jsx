@@ -112,7 +112,7 @@ export default function SplitBillModal({
   const submitSplitTransaction = async (payMethod, paidAmount) => {
     const totalVal = getTotal(billB);
     if (paidAmount < totalVal) {
-      alert('Jumlah bayar kurang dari total belanja.');
+      alert('Jumlah pembayaran belum mencukupi total tagihan.');
       return;
     }
 

@@ -55,7 +55,7 @@ export default function WaSettings() {
     localStorage.setItem('wa_api_key', apiKey);
     localStorage.setItem('wa_device_id', deviceId);
     localStorage.setItem('wa_webhook_url', webhookUrl);
-    alert('Konfigurasi koneksi WhatsApp berhasil disimpan!');
+    alert('Konfigurasi koneksi WhatsApp berhasil disimpan.');
   };
 
   const handleSaveTemplates = () => {
@@ -63,7 +63,7 @@ export default function WaSettings() {
     localStorage.setItem('wa_tpl_invoice', invoiceTemplate);
     localStorage.setItem('wa_tpl_pending', pendingTemplate);
     localStorage.setItem('wa_tpl_ready', readyTemplate);
-    alert('Template pesan WhatsApp berhasil disimpan!');
+    alert('Template pesan WhatsApp berhasil disimpan.');
   };
 
   const checkConnectionStatus = () => {

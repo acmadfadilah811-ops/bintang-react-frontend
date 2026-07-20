@@ -2,21 +2,30 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Wallet, Calendar, Clock, AlertCircle, CheckCircle, ArrowRight, User, Search, RefreshCw } from 'lucide-react';
 import { useKasir } from '../context/KasirContext';
+import { useAuth } from '../../../context/AuthContext';
 import apiClient from '../../../api/apiClient';
 
 export default function PosShift() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { shiftAktif, setShiftAktif, checkActiveShift } = useKasir();
 
   // Create Shift Form States
   const [kasirQuery, setKasirQuery] = useState('');
-  const [selectedKasir, setSelectedKasir] = useState(null);
+  const [selectedKasir, setSelectedKasir] = useState(user || null);
   const [showKasirDropdown, setShowKasirDropdown] = useState(false);
   const [cashiers, setCashiers] = useState([]);
   
-  const [selectedShiftTiming, setSelectedShiftTiming] = useState('');
+  const [selectedShiftTiming, setSelectedShiftTiming] = useState('Shift Pagi');
   const [shiftTimings, setShiftTimings] = useState([]);
-  
+
+  // Auto select logged-in user as Kasir
+  useEffect(() => {
+    if (user && !selectedKasir) {
+      setSelectedKasir(user);
+    }
+  }, [user]);
+
   const [kasAwal, setKasAwal] = useState('0');
   const [loadingOpen, setLoadingOpen] = useState(false);
 
@@ -39,11 +48,13 @@ export default function PosShift() {
   // Fetch cashiers for searchable selection
   const fetchCashiers = async (search = '') => {
     try {
-      // Query users (managers, owners, admins, staff, kasir)
       const res = await apiClient.get('/users/', { params: { search } });
       setCashiers(res.data || []);
     } catch (err) {
-      console.error('Error fetching cashiers:', err);
+      console.warn('Cannot fetch full user list (non-admin), using current logged in user.');
+      if (user) {
+        setCashiers([user]);
+      }
     }
   };
 
@@ -54,10 +65,13 @@ export default function PosShift() {
       const data = res.data || [];
       setShiftTimings(data);
       if (data.length > 0) {
-        setSelectedShiftTiming(data[0].id);
+        setSelectedShiftTiming(data[0].judul || data[0].nama || String(data[0].id));
+      } else {
+        setSelectedShiftTiming('Shift Pagi');
       }
     } catch (err) {
       console.error('Error fetching shift timings:', err);
+      setSelectedShiftTiming('Shift Pagi');
     }
   };
 
@@ -129,30 +143,30 @@ export default function PosShift() {
   const handleOpenShift = async (e) => {
     e.preventDefault();
     if (!selectedKasir) {
-      alert('Nama Kasir wajib dipilih.');
+      alert('Nama kasir wajib dipilih.');
       return;
     }
     if (!selectedShiftTiming) {
-      alert('Shift timing wajib dipilih.');
+      alert('Periode shift wajib dipilih.');
       return;
     }
 
     setLoadingOpen(true);
     try {
       // Simpan NAMA shift (bukan id) agar terbaca di laporan & ringkasan.
-      const timing = shiftTimings.find((t) => String(t.id) === String(selectedShiftTiming));
+      const timing = shiftTimings.find((t) => String(t.id) === String(selectedShiftTiming) || t.judul === selectedShiftTiming);
       const payload = {
         kasir: selectedKasir.id,
-        shift: timing?.judul || String(selectedShiftTiming),
+        shift: timing?.judul || timing?.nama || selectedShiftTiming || 'Shift Pagi',
         kas_awal: parseFloat(kasAwal || 0),
         waktu_buka: new Date().toISOString(),
       };
       const res = await apiClient.post('/saldo-kas-harian/', payload);
       setShiftAktif(res.data);
-      alert('Shift berhasil dibuka! Kas awal telah tercatat.');
+      alert('Shift berhasil dibuka. Kas awal telah tercatat pada periode ini.');
     } catch (err) {
       console.error('Error opening shift:', err);
-      alert('Gagal membuka shift: ' + (err.response?.data?.error || err.message));
+      alert('Gagal membuka shift: ' + (err.response?.data?.error || err.response?.data?.detail || err.message));
     } finally {
       setLoadingOpen(false);
     }
@@ -161,7 +175,7 @@ export default function PosShift() {
   const handleCloseShift = async (e) => {
     e.preventDefault();
     if (!shiftAktif) return;
-    if (!window.confirm('Apakah Anda yakin ingin menutup shift ini? Tindakan ini akan mengunci semua transaksi kasir pada shift ini.')) {
+    if (!window.confirm('Tutup shift ini? Seluruh transaksi pada shift akan dikunci dan tidak dapat diubah kembali.')) {
       return;
     }
 
@@ -183,7 +197,7 @@ export default function PosShift() {
       setKasAkhir('0');
       setTutupCatatan('');
       alert(
-        'Shift berhasil ditutup!\n\n' +
+        'Shift berhasil ditutup. Rekapitulasi kas:\n\n' +
         `Kas awal        : ${rp(d.kas_awal)}\n` +
         `Penjualan tunai : ${rp(d.penjualan_tunai)}\n` +
         `Kas masuk       : ${rp(d.kas_masuk)}\n` +
@@ -295,14 +309,24 @@ export default function PosShift() {
               <select
                 value={selectedShiftTiming}
                 onChange={(e) => setSelectedShiftTiming(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-bold text-slate-700 focus:outline-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-bold text-slate-700 focus:outline-none cursor-pointer"
               >
-                <option value="">-- Pilih Shift Timing --</option>
-                {shiftTimings.map((st) => (
-                  <option key={st.id} value={st.id}>
-                    {st.nama} ({st.jam_mulai} - {st.jam_selesai})
-                  </option>
-                ))}
+                {shiftTimings.length === 0 ? (
+                  <>
+                    <option value="Shift Pagi">Shift Pagi (08:00 - 16:00)</option>
+                    <option value="Shift Sore">Shift Sore (16:00 - 23:00)</option>
+                  </>
+                ) : (
+                  shiftTimings.map((st) => {
+                    const labelName = st.judul || st.nama || `Shift #${st.id}`;
+                    const timeRange = st.jam_mulai ? `(${st.jam_mulai} - ${st.jam_berakhir || st.jam_selesai || ''})` : '';
+                    return (
+                      <option key={st.id} value={labelName}>
+                        {labelName} {timeRange}
+                      </option>
+                    );
+                  })
+                )}
               </select>
             </div>
 
@@ -455,7 +479,7 @@ export default function PosShift() {
                     value={kasAkhir}
                     onChange={(e) => setKasAkhir(e.target.value)}
                     className="w-full bg-transparent border-none focus:outline-none font-black text-slate-900"
-                    placeholder="Masukkan jumlah fisik uang tunai..."
+                    placeholder="Jumlah fisik uang tunai hasil perhitungan"
                   />
                 </div>
               </div>
@@ -467,7 +491,7 @@ export default function PosShift() {
                   rows="3"
                   value={tutupCatatan}
                   onChange={(e) => setTutupCatatan(e.target.value)}
-                  placeholder="Tulis alasan jika ada selisih kas atau informasi penting lainnya..."
+                  placeholder="Keterangan selisih kas atau catatan serah terima shift"
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>

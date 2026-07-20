@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../../../context/AuthContext';
 import { useKasir } from '../context/KasirContext';
 import apiClient from '../../../api/apiClient';
+import SiapDiambilPanel from '../components/SiapDiambilPanel';
 
 export default function KasirDashboard() {
   const navigate = useNavigate();
@@ -61,14 +62,16 @@ export default function KasirDashboard() {
     {
       label: 'Status Shift',
       value: shiftAktif ? 'Aktif' : 'Belum Dibuka',
-      sub: shiftAktif ? `Kas awal ${formatCurrency(shiftAktif.kas_awal)}` : 'Buka shift dulu untuk transaksi',
+      sub: shiftAktif
+        ? `Kas awal ${formatCurrency(shiftAktif.kas_awal)}`
+        : 'Buka shift untuk mulai mencatat transaksi',
       icon: Wallet,
       tone: shiftAktif ? 'emerald' : 'rose',
     },
     {
       label: 'Pesanan WA Menunggu',
       value: String(waCount),
-      sub: 'Perlu diverifikasi kasir',
+      sub: 'Menunggu verifikasi kasir',
       icon: MessageCircle,
       tone: 'indigo',
     },
@@ -82,7 +85,7 @@ export default function KasirDashboard() {
     {
       label: 'Penjualan Hari Ini',
       value: formatCurrency(todayStats.total),
-      sub: 'Total omzet shift berjalan',
+      sub: 'Akumulasi omzet pada shift berjalan',
       icon: CreditCard,
       tone: 'emerald',
     },
@@ -96,10 +99,9 @@ export default function KasirDashboard() {
   };
 
   const actions = [
-    { label: 'Buka Terminal Kasir', desc: 'Proses penjualan & pembayaran', icon: CreditCard, path: '/kasir/terminal', color: 'indigo' },
-    { label: 'Buat Order', desc: 'Input pesanan pelanggan manual', icon: ShoppingCart, path: '/kasir/buat-order', color: 'emerald' },
-    { label: 'Antrean WA', desc: 'Verifikasi pesanan dari bot', icon: MessageCircle, path: '/kasir/antrean-wa', color: 'rose', badge: waCount },
-    { label: 'Daftar Produk', desc: 'Lihat katalog & stok', icon: Package, path: '/kasir/produk', color: 'blue' },
+    { label: 'Terminal Kasir', desc: 'Proses transaksi penjualan dan penerbitan SPK', icon: CreditCard, path: '/kasir/terminal', color: 'indigo' },
+    { label: 'Antrean WA', desc: 'Verifikasi pesanan masuk dari kanal WhatsApp', icon: MessageCircle, path: '/kasir/antrean-wa', color: 'rose', badge: waCount },
+    { label: 'Daftar Produk', desc: 'Katalog produk beserta harga dan ketersediaan stok', icon: Package, path: '/kasir/produk', color: 'blue' },
   ];
 
   const actionColor = {
@@ -113,8 +115,12 @@ export default function KasirDashboard() {
     <div className="flex-1 overflow-y-auto p-6 bg-[#F4F7FE]">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-xl font-black text-slate-800">Halo, {user?.username || 'Kasir'} 👋</h1>
-        <p className="text-xs font-semibold text-slate-500 mt-0.5">{todayLabel}</p>
+        <h1 className="text-xl font-black text-slate-800">
+          Dashboard Kasir — {user?.username || 'Kasir'}
+        </h1>
+        <p className="text-xs font-semibold text-slate-500 mt-0.5">
+          Ringkasan operasional kasir · {todayLabel}
+        </p>
       </div>
 
       {/* Shift warning */}
@@ -125,8 +131,10 @@ export default function KasirDashboard() {
               <AlertCircle size={20} />
             </div>
             <div>
-              <h4 className="font-extrabold text-slate-800 text-sm">Shift belum dibuka</h4>
-              <p className="text-xs text-slate-500 font-semibold">Buka shift kasir dulu sebelum memproses transaksi.</p>
+              <h4 className="font-extrabold text-slate-800 text-sm">Shift Kasir Belum Dibuka</h4>
+              <p className="text-xs text-slate-500 font-semibold">
+                Transaksi baru tidak dapat diproses sebelum shift dibuka dan kas awal tercatat.
+              </p>
             </div>
           </div>
           <button
@@ -155,6 +163,11 @@ export default function KasirDashboard() {
             </div>
           );
         })}
+      </div>
+
+      {/* Pesanan siap diambil & progres produksi */}
+      <div className="mb-8">
+        <SiapDiambilPanel />
       </div>
 
       {/* Quick actions */}

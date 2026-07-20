@@ -86,7 +86,6 @@ export default function KasirTopbar() {
   const navLinks = [
     { path: '/kasir/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/kasir/terminal', label: 'Terminal', icon: CreditCard },
-    { path: '/kasir/buat-order', label: 'Buat Order', icon: ShoppingCart },
     { path: '/kasir/produk', label: 'Produk', icon: Package },
     { path: '/kasir/antrean-wa', label: 'Antrean WA', icon: MessageCircle, badge: waOrderCount },
     { path: '/kasir/riwayat', label: 'Riwayat', icon: History },
@@ -147,7 +146,7 @@ export default function KasirTopbar() {
         ) : (
           <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl">
             <span className="w-1.5 h-1.5 bg-rose-500 rounded-full" />
-            <span>Shift Belum Buka</span>
+            <span>Shift Belum Dibuka</span>
           </div>
         )}
 
@@ -196,7 +195,7 @@ export default function KasirTopbar() {
           {showProfile && (
             <div className="absolute right-0 top-12 w-48 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden py-1 animate-scale-up">
               <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/50 text-left">
-                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Halo,</p>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Masuk sebagai</p>
                 <p className="text-sm font-black text-slate-700 truncate capitalize">
                   {user?.username}
                 </p>

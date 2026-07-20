@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { X, Sparkles } from 'lucide-react';
+import NumericInput from '../../../components/NumericInput';
 
 export default function CustomItemModal({ isOpen, onClose, onAdd }) {
   const [name, setName] = useState('');
-  const [price, setPrice] = useState('');
+  const [price, setPrice] = useState(0);
   const [qty, setQty] = useState(1);
   const [note, setNote] = useState('');
 
@@ -17,12 +18,12 @@ export default function CustomItemModal({ isOpen, onClose, onAdd }) {
     }
     const parsedPrice = parseFloat(price);
     if (isNaN(parsedPrice) || parsedPrice < 0) {
-      alert('Harga item harus berupa angka valid dan minimal 0.');
+      alert('Harga item harus berupa angka dan tidak boleh kurang dari 0.');
       return;
     }
     const parsedQty = parseFloat(qty);
     if (isNaN(parsedQty) || parsedQty <= 0) {
-      alert('Qty harus berupa angka valid dan minimal 1.');
+      alert('Kuantitas harus berupa angka dan minimal 1.');
       return;
     }
 
@@ -30,7 +31,7 @@ export default function CustomItemModal({ isOpen, onClose, onAdd }) {
     
     // Reset form
     setName('');
-    setPrice('');
+    setPrice(0);
     setQty(1);
     setNote('');
     onClose();
@@ -74,28 +75,24 @@ export default function CustomItemModal({ isOpen, onClose, onAdd }) {
               <label className="text-xs font-extrabold text-slate-600 block mb-1">
                 Harga Satuan (Rp.) <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="number"
+              <NumericInput
                 placeholder="0"
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-extrabold focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                required
-                min="0"
+                onChange={(val) => setPrice(val)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-extrabold focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-right"
+                min={0}
               />
             </div>
             <div>
               <label className="text-xs font-extrabold text-slate-600 block mb-1">
                 Qty <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="number"
+              <NumericInput
                 placeholder="1"
                 value={qty}
-                onChange={(e) => setQty(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-extrabold focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                required
-                min="1"
+                onChange={(val) => setQty(val)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-extrabold focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-center"
+                min={1}
               />
             </div>
           </div>

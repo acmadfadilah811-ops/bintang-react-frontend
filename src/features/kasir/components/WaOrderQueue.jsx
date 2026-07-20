@@ -16,8 +16,15 @@ import {
   ToggleRight,
 } from 'lucide-react';
 import apiClient from '../../../api/apiClient';
+import { useAuth } from '../../../context/AuthContext';
 
 export default function WaOrderQueue() {
+  // Kasir hanya boleh menerbitkan SPK ke antrean divisi — aturan yang sama
+  // dengan SpkPublishModal, ditegakkan backend di api/spk.py. Layar ini punya
+  // pemilih penugasan sendiri, jadi gatenya harus ikut dipasang di sini.
+  const { user } = useAuth();
+  const bolehPilihStaff = (user?.role || '').toLowerCase() !== 'kasir';
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -74,18 +81,27 @@ export default function WaOrderQueue() {
   // Fetch lists for SPK assignment
   const fetchAssignmentData = async () => {
     try {
-      const [resStaff, resDivisi, resTahap] = await Promise.all([
-        apiClient.get('/users/', { params: { role: 'staff' } }),
+      // /users/ tertutup untuk kasir (IsOwnerManagerOrAdmin). Tidak perlu
+      // dipanggil hanya untuk menerima 403 — kasir tidak memilih staff.
+      const [resStaff, resDivisi, resTahap] = await Promise.allSettled([
+        bolehPilihStaff
+          ? apiClient.get('/users/', { params: { role: 'staff' } })
+          : Promise.resolve({ data: [] }),
         apiClient.get('/divisi/'),
         apiClient.get('/tahap-proses/'),
       ]);
-      setStaffList(resStaff.data || []);
-      setDivisiList(resDivisi.data || []);
-      setTahapList(resTahap.data || []);
 
-      if (resDivisi.data?.length > 0) setTargetDivisiId(resDivisi.data[0].id);
-      if (resStaff.data?.length > 0) setTargetStaffId(resStaff.data[0].id);
-      if (resTahap.data?.length > 0) setTargetTahapId(resTahap.data[0].id);
+      const staff = resStaff.status === 'fulfilled' ? (resStaff.value.data || []) : [];
+      const divisi = resDivisi.status === 'fulfilled' ? (resDivisi.value.data || []) : [];
+      const tahap = resTahap.status === 'fulfilled' ? (resTahap.value.data || []) : [];
+
+      setStaffList(staff);
+      setDivisiList(divisi);
+      setTahapList(tahap);
+
+      if (divisi.length > 0) setTargetDivisiId(divisi[0].id);
+      if (staff.length > 0) setTargetStaffId(staff[0].id);
+      if (tahap.length > 0) setTargetTahapId(tahap[0].id);
     } catch (err) {
       console.error('Error fetching assignment data:', err);
     }
@@ -127,7 +143,7 @@ export default function WaOrderQueue() {
       setContactData(res.data);
     } catch (err) {
       console.error('Error updating handover status:', err);
-      alert('Gagal mengubah status ambil alih chat.');
+      alert('Status pengambilalihan percakapan gagal diperbarui. Silakan coba kembali.');
     }
   };
 
@@ -209,7 +225,7 @@ export default function WaOrderQueue() {
         }
       }
 
-      alert('Pesanan berhasil diperbarui!');
+      alert('Perubahan pesanan berhasil disimpan.');
       // Reload order list and update detail screen
       await fetchQueue();
     } catch (err) {
@@ -237,7 +253,7 @@ export default function WaOrderQueue() {
         status_global: targetStatusGlobal,
       };
 
-      if (selectedAssignType === 'staff') {
+      if (bolehPilihStaff && selectedAssignType === 'staff') {
         assignPayload.staff_id = targetStaffId;
       } else {
         assignPayload.divisi_id = targetDivisiId;
@@ -249,12 +265,17 @@ export default function WaOrderQueue() {
 
       await apiClient.post(`/orders/${selectedOrder.id}/assign/`, assignPayload);
 
-      alert('Pesanan berhasil diverifikasi dan dikirim ke Papan Kerja Produksi!');
+      alert('Pesanan telah diverifikasi dan diteruskan ke Papan Kerja Produksi.');
       setSelectedOrder(null);
       await fetchQueue();
     } catch (err) {
       console.error('Error publishing SPK:', err);
-      alert('Gagal mengirim ke antrean produksi.');
+      alert(
+        'Gagal mengirim ke antrean produksi: ' +
+          (err.response?.data?.error ||
+            err.response?.data?.detail ||
+            'terjadi kesalahan pada server.')
+      );
     } finally {
       setPublishing(false);
     }
@@ -521,7 +542,7 @@ export default function WaOrderQueue() {
                     rows="3"
                     value={editCatatan}
                     onChange={(e) => setEditCatatan(e.target.value)}
-                    placeholder="Tulis instruksi pengerjaan desain/finishing di sini..."
+                    placeholder="Instruksi pengerjaan desain, bahan, atau finishing"
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-slate-50/30"
                   />
                 </div>
@@ -618,22 +639,31 @@ export default function WaOrderQueue() {
                   </select>
                 </div>
 
-                {/* 2. Assignment Type Selection */}
-                <div>
-                  <label className="block text-slate-500 mb-1">Penugasan SPK Ke</label>
-                  <select
-                    value={selectedAssignType}
-                    onChange={(e) => setSelectedAssignType(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 focus:outline-none"
-                  >
-                    <option value="divisi">Divisi (Global Pool)</option>
-                    <option value="staff">Staff Spesifik (PIC)</option>
-                  </select>
-                </div>
+                {/* 2. Assignment Type Selection — kasir dikunci ke divisi */}
+                {bolehPilihStaff ? (
+                  <div>
+                    <label className="block text-slate-500 mb-1">Penugasan SPK Ke</label>
+                    <select
+                      value={selectedAssignType}
+                      onChange={(e) => setSelectedAssignType(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 focus:outline-none"
+                    >
+                      <option value="divisi">Divisi (Global Pool)</option>
+                      <option value="staff">Staff Spesifik (PIC)</option>
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-slate-500 mb-1">Penugasan SPK Ke</label>
+                    <p className="bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-500 leading-snug">
+                      Antrean divisi. Pembagian ke staff dilakukan kepala divisi.
+                    </p>
+                  </div>
+                )}
 
                 {/* 3. Division or Staff dropdown */}
                 <div>
-                  {selectedAssignType === 'staff' ? (
+                  {bolehPilihStaff && selectedAssignType === 'staff' ? (
                     <>
                       <label className="block text-slate-500 mb-1">Pilih Staff PIC</label>
                       <select

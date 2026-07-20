@@ -31,12 +31,18 @@ const formatTanggal = (value) => {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 };
 
+// Tinggi bilah tab yang sticky di top:0 (paddingTop 12 + tombol ~34 +
+// paddingBottom 8 + border 1). Header Section menempel tepat di bawahnya —
+// sebelumnya dipatok 128px, jauh lebih rendah dari bilah tab, sehingga header
+// menggantung menutupi baris pertama isi section (kotak upload foto).
+const TAB_BAR_HEIGHT = 55;
+
 function Section({ title, headerRight, children }) {
   return (
     <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 16 }}>
       <div style={{
         position: 'sticky',
-        top: 128,
+        top: TAB_BAR_HEIGHT,
         zIndex: 20,
         background: '#fff',
         display: 'flex',
@@ -49,7 +55,7 @@ function Section({ title, headerRight, children }) {
         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1e293b', paddingTop: 6 }}>{title}</h3>
         {headerRight}
       </div>
-      <div style={{ padding: '0 18px' }}>{children}</div>
+      <div style={{ padding: '4px 18px 0' }}>{children}</div>
     </div>
   );
 }

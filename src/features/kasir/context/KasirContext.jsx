@@ -18,20 +18,20 @@ export function KasirProvider({ children }) {
   const checkActiveShift = async () => {
     setLoadingShift(true);
     try {
-      // API endpoint for checking active shift. 
-      // If none, we should prompt to open shift (Kas Awal).
       const response = await apiClient.get('/saldo-kas-harian/');
-      // Filter for today / active shift
-      // Let's assume the API returns list or has an active flag.
-      // Usually, it lists today's records. Let's find one that is active or use the last one.
       const list = response.data.results || response.data || [];
-      // Shift terbuka = kas_akhir belum diisi DAN belum ditutup.
       const todayStr = new Date().toISOString().slice(0, 10);
       const isOpen = (item) =>
         (item.kas_akhir === null || item.kas_akhir === undefined) && !item.waktu_tutup;
-      // Dahulukan shift milik pengguna yang login, lalu shift hari ini, baru
-      // shift terbuka mana pun — supaya kasir tidak "meminjam" shift kasir lain.
-      const milikSaya = (item) => user?.id && String(item.kasir) === String(user.id);
+      const getKasirId = (item) => {
+        if (!item || item.kasir === undefined || item.kasir === null) return null;
+        if (typeof item.kasir === 'object') return item.kasir.id;
+        return item.kasir;
+      };
+      const milikSaya = (item) => {
+        const kId = getKasirId(item);
+        return user?.id && kId && String(kId) === String(user.id);
+      };
       const active =
         list.find((item) => isOpen(item) && milikSaya(item) && item.tanggal === todayStr) ||
         list.find((item) => isOpen(item) && milikSaya(item)) ||
