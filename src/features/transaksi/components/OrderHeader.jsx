@@ -60,12 +60,8 @@ export default function OrderHeader({
 
   const getFormattedOrderId = () => {
     if (!order) return '';
-    const date = new Date(order.waktu);
-    const yy = String(date.getFullYear()).slice(-2);
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
-    const paddedId = String(order.id).padStart(7, '0');
-    return `OL${yy}${mm}${dd}${paddedId}`;
+    if (typeof order.id === 'string' && order.id.startsWith('ORD-')) return order.id;
+    return `ORD-${order.id}`;
   };
 
   const getDisplayDate = () => {
@@ -94,7 +90,7 @@ export default function OrderHeader({
     }
   };
 
-  const emailLink = `mailto:${metadata.customerEmail || 'dika@customer.com'}`;
+  const emailLink = `mailto:${metadata.customerEmail || ''}`;
   const smsLink = `sms:${order.nomor_wa || ''}`;
   const waLink = `https://wa.me/${(order.nomor_wa || '').replace(/[^0-9]/g, '')}`;
 

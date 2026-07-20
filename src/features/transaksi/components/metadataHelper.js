@@ -4,8 +4,8 @@
  */
 
 export const defaultMetadata = {
-  customerEmail: 'dika@customer.com',
-  customerAddress: 'Jalan Angkasa Pura No. 16\nCempaka Putih\nKota Jakarta Pusat\nDKI JAKARTA 123456\nIndonesia',
+  customerEmail: '',
+  customerAddress: '',
   shippingCourier: '-',
   shippingService: '-',
   shippingDate: '-',
@@ -14,8 +14,8 @@ export const defaultMetadata = {
   dropshipPhone: '-',
   posStaff: '-',
   dueDate: '-',
-  invoiceFooter: 'Untuk info lebih lanjut, bisa hubungi Tim Support kami',
-  catatan: 'Tidak ada'
+  invoiceFooter: 'Terima kasih atas pesanan Anda',
+  catatan: ''
 };
 
 export const parseOrderMetadata = (catatanPelanggan) => {

@@ -10,7 +10,7 @@ export default function ReturnOrderDetail({ orderId, onBack, onSaved }) {
   const [returnDate, setReturnDate] = useState('');
   const [returnStatus, setReturnStatus] = useState('Tunda');
   const [returnCatatan, setReturnCatatan] = useState('');
-  const [customerEmail, setCustomerEmail] = useState('dika@customer.com');
+  const [customerEmail, setCustomerEmail] = useState('');
 
   // Edit states for cards
   const [editingCard, setEditingCard] = useState(null);
@@ -30,7 +30,6 @@ export default function ReturnOrderDetail({ orderId, onBack, onSaved }) {
     );
     
     if (match) {
-      // If status is present (from the 3-parameter regex)
       if (match.length === 4) {
         return {
           tanggal: match[1],
@@ -38,7 +37,6 @@ export default function ReturnOrderDetail({ orderId, onBack, onSaved }) {
           catatan: match[3],
         };
       }
-      // Fallback to 2-parameter regex
       return {
         tanggal: match[1],
         status: 'Tunda',
@@ -61,7 +59,6 @@ export default function ReturnOrderDetail({ orderId, onBack, onSaved }) {
         setReturnCatatan(info.catatan || '');
       }
 
-      // Try to parse email from notes format "Name (Email)"
       if (data.catatan_pelanggan && data.catatan_pelanggan.includes('(')) {
         const emailMatch = data.catatan_pelanggan.match(/\(([^)]+)\)/);
         if (emailMatch) {
@@ -76,7 +73,7 @@ export default function ReturnOrderDetail({ orderId, onBack, onSaved }) {
     }
   };
 
-  useState(() => {
+  useEffect(() => {
     fetchOrderDetail();
   }, [orderId]);
 

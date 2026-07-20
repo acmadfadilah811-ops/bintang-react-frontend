@@ -150,19 +150,30 @@ export default function OrderDetail({ orderId, onBack, onSaved }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 text-slate-700">
-                {items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="py-3">
-                      <span className="font-bold text-slate-800 block">{item.nama_produk || 'Produk Custom'}</span>
-                      {item.catatan && <span className="text-[10px] text-slate-400 block mt-0.5">{item.catatan}</span>}
-                    </td>
-                    <td className="py-3 text-center font-semibold">{item.jumlah || 1} pcs</td>
-                    <td className="py-3 text-right font-mono">Rp {(item.harga_satuan || 0).toLocaleString('id-ID')}</td>
-                    <td className="py-3 text-right font-mono font-bold text-slate-800">
-                      Rp {((item.jumlah || 1) * (item.harga_satuan || 0)).toLocaleString('id-ID')}
-                    </td>
-                  </tr>
-                ))}
+                {items.map((item, idx) => {
+                  const namaProduk = item.jenis_produk || item.product_nama || item.nama_produk || item.nama || 'Produk Custom';
+                  const qty = item.qty ?? item.jumlah ?? 1;
+                  const harga = item.harga_jual ?? item.harga_satuan ?? item.harga ?? 0;
+                  const subtotal = qty * harga;
+                  return (
+                    <tr key={item.id || idx}>
+                      <td className="py-3">
+                        <span className="font-bold text-slate-800 block">{namaProduk}</span>
+                        {(item.panjang > 0 || item.lebar > 0) && (
+                          <span className="text-[10px] text-slate-400 block mt-0.5">
+                            Ukuran: {item.panjang || 0}m × {item.lebar || 0}m
+                          </span>
+                        )}
+                        {item.catatan && <span className="text-[10px] text-slate-400 block mt-0.5">{item.catatan}</span>}
+                      </td>
+                      <td className="py-3 text-center font-semibold">{qty} pcs</td>
+                      <td className="py-3 text-right font-mono">Rp {harga.toLocaleString('id-ID')}</td>
+                      <td className="py-3 text-right font-mono font-bold text-slate-800">
+                        Rp {subtotal.toLocaleString('id-ID')}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

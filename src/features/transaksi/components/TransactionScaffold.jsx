@@ -17,57 +17,55 @@ export { Dropdown, DateRangePicker, Pagination };
 /** Tabel data dengan header ber-sort + baris "No Data" saat kosong. */
 function DataTableView({ columns, rows, colWidths = {}, onMouseDownResize }) {
   return (
-    <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse table-fixed">
-          <thead>
-            <tr className="bg-slate-50/70 border-b border-slate-200">
-              {columns.map((c) => (
-                <th
-                  key={c.key}
-                  style={{ width: colWidths[c.key] ? `${colWidths[c.key]}px` : undefined }}
-                  className="px-4 py-3.5 text-left font-semibold text-slate-600 whitespace-nowrap border-r border-slate-200 last:border-r-0 relative group"
-                >
-                  <span className="inline-flex items-center gap-1">
-                    {c.label}
-                    {c.sortable !== false && (
-                      <ChevronsUpDown size={13} className="text-slate-400" />
-                    )}
-                  </span>
-                  {/* Resize divider */}
-                  <div
-                    onMouseDown={(e) => onMouseDownResize && onMouseDownResize(e, c.key)}
-                    className="absolute right-0 top-0 bottom-0 w-1.5 hover:bg-blue-400 active:bg-blue-500 cursor-col-resize select-none z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-                  />
-                </th>
-              ))}
+    <div className="border border-slate-200 rounded-xl overflow-x-auto bg-white">
+      <table className="w-full text-xs border-collapse min-w-[960px]">
+        <thead>
+          <tr className="bg-slate-50/70 border-b border-slate-200">
+            {columns.map((c) => (
+              <th
+                key={c.key}
+                style={{ width: colWidths[c.key] ? `${colWidths[c.key]}px` : undefined }}
+                className="px-4 py-3 text-left font-semibold text-slate-600 whitespace-nowrap border-r border-slate-200 last:border-r-0 relative group"
+              >
+                <span className="inline-flex items-center gap-1">
+                  {c.label}
+                  {c.sortable !== false && (
+                    <ChevronsUpDown size={13} className="text-slate-400" />
+                  )}
+                </span>
+                {/* Resize divider */}
+                <div
+                  onMouseDown={(e) => onMouseDownResize && onMouseDownResize(e, c.key)}
+                  className="absolute right-0 top-0 bottom-0 w-1.5 hover:bg-blue-400 active:bg-blue-500 cursor-col-resize select-none z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={columns.length} className="px-4 py-16 text-center text-slate-400">
+                No Data
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={columns.length} className="px-4 py-16 text-center text-slate-400">
-                  No Data
-                </td>
+          ) : (
+            rows.map((row, i) => (
+              <tr key={row.id || i} className="border-b border-slate-100 hover:bg-slate-50/60">
+                {columns.map((c) => (
+                  <td
+                    key={c.key}
+                    style={{ width: colWidths[c.key] ? `${colWidths[c.key]}px` : undefined }}
+                    className="px-4 py-3 text-slate-700 whitespace-nowrap border-r border-slate-100 last:border-r-0"
+                  >
+                    {c.render ? c.render(row) : row[c.key]}
+                  </td>
+                ))}
               </tr>
-            ) : (
-              rows.map((row, i) => (
-                <tr key={row.id || i} className="border-b border-slate-100 hover:bg-slate-50/60">
-                  {columns.map((c) => (
-                    <td
-                      key={c.key}
-                      style={{ width: colWidths[c.key] ? `${colWidths[c.key]}px` : undefined }}
-                      className="px-4 py-3 text-slate-700 truncate border-r border-slate-100 last:border-r-0"
-                    >
-                      {c.render ? c.render(row) : row[c.key]}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+            ))
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -412,7 +410,7 @@ export default function TransactionScaffold({
                 ) : (
                   <div className="w-full self-stretch flex flex-col justify-between h-full">
                     <div className="overflow-auto flex-1 bg-white">
-                      <table className="w-full text-sm table-fixed border-collapse">
+                      <table className="w-full text-xs border-collapse min-w-[960px]">
                         <thead>
                           <tr className="bg-white text-slate-500 text-left border-b border-slate-100">
                             {cols.map((c) => (
@@ -438,7 +436,7 @@ export default function TransactionScaffold({
                                 <td
                                   key={c.key}
                                   style={{ width: colWidths[c.key] ? `${colWidths[c.key]}px` : undefined }}
-                                  className="px-4 py-3 text-slate-700 truncate"
+                                  className="px-4 py-3 text-slate-700 whitespace-nowrap"
                                 >
                                   {c.render ? c.render(row) : row[c.key]}
                                 </td>
