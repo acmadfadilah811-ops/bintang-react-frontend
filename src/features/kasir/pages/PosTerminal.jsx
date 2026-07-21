@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Minus, Trash2, User, CreditCard, ShoppingBag, Percent, AlertCircle, X, Factory } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, User, CreditCard, ShoppingBag, Percent, AlertCircle, X, Factory, Tag } from 'lucide-react';
 import { useKasir } from '../context/KasirContext';
 import apiClient from '../../../api/apiClient';
 import CustomItemModal from '../components/CustomItemModal';
@@ -30,13 +30,22 @@ export default function PosTerminal() {
     setDiscountPercent,
     taxPercent,
     setTaxPercent,
+    selectedCoupon,
+    setSelectedCoupon,
     getSubtotal,
     getDiscountAmount,
+    getCouponDiscountAmount,
     getTaxAmount,
     getTotal,
     cartNotes,
     setCartNotes,
   } = useKasir();
+
+  // Coupon States
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [couponInput, setCouponInput] = useState('');
+  const [showCouponModal, setShowCouponModal] = useState(false);
+  const [evaluatingCoupon, setEvaluatingCoupon] = useState(false);
 
   // Catalog States
   // Pengaturan POS yang memengaruhi perilaku kasir. Penegakan sesungguhnya ada
@@ -128,6 +137,50 @@ export default function PosTerminal() {
   const [spkUntukNota, setSpkUntukNota] = useState(null);
 
   const contactDropdownRef = useRef(null);
+
+  // Fetch active coupons for POS
+  useEffect(() => {
+    const fetchCoupons = async () => {
+      try {
+        const res = await apiClient.get('/discount-coupons/');
+        const list = res.data?.results || res.data || [];
+        const posActive = list.filter(c => c.is_active && c.show_pos);
+        setAvailableCoupons(posActive);
+      } catch (err) {
+        console.error('Error fetching coupons:', err);
+      }
+    };
+    fetchCoupons();
+  }, []);
+
+  const applyCouponCode = async (codeToApply) => {
+    const code = (codeToApply || couponInput).trim();
+    if (!code) return;
+    setEvaluatingCoupon(true);
+    try {
+      const res = await apiClient.post('/discount-coupons/evaluate/', {
+        kode: code,
+        subtotal: getSubtotal(),
+        pelanggan: selectedContact ? selectedContact.id : null,
+        items: cart.map(it => ({
+          product_id: it.product ? it.product.id : null,
+          harga: it.harga,
+          qty: it.qty
+        }))
+      });
+      if (res.data?.ok) {
+        setSelectedCoupon(res.data.kupon);
+        setCouponInput('');
+        setShowCouponModal(false);
+      } else {
+        alert(res.data?.alasan || 'Kupon tidak dapat digunakan.');
+      }
+    } catch (err) {
+      alert(err.response?.data?.alasan || err.response?.data?.error || 'Kode kupon tidak valid atau tidak dapat digunakan.');
+    } finally {
+      setEvaluatingCoupon(false);
+    }
+  };
 
   // Fetch Categories and initial Products
   useEffect(() => {
@@ -258,6 +311,7 @@ export default function PosTerminal() {
         dibayar: paidVal,
         kembalian: paidVal - totalVal,
         catatan: cartNotes,
+        kupon_kode: selectedCoupon ? selectedCoupon.kode : null,
         status: 'paid',
         items: cart.map(item => ({
           product_id: item.product ? item.product.id : null,
@@ -659,6 +713,34 @@ export default function PosTerminal() {
               />
             </div>
 
+            {/* Kupon Diskon Section */}
+            <div className="flex items-center justify-between text-slate-500 py-0.5">
+              <span className="flex items-center gap-1 font-bold">
+                <Tag size={12} className="text-emerald-600" /> Kupon Diskon
+              </span>
+              {selectedCoupon ? (
+                <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg text-[11px] font-black text-emerald-700">
+                  <span>{selectedCoupon.kode} (-{formatCurrency(getCouponDiscountAmount())})</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCoupon(null)}
+                    className="text-emerald-500 hover:text-emerald-800 font-bold ml-1 cursor-pointer"
+                    title="Lepas kupon"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowCouponModal(true)}
+                  className="text-[11px] font-extrabold text-indigo-600 hover:text-indigo-800 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-lg cursor-pointer transition-all hover:bg-indigo-100"
+                >
+                  + Kupon / Voucher
+                </button>
+              )}
+            </div>
+
             {/* Tax Section */}
             <div className="flex items-center justify-between text-slate-500">
               <span>Pajak (%)</span>
@@ -984,6 +1066,78 @@ export default function PosTerminal() {
             >
               Terbitkan SPK Produksi
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Kupon Diskon */}
+      {showCouponModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl border border-slate-100 max-w-md w-full p-6 relative flex flex-col shadow-2xl">
+            <button
+              onClick={() => setShowCouponModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+            <h5 className="font-extrabold text-slate-800 text-base mb-1 flex items-center gap-2">
+              <Tag size={18} className="text-emerald-600" />
+              <span>Gunakan Kupon Diskon / Voucher</span>
+            </h5>
+            <p className="text-xs text-slate-500 font-semibold mb-4">Masukkan kode kupon promo atau pilih voucher yang tersedia.</p>
+
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                placeholder="Ketik kode kupon (contoh: HEMAT10)..."
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                onKeyDown={(e) => { if (e.key === 'Enter') applyCouponCode(); }}
+                className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold uppercase focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <button
+                type="button"
+                onClick={() => applyCouponCode()}
+                disabled={evaluatingCoupon || !couponInput.trim()}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl cursor-pointer"
+              >
+                {evaluatingCoupon ? 'Memeriksa...' : 'Gunakan'}
+              </button>
+            </div>
+
+            <div className="border-t border-slate-100 pt-3">
+              <span className="text-[11px] font-extrabold text-slate-400 block mb-2">Kupon Kasir Yang Tersedia</span>
+              {availableCoupons.length === 0 ? (
+                <p className="text-xs text-slate-400 font-semibold italic text-center py-4">Belum ada kupon diskon aktif untuk kasir.</p>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {availableCoupons.map((c) => (
+                    <div
+                      key={c.id}
+                      className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 hover:bg-emerald-50/50 hover:border-emerald-300 transition-all flex items-center justify-between gap-3 cursor-pointer"
+                      onClick={() => applyCouponCode(c.kode)}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">{c.kode}</span>
+                          <span className="font-extrabold text-xs text-slate-800 truncate">{c.judul}</span>
+                        </div>
+                        <p className="text-[10px] font-semibold text-slate-500 mt-1">
+                          {c.tipe_diskon === 'percent' ? `Diskon ${c.jumlah_diskon}%` : `Potongan ${formatCurrency(c.jumlah_diskon)}`}
+                          {c.min_total_pesanan > 0 && ` • Min. Belanja ${formatCurrency(c.min_total_pesanan)}`}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-extrabold rounded-lg shadow-sm hover:bg-emerald-700 cursor-pointer shrink-0"
+                      >
+                        Pilih
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -13,6 +13,7 @@ export function KasirProvider({ children }) {
   const [selectedContact, setSelectedContact] = useState(null);
   const [discountPercent, setDiscountPercent] = useState(0);
   const [taxPercent, setTaxPercent] = useState(0);
+  const [selectedCoupon, setSelectedCoupon] = useState(null);
 
   // Fetch active shift status on mount
   const checkActiveShift = async () => {
@@ -153,6 +154,7 @@ export function KasirProvider({ children }) {
     setSelectedContact(null);
     setDiscountPercent(0);
     setTaxPercent(0);
+    setSelectedCoupon(null);
   };
 
   const removeItemsFromCart = (itemsToRemove) => {
@@ -181,13 +183,29 @@ export function KasirProvider({ children }) {
     return Math.round((getSubtotal() * Number(discountPercent || 0)) / 100);
   };
 
+  const getCouponDiscountAmount = () => {
+    if (!selectedCoupon) return 0;
+    const subtotal = getSubtotal();
+    if (selectedCoupon.min_total_pesanan && subtotal < Number(selectedCoupon.min_total_pesanan)) {
+      return 0;
+    }
+    if (selectedCoupon.tipe_diskon === 'percent') {
+      let val = Math.round((subtotal * Number(selectedCoupon.jumlah_diskon || 0)) / 100);
+      if (Number(selectedCoupon.maksimal_jumlah_diskon) > 0) {
+        val = Math.min(val, Number(selectedCoupon.maksimal_jumlah_diskon));
+      }
+      return Math.min(val, subtotal);
+    }
+    return Math.min(subtotal, Number(selectedCoupon.jumlah_diskon || 0));
+  };
+
   const getTaxAmount = () => {
-    const afterDiscount = getSubtotal() - getDiscountAmount();
+    const afterDiscount = Math.max(0, getSubtotal() - getDiscountAmount() - getCouponDiscountAmount());
     return Math.round((afterDiscount * Number(taxPercent || 0)) / 100);
   };
 
   const getTotal = () => {
-    return Math.round(getSubtotal() - getDiscountAmount() + getTaxAmount());
+    return Math.max(0, Math.round(getSubtotal() - getDiscountAmount() - getCouponDiscountAmount() + getTaxAmount()));
   };
 
   return (
@@ -212,8 +230,11 @@ export function KasirProvider({ children }) {
         setDiscountPercent,
         taxPercent,
         setTaxPercent,
+        selectedCoupon,
+        setSelectedCoupon,
         getSubtotal,
         getDiscountAmount,
+        getCouponDiscountAmount,
         getTaxAmount,
         getTotal,
         cartNotes,
