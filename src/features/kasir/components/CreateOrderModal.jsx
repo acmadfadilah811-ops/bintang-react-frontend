@@ -18,6 +18,31 @@ const emptyItem = () => ({
   harga_jual: 0,
 });
 
+const checkIsMeteran = (product) => {
+  if (!product) return false;
+  const priceTypeM2 = product.price_type === 'per_m2';
+  const nameMatch = (name) => {
+    if (!name) return false;
+    const n = String(name).toLowerCase();
+    return (
+      n.includes('per_m2') ||
+      n.includes('outdoor') ||
+      n.includes('banner') ||
+      n.includes('spanduk') ||
+      n.includes('baliho') ||
+      n.includes('sticker') ||
+      n.includes('meter')
+    );
+  };
+  return (
+    product.is_meteran === true ||
+    product.tipe_kalkulasi === 'meteran' ||
+    priceTypeM2 ||
+    nameMatch(product.kategori_nama) ||
+    nameMatch(product.kategori)
+  );
+};
+
 export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCustomer, initialCart }) {
   const navigate = useNavigate();
   let shiftAktif = null;
@@ -136,17 +161,7 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
   // Add Product from Left Catalog to Right Order Items
   const addProductToOrder = (product) => {
     const detectedPrice = product.harga_jual_toko ?? product.harga_jual ?? 0;
-    const isMeteran =
-      product.is_meteran ||
-      product.tipe_kalkulasi === 'meteran' ||
-      (product.kategori &&
-        (String(product.kategori).includes('per_m2') ||
-         String(product.kategori).includes('outdoor') ||
-         String(product.kategori).includes('banner') ||
-         String(product.kategori).includes('spanduk') ||
-         String(product.kategori).includes('baliho') ||
-         String(product.kategori).includes('sticker') ||
-         String(product.kategori).includes('meter')));
+    const isMeteran = checkIsMeteran(product);
 
     const newItem = {
       id: `prod-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -591,17 +606,7 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
                               onChange={(p) => {
                                 if (p) {
                                   const detectedPrice = p.harga_jual_toko ?? p.harga_jual ?? 0;
-                                  const isMeteran =
-                                    p.is_meteran ||
-                                    p.tipe_kalkulasi === 'meteran' ||
-                                    (p.kategori &&
-                                      (String(p.kategori).includes('per_m2') ||
-                                       String(p.kategori).includes('outdoor') ||
-                                       String(p.kategori).includes('banner') ||
-                                       String(p.kategori).includes('spanduk') ||
-                                       String(p.kategori).includes('baliho') ||
-                                       String(p.kategori).includes('sticker') ||
-                                       String(p.kategori).includes('meter')));
+                                  const isMeteran = checkIsMeteran(p);
                                   updateItem(idx, {
                                     product: p.id,
                                     product_nama: p.nama,
