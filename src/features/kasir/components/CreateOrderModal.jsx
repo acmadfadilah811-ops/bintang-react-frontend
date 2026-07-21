@@ -59,6 +59,9 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
   const [metode, setMetode] = useState('tunai');
   const [dp, setDp] = useState(0);
   const [diskon, setDiskon] = useState(0);
+  const [couponInput, setCouponInput] = useState('');
+  const [selectedCoupon, setSelectedCoupon] = useState(null);
+  const [evaluatingCoupon, setEvaluatingCoupon] = useState(false);
   const [catatan, setCatatan] = useState('');
   const [items, setItems] = useState([emptyItem()]);
   const [saving, setSaving] = useState(false);
@@ -68,25 +71,32 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const customerDropdownRef = useRef(null);
 
+  const hasInitialized = useRef(false);
+
   useEffect(() => {
     if (isOpen) {
-      if (initialCustomer) {
-        setNama(initialCustomer.nama || '');
-        setNomorWa(initialCustomer.nomor_wa || '');
+      if (!hasInitialized.current) {
+        if (initialCustomer) {
+          setNama(initialCustomer.nama || '');
+          setNomorWa(initialCustomer.nomor_wa || '');
+        }
+        if (initialCart && initialCart.length > 0) {
+          const mappedItems = initialCart.map((c) => ({
+            id: `cart-${c.id || Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            jenis_produk: c.nama || c.jenis_produk || '',
+            product: c.product?.id || c.product_id || c.id || null,
+            product_nama: c.nama || '',
+            panjang: c.panjang || 1,
+            lebar: c.lebar || 1,
+            qty: c.qty || 1,
+            harga_jual: c.harga_jual_toko || c.harga || 0,
+          }));
+          setItems(mappedItems);
+        }
+        hasInitialized.current = true;
       }
-      if (initialCart && initialCart.length > 0) {
-        const mappedItems = initialCart.map((c) => ({
-          id: `cart-${c.id || Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          jenis_produk: c.nama || c.jenis_produk || '',
-          product: c.product?.id || c.product_id || c.id || null,
-          product_nama: c.nama || '',
-          panjang: c.panjang || 1,
-          lebar: c.lebar || 1,
-          qty: c.qty || 1,
-          harga_jual: c.harga_jual_toko || c.harga || 0,
-        }));
-        setItems(mappedItems);
-      }
+    } else {
+      hasInitialized.current = false;
     }
   }, [isOpen, initialCustomer, initialCart]);
 
@@ -227,8 +237,60 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
 
   const getSubtotal = () =>
     items.reduce((sum, it) => sum + getItemSubtotal(it), 0);
-  const getTotal = () => Math.max(0, getSubtotal() - (getSubtotal() * parseFloat(diskon || 0)) / 100);
-  const getSisa = () => Math.max(0, getTotal() - parseFloat(dp || 0));
+
+  const getCouponDiscountAmount = () => {
+    if (!selectedCoupon) return 0;
+    const subtotal = getSubtotal();
+    if (selectedCoupon.min_total_pesanan && subtotal < Number(selectedCoupon.min_total_pesanan)) {
+      return 0;
+    }
+    if (selectedCoupon.tipe_diskon === 'percent') {
+      let val = Math.round((subtotal * Number(selectedCoupon.jumlah_diskon || 0)) / 100);
+      if (Number(selectedCoupon.maksimal_jumlah_diskon) > 0) {
+        val = Math.min(val, Number(selectedCoupon.maksimal_jumlah_diskon));
+      }
+      return Math.min(val, subtotal);
+    }
+    return Math.min(subtotal, Number(selectedCoupon.jumlah_diskon || 0));
+  };
+
+  const getPercentDiscountAmount = () =>
+    Math.round((getSubtotal() * parseFloat(diskon || 0)) / 100);
+
+  const getTotal = () =>
+    Math.max(0, getSubtotal() - getPercentDiscountAmount() - getCouponDiscountAmount());
+
+  const getSisa = () =>
+    Math.max(0, getTotal() - parseFloat(dp || 0));
+
+  const applyCouponCode = async (codeToApply) => {
+    const code = (codeToApply || couponInput).trim();
+    if (!code) return;
+    setEvaluatingCoupon(true);
+    try {
+      const res = await apiClient.post('/discount-coupons/evaluate/', {
+        kode: code,
+        subtotal: getSubtotal(),
+        pelanggan: null,
+        items: items.map(it => ({
+          product_id: it.product,
+          harga: it.harga_jual,
+          qty: it.qty
+        }))
+      });
+      if (res.data?.ok) {
+        setSelectedCoupon(res.data.kupon);
+        setCouponInput('');
+        alert('Kupon berhasil diterapkan!');
+      } else {
+        alert(res.data?.alasan || 'Kupon tidak dapat digunakan.');
+      }
+    } catch (err) {
+      alert(err.response?.data?.alasan || err.response?.data?.error || 'Kode kupon tidak valid atau tidak dapat digunakan.');
+    } finally {
+      setEvaluatingCoupon(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
@@ -256,6 +318,8 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
         dp_dibayar: parseInt(dp || 0),
         diskon_persen: parseFloat(diskon || 0),
         status_global: 'review',
+        kupon_kode: selectedCoupon ? selectedCoupon.kode : null,
+        diskon_kupon: getCouponDiscountAmount(),
       });
       const orderId = resOrder.data.id;
       for (const it of validItems) {
@@ -290,6 +354,8 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
     setCatatan('');
     setDp(0);
     setDiskon(0);
+    setCouponInput('');
+    setSelectedCoupon(null);
     setItems([emptyItem()]);
     if (onSuccess) onSuccess();
     if (onClose) onClose();
@@ -304,6 +370,7 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
       alert(
         `Order #${orderBaru.id} tersimpan, namun SPK gagal diterbitkan. Terbitkan ulang melalui menu Antrean WA.`
       );
+      throw err;
     }
     handleFinish();
   };
@@ -704,7 +771,47 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
                       className="w-20 text-right px-2 py-0.5 border border-slate-200 rounded-lg font-bold bg-white text-slate-800"
                     />
                   </div>
-                  <div className="flex justify-between items-center font-black text-slate-900 text-xs">
+
+                  <div className="pt-1 border-t border-dashed border-slate-200">
+                    {!selectedCoupon ? (
+                      <div className="flex gap-1.5 items-center">
+                        <input
+                          type="text"
+                          placeholder="KODE KUPON PROMO"
+                          value={couponInput}
+                          onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                          className="flex-1 px-2 py-1 text-[11px] border border-slate-200 rounded-lg uppercase font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => applyCouponCode()}
+                          disabled={evaluatingCoupon}
+                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] rounded-lg disabled:opacity-50 cursor-pointer"
+                        >
+                          {evaluatingCoupon ? 'Checking...' : 'Terapkan'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between items-center bg-emerald-50 border border-emerald-100 rounded-lg p-1.5 text-[11px]">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-emerald-800 uppercase">{selectedCoupon.kode}</span>
+                          <span className="text-[10px] text-slate-500">{selectedCoupon.judul}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-extrabold text-emerald-700">-{formatCurrency(getCouponDiscountAmount())}</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCoupon(null)}
+                            className="text-slate-400 hover:text-rose-500 font-bold p-0.5 text-xs"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center font-black text-slate-900 text-xs pt-1 border-t border-slate-200">
                     <span>Total</span>
                     <span className="text-indigo-600 text-sm">{formatCurrency(getTotal())}</span>
                   </div>
