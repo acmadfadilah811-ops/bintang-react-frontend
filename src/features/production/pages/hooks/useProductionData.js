@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import apiClient from '../../../../api/apiClient';
-import { notifyApiError } from '../../../../utils/notify';
 
 export default function useProductionData() {
   const [jobs, setJobs] = useState([]);
@@ -11,8 +10,6 @@ export default function useProductionData() {
   const [staffList, setStaffList] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [customersTruncated, setCustomersTruncated] = useState(false);
-  const [customersLimit, setCustomersLimit] = useState(0);
   const [pricelists, setPricelists] = useState([]);
   const [divisions, setDivisions] = useState([]);
   const [globalJobs, setGlobalJobs] = useState([]);
@@ -87,25 +84,12 @@ export default function useProductionData() {
     }
   }, []);
 
-  const fetchCustomers = useCallback(async (search = '') => {
+  const fetchCustomers = useCallback(async () => {
     try {
-      // BE-24: papan produksi memakai endpoint sempit (nama + no. WA saja);
-      // /contacts/ penuh kini dikunci untuk staff agar data finansial pelanggan
-      // (piutang, total belanja) tidak bocor.
-      // Pencarian dilakukan di server dan hasilnya dibatasi, jadi papan produksi
-      // tidak lagi menarik seluruh tabel kontak setiap kali dibuka.
-      const res = await apiClient.get('/contacts/production-lite/', {
-        params: search ? { search } : {},
-      });
-      const payload = res.data;
-      // Toleran terhadap bentuk lama (array polos) maupun baru ({results,...}).
-      setCustomers(Array.isArray(payload) ? payload : payload?.results || []);
-      setCustomersTruncated(Boolean(payload?.truncated));
-      setCustomersLimit(Number(payload?.limit) || 0);
+      const res = await apiClient.get('/contacts/production-lite/');
+      setCustomers(Array.isArray(res.data) ? res.data : (res.data?.results || []));
     } catch (err) {
-      notifyApiError(err, 'Gagal memuat data pelanggan.');
-      setCustomers([]);
-      setCustomersTruncated(false);
+      console.error('Failed to fetch customers:', err);
     }
   }, []);
 
@@ -203,8 +187,6 @@ export default function useProductionData() {
     staffList,
     inventory,
     customers,
-    customersTruncated,
-    customersLimit,
     pricelists,
     divisions,
     globalJobs,

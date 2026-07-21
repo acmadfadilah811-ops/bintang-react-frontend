@@ -1,16 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Search, MessageCircle, RefreshCw } from 'lucide-react';
 
-export default function CustomerPanel({ customers, truncated, limit, onSearch }) {
+export default function CustomerPanel({ customers, refresh }) {
   const [search, setSearch] = useState('');
 
-  // Pencarian ditangani server: menyaring di klien akan memaksa endpoint
-  // mengirim seluruh tabel kontak, dan memotongnya diam-diam justru membuat
-  // pelanggan "hilang" dari hasil pencarian.
-  useEffect(() => {
-    const handle = setTimeout(() => onSearch(search.trim()), 300);
-    return () => clearTimeout(handle);
-  }, [search, onSearch]);
+  const filteredCustomers = customers.filter(
+    (c) =>
+      (c.nama || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.nomor_wa || '').includes(search)
+  );
 
   return (
     <div className="space-y-4">
@@ -24,7 +22,7 @@ export default function CustomerPanel({ customers, truncated, limit, onSearch })
           </p>
         </div>
         <button
-          onClick={() => onSearch(search.trim())}
+          onClick={refresh}
           className="flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-500 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg cursor-pointer"
         >
           <RefreshCw size={12} />
@@ -44,12 +42,6 @@ export default function CustomerPanel({ customers, truncated, limit, onSearch })
             className="w-full text-xs pl-9 pr-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
           />
         </div>
-        {truncated && (
-          <p className="mt-2 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            Menampilkan {limit} pelanggan pertama. Persempit pencarian untuk
-            menemukan pelanggan yang belum terlihat.
-          </p>
-        )}
       </div>
 
       {/* Table List */}
@@ -63,16 +55,15 @@ export default function CustomerPanel({ customers, truncated, limit, onSearch })
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
-            {customers.length === 0 ? (
+            {filteredCustomers.length === 0 ? (
               <tr>
                 <td colSpan={3} className="px-6 py-8 text-center text-slate-400 italic">
                   Tidak ada konsumen ditemukan
                 </td>
               </tr>
             ) : (
-              customers.map((cust, idx) => (
-                // nomor_wa bisa duplikat di data lama, jadi jangan dipakai sendirian.
-                <tr key={`${cust.nomor_wa}-${idx}`} className="hover:bg-slate-50/50">
+              filteredCustomers.map((cust) => (
+                <tr key={cust.nomor_wa} className="hover:bg-slate-50/50">
                   <td className="px-6 py-3.5 font-bold text-slate-800">{cust.nama}</td>
                   <td className="px-6 py-3.5 font-mono text-slate-500">{cust.nomor_wa}</td>
                   <td className="px-6 py-3.5 text-right">

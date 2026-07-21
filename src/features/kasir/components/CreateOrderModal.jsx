@@ -136,6 +136,18 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
   // Add Product from Left Catalog to Right Order Items
   const addProductToOrder = (product) => {
     const detectedPrice = product.harga_jual_toko ?? product.harga_jual ?? 0;
+    const isMeteran =
+      product.is_meteran ||
+      product.tipe_kalkulasi === 'meteran' ||
+      (product.kategori &&
+        (String(product.kategori).includes('per_m2') ||
+         String(product.kategori).includes('outdoor') ||
+         String(product.kategori).includes('banner') ||
+         String(product.kategori).includes('spanduk') ||
+         String(product.kategori).includes('baliho') ||
+         String(product.kategori).includes('sticker') ||
+         String(product.kategori).includes('meter')));
+
     const newItem = {
       id: `prod-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       jenis_produk: product.nama,
@@ -143,6 +155,7 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
       product_nama: product.nama,
       panjang: 1,
       lebar: 1,
+      is_meteran: isMeteran,
       qty: 1,
       harga_jual: detectedPrice,
     };
@@ -160,8 +173,36 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
   const formatCurrency = (v) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(v || 0);
 
+  const getItemSubtotal = (it) => {
+    const p_raw = parseFloat(it.panjang);
+    const l_raw = parseFloat(it.lebar);
+    const isMeteran =
+      it.is_meteran === true ||
+      (it.is_meteran !== false && (p_raw > 0 || l_raw > 0));
+    const p = p_raw > 0 ? p_raw : 1;
+    const l = l_raw > 0 ? l_raw : 1;
+    const qty = parseInt(it.qty) || 1;
+    const harga = parseFloat(it.harga_jual) || 0;
+    return isMeteran ? p * l * harga * qty : harga * qty;
+  };
+
   const changeItem = (idx, field, value) => {
-    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [field]: value } : it)));
+    setItems((prev) =>
+      prev.map((it, i) => {
+        if (i !== idx) return it;
+        const updated = { ...it, [field]: value };
+        if (field === 'panjang' || field === 'lebar') {
+          const p = parseFloat(field === 'panjang' ? value : it.panjang) || 0;
+          const l = parseFloat(field === 'lebar' ? value : it.lebar) || 0;
+          if (p > 0 || l > 0) {
+            updated.is_meteran = true;
+            if (!updated.panjang || parseFloat(updated.panjang) <= 0) updated.panjang = 1;
+            if (!updated.lebar || parseFloat(updated.lebar) <= 0) updated.lebar = 1;
+          }
+        }
+        return updated;
+      })
+    );
   };
   const updateItem = (idx, patch) => {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -170,7 +211,7 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
   const removeItem = (idx) => setItems((prev) => prev.filter((_, i) => i !== idx));
 
   const getSubtotal = () =>
-    items.reduce((sum, it) => sum + parseFloat(it.harga_jual || 0) * parseFloat(it.qty || 1), 0);
+    items.reduce((sum, it) => sum + getItemSubtotal(it), 0);
   const getTotal = () => Math.max(0, getSubtotal() - (getSubtotal() * parseFloat(diskon || 0)) / 100);
   const getSisa = () => Math.max(0, getTotal() - parseFloat(dp || 0));
 
@@ -203,14 +244,16 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
       });
       const orderId = resOrder.data.id;
       for (const it of validItems) {
+        const itemSubtotal = getItemSubtotal(it);
         await apiClient.post('/order-items/', {
           order: orderId,
           jenis_produk: it.jenis_produk,
           product: it.product || null,
           panjang: parseFloat(it.panjang || 0),
           lebar: parseFloat(it.lebar || 0),
+          harga_per_m2: parseFloat(it.harga_jual || 0),
           qty: parseInt(it.qty || 1),
-          harga_jual: parseInt(it.harga_jual || 0),
+          harga_jual: Math.round(itemSubtotal),
         });
       }
       setOrderBaru({ id: orderId, nama });
@@ -548,14 +591,28 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
                               onChange={(p) => {
                                 if (p) {
                                   const detectedPrice = p.harga_jual_toko ?? p.harga_jual ?? 0;
+                                  const isMeteran =
+                                    p.is_meteran ||
+                                    p.tipe_kalkulasi === 'meteran' ||
+                                    (p.kategori &&
+                                      (String(p.kategori).includes('per_m2') ||
+                                       String(p.kategori).includes('outdoor') ||
+                                       String(p.kategori).includes('banner') ||
+                                       String(p.kategori).includes('spanduk') ||
+                                       String(p.kategori).includes('baliho') ||
+                                       String(p.kategori).includes('sticker') ||
+                                       String(p.kategori).includes('meter')));
                                   updateItem(idx, {
                                     product: p.id,
                                     product_nama: p.nama,
                                     jenis_produk: it.jenis_produk ? it.jenis_produk : p.nama,
                                     harga_jual: detectedPrice > 0 ? detectedPrice : it.harga_jual,
+                                    is_meteran: isMeteran,
+                                    panjang: it.panjang || 1,
+                                    lebar: it.lebar || 1,
                                   });
                                 } else {
-                                  updateItem(idx, { product: null, product_nama: '' });
+                                  updateItem(idx, { product: null, product_nama: '', is_meteran: false });
                                 }
                               }}
                             />
@@ -593,7 +650,7 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
                             />
                           </td>
                           <td className="px-3 py-2 text-right font-black text-slate-900 text-xs">
-                            {formatCurrency(parseFloat(it.harga_jual || 0) * parseFloat(it.qty || 1))}
+                            {formatCurrency(getItemSubtotal(it))}
                           </td>
                           <td className="px-2 py-2 text-center">
                             {items.length > 1 && (

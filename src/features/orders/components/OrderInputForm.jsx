@@ -180,17 +180,31 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
     newItems[index][field] = value;
+    if (field === 'panjang' || field === 'lebar') {
+      const p = parseFloat(field === 'panjang' ? value : newItems[index].panjang) || 0;
+      const l = parseFloat(field === 'lebar' ? value : newItems[index].lebar) || 0;
+      if (p > 0 || l > 0) {
+        newItems[index].is_meteran = true;
+        if (!newItems[index].panjang || parseFloat(newItems[index].panjang) <= 0) newItems[index].panjang = 1;
+        if (!newItems[index].lebar || parseFloat(newItems[index].lebar) <= 0) newItems[index].lebar = 1;
+      }
+    }
     setFormData({ ...formData, items: newItems });
   };
 
   const calculateSubtotal = () => {
     return formData.items.reduce((total, item) => {
-      const isMeteran = item.is_meteran !== false;
+      const p_raw = parseFloat(item.panjang);
+      const l_raw = parseFloat(item.lebar);
+      const isMeteran =
+        item.is_meteran === true ||
+        (item.is_meteran !== false && (p_raw > 0 || l_raw > 0));
+
       const qty = parseInt(item.qty) || 1;
       const harga = parseFloat(item.harga_per_m2) || 0;
       if (isMeteran) {
-        const p = parseFloat(item.panjang) || 0;
-        const l = parseFloat(item.lebar) || 0;
+        const p = p_raw > 0 ? p_raw : 1;
+        const l = l_raw > 0 ? l_raw : 1;
         return total + p * l * harga * qty;
       } else {
         return total + harga * qty;

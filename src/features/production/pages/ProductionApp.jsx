@@ -149,8 +149,6 @@ export default function ProductionApp() {
     staffList,
     inventory,
     customers,
-    customersTruncated,
-    customersLimit,
     pricelists,
     divisions,
     globalJobs,
@@ -250,15 +248,14 @@ export default function ProductionApp() {
   // Lazy load tab data dynamically on activeTab change
   useEffect(() => {
     if (!modeInitialized) return;
-    // Tab 'customers' TIDAK di-fetch di sini: CustomerPanel yang memicu
-    // pencarian server (termasuk saat mount). Memanggilnya di sini juga akan
-    // menghasilkan dua request untuk satu kali buka tab.
-    if (activeTab === 'pricelist') {
+    if (activeTab === 'customers') {
+      fetchCustomers();
+    } else if (activeTab === 'pricelist') {
       fetchPricelists();
     } else if (activeTab === 'divisions') {
       fetchDivisions();
     }
-  }, [activeTab, modeInitialized, fetchPricelists, fetchDivisions]);
+  }, [activeTab, modeInitialized, fetchCustomers, fetchPricelists, fetchDivisions]);
 
   // Handle action triggers
   const handleClaim = async (jobId) => {
@@ -311,14 +308,7 @@ export default function ProductionApp() {
         case 'inventory':
           return <InventoryPanel items={inventory} refresh={fetchAdminData} />;
         case 'customers':
-          return (
-            <CustomerPanel
-              customers={customers}
-              truncated={customersTruncated}
-              limit={customersLimit}
-              onSearch={fetchCustomers}
-            />
-          );
+          return <CustomerPanel customers={customers} refresh={fetchAdminData} />;
         case 'pricelist':
           return <PricelistPanel items={pricelists} refresh={fetchAdminData} />;
         case 'divisions':
