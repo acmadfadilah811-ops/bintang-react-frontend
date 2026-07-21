@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { playSoundForType } from '../utils/notificationSounds';
 import apiClient from '../api/apiClient';
+import { registerNotifier } from '../utils/notify';
 
 const DynamicIslandContext = createContext(null);
 
@@ -119,6 +120,15 @@ export function DynamicIslandProvider({ children }) {
   const dismissNotification = () => {
     setActiveNotification(null);
   };
+
+  // FE-16: daftarkan surface notifikasi ini sebagai handler global agar helper
+  // penanganan error API (notifyApiError) dapat menampilkan pesan ke pengguna
+  // dari mana saja, termasuk di luar komponen React.
+  useEffect(() => {
+    registerNotifier(triggerNotification);
+    return () => registerNotifier(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto dismiss notification after 4.5 seconds
   useEffect(() => {

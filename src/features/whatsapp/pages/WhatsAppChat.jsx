@@ -28,6 +28,10 @@ export default function WhatsAppChat() {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const prevMessageCountRef = useRef(null); // track incoming message count for sound trigger
+  // FE-15: auto-pilih chat dari ?number= hanya SEKALI. Tanpa guard ini,
+  // fetchChats yang dipanggil tiap 5 detik akan terus memanggil setActiveChat +
+  // fetchMessages(loader), memicu flicker loading dan me-reset interval polling.
+  const autoSelectedRef = useRef(false);
 
   // Fetch chats on mount
   useEffect(() => {
@@ -67,9 +71,10 @@ export default function WhatsAppChat() {
 
       setChats(sortedChats);
 
-      if (targetNumber) {
+      if (targetNumber && !autoSelectedRef.current) {
         const matchingChat = sortedChats.find(chat => chat.id.split('@')[0] === targetNumber);
         if (matchingChat) {
+          autoSelectedRef.current = true;
           setActiveChat(matchingChat);
           fetchMessages(matchingChat.id, true);
         }

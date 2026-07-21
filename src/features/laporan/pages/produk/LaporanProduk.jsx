@@ -731,7 +731,8 @@ function LaporanDetail({ report, collapsed, onExpand }) {
         `/reports/${report.dataSource}/export/?format=${fmt}&${queryString}`,
         { responseType: 'blob' },
       );
-      const blob = new Blob([res.data], fmt === 'pdf' ? { type: 'text/html' } : {});
+      const mimeType = fmt === 'pdf' ? 'text/html' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      const blob = new Blob([res.data], { type: mimeType });
       const url = URL.createObjectURL(blob);
       if (fmt === 'pdf') {
         // Backend mengirim HTML yang otomatis membuka dialog cetak.
@@ -740,11 +741,24 @@ function LaporanDetail({ report, collapsed, onExpand }) {
         const a = document.createElement('a');
         a.href = url;
         a.download = `${report.dataSource}.xlsx`;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }
-    } catch {
-      alert('Gagal mengunduh laporan.');
+    } catch (err) {
+      console.error('Export error:', err);
+      let errMsg = err.message || 'Terjadi kesalahan saat mengunduh.';
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const json = JSON.parse(text);
+          if (json.error) errMsg = json.error;
+        } catch (_) {}
+      } else if (err.response?.data?.error) {
+        errMsg = err.response.data.error;
+      }
+      alert(`Gagal mengunduh laporan: ${errMsg}`);
     }
   };
 
@@ -895,7 +909,13 @@ function LaporanDetail({ report, collapsed, onExpand }) {
         ) : null;
       case 'export':
         return report.toolbar?.exportButton ? (
-          <button key="export" type="button" className={blueBtn}>
+          <button
+            key="export"
+            type="button"
+            disabled={!report.dataSource}
+            onClick={() => doExport('xlsx')}
+            className={`${blueBtn} disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
             <FileSpreadsheet size={15} /> Export
           </button>
         ) : null;

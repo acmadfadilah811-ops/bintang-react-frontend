@@ -46,13 +46,11 @@ export default function ProtectedRoute() {
   const userRole = user.role?.toLowerCase() || 'staff';
   const fid = getFeatureIdByPath(location.pathname);
 
-  // Cek otorisasi menu
-  if (fid && !hasMenuAccess(userRole, fid)) {
-    // Selalu izinkan akses ke halaman profile
-    if (location.pathname !== '/profile') {
-      const redirectPath = userRole === 'staff' ? '/staff-dashboard' : '/dashboard';
-      return <Navigate to={redirectPath} replace />;
-    }
+  // Cek otorisasi menu — pengecualian untuk halaman profil & dashboard dasar
+  const isBasicRoute = location.pathname === '/profile' || location.pathname === '/dashboard' || location.pathname === '/staff-dashboard' || location.pathname === '/';
+  if (!isBasicRoute && fid && !hasMenuAccess(userRole, fid)) {
+    const redirectPath = userRole === 'staff' ? '/staff-dashboard' : '/dashboard';
+    return <Navigate to={redirectPath} replace />;
   }
 
   return <Outlet />;

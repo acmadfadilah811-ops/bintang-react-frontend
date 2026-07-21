@@ -320,7 +320,7 @@ export default function Sidebar() {
           </div>
           {!isCollapsed && (
             <h1
-              className="text-slate-855 text-slate-800 font-extrabold text-[15px] tracking-tight animate-fade-in truncate max-w-[125px]"
+              className="text-slate-800 text-slate-800 font-extrabold text-sm tracking-tight animate-fade-in truncate max-w-[125px]"
               title={businessSettings?.nama_bisnis || 'Bintang Advertising'}
             >
               {businessSettings?.nama_bisnis || 'Bintang Advertising'}
@@ -412,7 +412,7 @@ export default function Sidebar() {
                           className={`w-full flex items-center rounded-lg transition-all duration-200 focus:outline-none cursor-pointer ${
                             isCollapsed
                               ? 'justify-center p-1.5 my-0.5'
-                              : 'pl-9 pr-3 py-1.5 gap-2 text-xs'
+                              : 'pl-9 pr-3 py-1.5 gap-2 text-sm'
                           } ${
                             isSubActive
                               ? accent?.subActive || 'text-blue-600 font-extrabold bg-blue-50/60'

@@ -60,7 +60,7 @@ export function AddonsPage({ onToggleCreate }) {
 
   const fetchProducts = async () => {
     try {
-      const res = await apiClient.get('/products/');
+      const res = await apiClient.get('/products/', { params: { page: 1, page_size: 1000 } });
       setAvailableProducts(Array.isArray(res.data) ? res.data : res.data?.results || []);
     } catch (err) {
       console.error('Error fetching available products:', err);

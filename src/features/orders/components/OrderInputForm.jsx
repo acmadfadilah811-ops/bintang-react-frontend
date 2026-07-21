@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import apiClient from '../../../api/apiClient';
 import ProductMasterPicker from './ProductMasterPicker';
+import { toLocalDateTimeInput } from '../../../utils/date';
 
 export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,7 +49,7 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
     if (isOpen) {
       fetchPrices();
       setFormData({
-        waktu: new Date().toISOString().slice(0, 16), // Format YYYY-MM-DDTHH:MM
+        waktu: toLocalDateTimeInput(), // Format YYYY-MM-DDTHH:MM
         nomor_wa: '',
         nama: '',
         catatan_pelanggan: '',
@@ -121,7 +122,7 @@ export default function OrderInputForm({ isOpen, onClose, onSuccess }) {
 
   // Struktur state baru sesuai rencana
   const [formData, setFormData] = useState({
-    waktu: new Date().toISOString().slice(0, 16), // Format YYYY-MM-DDTHH:MM
+    waktu: toLocalDateTimeInput(), // Format YYYY-MM-DDTHH:MM
     nomor_wa: '',
     nama: '',
     catatan_pelanggan: '',

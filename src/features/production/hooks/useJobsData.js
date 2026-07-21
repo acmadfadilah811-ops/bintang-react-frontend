@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import apiClient from '../../../api/apiClient';
 import { STAFF_COLUMNS } from '../components/jobConstants';
 import { playSuccess } from '../../../utils/notificationSounds';
+import { fetchAllPages } from '../../../utils/paginatedApi';
 
 /**
  * useJobsData — Custom hook untuk semua state & handler di halaman Jobs.
@@ -28,15 +29,13 @@ export function useJobsData() {
     if (!silent) setLoading(true);
     try {
       const [jobsRes, ordersRes] = await Promise.allSettled([
-        apiClient.get('/jobs/'),
-        apiClient.get('/orders/'),
+        fetchAllPages('/jobs/'),
+        fetchAllPages('/orders/'),
       ]);
 
       if (jobsRes.status === 'fulfilled') {
         // Handle both paginated and non-paginated responses
-        const rawJobs = Array.isArray(jobsRes.value.data)
-          ? jobsRes.value.data
-          : (jobsRes.value.data?.results ?? []);
+        const rawJobs = jobsRes.value;
         setJobs(rawJobs);
         setError(null);
       } else {
@@ -49,9 +48,7 @@ export function useJobsData() {
       }
 
       if (ordersRes.status === 'fulfilled') {
-        const raw = Array.isArray(ordersRes.value.data)
-          ? ordersRes.value.data
-          : (ordersRes.value.data?.results ?? []);
+        const raw = ordersRes.value;
         const map = {};
         raw.forEach((order) => {
           order.items?.forEach((item) => {
@@ -74,6 +71,9 @@ export function useJobsData() {
           });
         });
         setOrderMap(map);
+      } else {
+        console.error('Gagal memuat data order:', ordersRes.reason);
+        setError('Gagal memuat detail order untuk papan produksi. Silakan coba lagi.');
       }
     } catch (err) {
       console.error('Gagal memuat data jobs:', err);
@@ -93,20 +93,18 @@ export function useJobsData() {
       if (!isMounted) return;
       try {
         const [tahapRes, staffRes] = await Promise.allSettled([
-          apiClient.get('/tahap-proses/'),
-          apiClient.get('/users/'),
+          fetchAllPages('/tahap-proses/'),
+          fetchAllPages('/users/'),
         ]);
         if (!isMounted) return;
         if (tahapRes.status === 'fulfilled') {
-          const rawTahap = Array.isArray(tahapRes.value.data)
-            ? tahapRes.value.data
-            : (tahapRes.value.data?.results ?? []);
+          const val = tahapRes.value;
+          const rawTahap = Array.isArray(val) ? val : (Array.isArray(val?.data) ? val.data : (val?.data?.results ?? (val?.results ?? [])));
           setTahapList(rawTahap);
         }
         if (staffRes.status === 'fulfilled') {
-          const rawStaff = Array.isArray(staffRes.value.data)
-            ? staffRes.value.data
-            : (staffRes.value.data?.results ?? []);
+          const val = staffRes.value;
+          const rawStaff = Array.isArray(val) ? val : (Array.isArray(val?.data) ? val.data : (val?.data?.results ?? (val?.results ?? [])));
           setStaffList(rawStaff.filter((u) => u.role === 'staff'));
         }
       } catch { /* silently ignore */ }

@@ -20,7 +20,8 @@ export function KasirProvider({ children }) {
     try {
       const response = await apiClient.get('/saldo-kas-harian/');
       const list = response.data.results || response.data || [];
-      const todayStr = new Date().toISOString().slice(0, 10);
+      const now = new Date();
+      const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
       const isOpen = (item) =>
         (item.kas_akhir === null || item.kas_akhir === undefined) && !item.waktu_tutup;
       const getKasirId = (item) => {
@@ -35,8 +36,6 @@ export function KasirProvider({ children }) {
       const active =
         list.find((item) => isOpen(item) && milikSaya(item) && item.tanggal === todayStr) ||
         list.find((item) => isOpen(item) && milikSaya(item)) ||
-        list.find((item) => isOpen(item) && item.tanggal === todayStr) ||
-        list.find(isOpen) ||
         null;
       setShiftAktif(active);
     } catch (error) {
@@ -175,20 +174,20 @@ export function KasirProvider({ children }) {
   };
 
   const getSubtotal = () => {
-    return cart.reduce((sum, item) => sum + item.harga * item.qty, 0);
+    return Math.round(cart.reduce((sum, item) => sum + Number(item.harga) * Number(item.qty), 0));
   };
 
   const getDiscountAmount = () => {
-    return (getSubtotal() * discountPercent) / 100;
+    return Math.round((getSubtotal() * Number(discountPercent || 0)) / 100);
   };
 
   const getTaxAmount = () => {
     const afterDiscount = getSubtotal() - getDiscountAmount();
-    return (afterDiscount * taxPercent) / 100;
+    return Math.round((afterDiscount * Number(taxPercent || 0)) / 100);
   };
 
   const getTotal = () => {
-    return getSubtotal() - getDiscountAmount() + getTaxAmount();
+    return Math.round(getSubtotal() - getDiscountAmount() + getTaxAmount());
   };
 
   return (

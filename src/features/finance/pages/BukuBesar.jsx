@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import apiClient from '../../../api/apiClient';
 import {
   BookOpen,
@@ -195,8 +195,19 @@ export default function BukuBesar() {
       minimumFractionDigits: 0,
     }).format(angka || 0);
 
-  // Menghitung saldo berjalan secara dinamis di frontend
-  let currentSaldo = saldoAwal;
+  // FE-17: hitung saldo berjalan SEBELUM render (useMemo), bukan dengan
+  // memutasi variabel `let` di tengah .map() JSX. Mutasi saat render adalah
+  // anti-pattern React (bisa salah saat re-render/strict mode) dan sebelumnya
+  // dipakai bersama key={index} yang tidak stabil.
+  const rowsWithSaldo = useMemo(() => {
+    let running = saldoAwal;
+    return bukuBesarData.map((trx) => {
+      const d = parseFloat(trx.debit) || 0;
+      const k = parseFloat(trx.kredit) || 0;
+      running = isCreditNormal ? running + k - d : running + d - k;
+      return { ...trx, _d: d, _k: k, _saldo: running };
+    });
+  }, [bukuBesarData, saldoAwal, isCreditNormal]);
 
   // Menghitung total mutasi dan saldo akhir
   const totalDebit = bukuBesarData.reduce((sum, trx) => sum + (parseFloat(trx.debit) || 0), 0);
@@ -545,20 +556,14 @@ export default function BukuBesar() {
                 {isManagerOrOwner && <td className="px-5 py-3"></td>}
               </tr>
 
-              {bukuBesarData.length > 0 ? (
-                bukuBesarData.map((trx, index) => {
-                  const d = parseFloat(trx.debit) || 0;
-                  const k = parseFloat(trx.kredit) || 0;
-
-                  // Perhitungan Saldo Berjalan sesuai normal balance kategori akun
-                  if (isCreditNormal) {
-                    currentSaldo = currentSaldo + k - d;
-                  } else {
-                    currentSaldo = currentSaldo + d - k;
-                  }
+              {rowsWithSaldo.length > 0 ? (
+                rowsWithSaldo.map((trx, index) => {
+                  const d = trx._d;
+                  const k = trx._k;
+                  const currentSaldo = trx._saldo;
 
                   return (
-                    <tr key={index} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={trx.id ?? index} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-5 py-3.5">{dayjs(trx.tanggal).format('DD MMM YYYY')}</td>
                       <td className="px-3 py-3.5 font-mono text-[10px] text-slate-400 uppercase tracking-wider">
                         {trx.no_referensi || '-'}

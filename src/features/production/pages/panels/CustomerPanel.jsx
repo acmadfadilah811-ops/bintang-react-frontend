@@ -17,7 +17,8 @@ export default function CustomerPanel({ customers, refresh }) {
         <div>
           <h2 className="text-sm font-extrabold text-slate-800">Database Konsumen / Pelanggan</h2>
           <p className="text-[11px] text-slate-400">
-            Daftar pelanggan Bintang Advertising yang terintegrasi WhatsApp.
+            Nama & kontak WhatsApp pelanggan. Data finansial (piutang/total belanja)
+            hanya tersedia bagi manajemen.
           </p>
         </div>
         <button
@@ -50,15 +51,13 @@ export default function CustomerPanel({ customers, refresh }) {
             <tr>
               <th className="px-6 py-3">Nama Pelanggan</th>
               <th className="px-6 py-3">Nomor WhatsApp</th>
-              <th className="px-6 py-3 text-center">Total Order</th>
-              <th className="px-6 py-3 text-right">Total Transaksi</th>
               <th className="px-6 py-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
             {filteredCustomers.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-slate-400 italic">
+                <td colSpan={3} className="px-6 py-8 text-center text-slate-400 italic">
                   Tidak ada konsumen ditemukan
                 </td>
               </tr>
@@ -67,12 +66,6 @@ export default function CustomerPanel({ customers, refresh }) {
                 <tr key={cust.nomor_wa} className="hover:bg-slate-50/50">
                   <td className="px-6 py-3.5 font-bold text-slate-800">{cust.nama}</td>
                   <td className="px-6 py-3.5 font-mono text-slate-500">{cust.nomor_wa}</td>
-                  <td className="px-6 py-3.5 text-center font-bold text-indigo-600">
-                    {cust.total_order}x
-                  </td>
-                  <td className="px-6 py-3.5 text-right font-bold text-slate-900">
-                    Rp{(cust.total_spent || 0).toLocaleString()}
-                  </td>
                   <td className="px-6 py-3.5 text-right">
                     <a
                       href={`https://wa.me/${cust.nomor_wa.replace(/\D/g, '')}`}

@@ -28,7 +28,7 @@ export default function useProductionData() {
     setError(null);
     try {
       const res = await apiClient.get('/jobs/');
-      const allJobs = res.data;
+      const allJobs = Array.isArray(res.data) ? res.data : (res.data?.results || []);
 
       // Separate personal jobs and unassigned division jobs (claim pool)
       const personal = allJobs.filter((j) => j.pic_staff !== null);
@@ -58,9 +58,9 @@ export default function useProductionData() {
         apiClient.get('/users/?role=staff'),
         apiClient.get('/inventory/'),
       ]);
-      setTahapList(resTahap.data);
-      setStaffList(resStaff.data);
-      setInventory(resInv.data);
+      setTahapList(Array.isArray(resTahap.data) ? resTahap.data : (resTahap.data?.results || []));
+      setStaffList(Array.isArray(resStaff.data) ? resStaff.data : (resStaff.data?.results || []));
+      setInventory(Array.isArray(resInv.data) ? resInv.data : (resInv.data?.results || []));
     } catch (err) {
       console.error('Failed to fetch metadata:', err);
     }
@@ -73,8 +73,8 @@ export default function useProductionData() {
         apiClient.get('/inventory/'),
         apiClient.get('/jobs/'), // All jobs
       ]);
-      setInventory(resInv.data);
-      const allJobs = resGlobal.data;
+      setInventory(Array.isArray(resInv.data) ? resInv.data : (resInv.data?.results || []));
+      const allJobs = Array.isArray(resGlobal.data) ? resGlobal.data : (resGlobal.data?.results || []);
       setGlobalJobs(allJobs);
       // Sync ke jobs/claimPool juga supaya Staff Mode view bisa langsung terisi saat switch
       setJobs(allJobs.filter((j) => j.pic_staff !== null));
@@ -86,8 +86,8 @@ export default function useProductionData() {
 
   const fetchCustomers = useCallback(async () => {
     try {
-      const res = await apiClient.get('/contacts/');
-      setCustomers(res.data);
+      const res = await apiClient.get('/contacts/production-lite/');
+      setCustomers(Array.isArray(res.data) ? res.data : (res.data?.results || []));
     } catch (err) {
       console.error('Failed to fetch customers:', err);
     }
@@ -96,7 +96,7 @@ export default function useProductionData() {
   const fetchPricelists = useCallback(async () => {
     try {
       const res = await apiClient.get('/product-prices/');
-      setPricelists(res.data);
+      setPricelists(Array.isArray(res.data) ? res.data : (res.data?.results || []));
     } catch (err) {
       console.error('Failed to fetch pricelists:', err);
     }
@@ -105,7 +105,7 @@ export default function useProductionData() {
   const fetchDivisions = useCallback(async () => {
     try {
       const res = await apiClient.get('/divisi/');
-      setDivisions(res.data);
+      setDivisions(Array.isArray(res.data) ? res.data : (res.data?.results || []));
     } catch (err) {
       console.error('Failed to fetch divisions:', err);
     }

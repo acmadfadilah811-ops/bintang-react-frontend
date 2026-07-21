@@ -9,6 +9,7 @@ import SpkPublishModal from '../components/SpkPublishModal';
 import SplitBillModal from '../components/SplitBillModal';
 import ReceiptPrint from '../components/ReceiptPrint';
 import NumericInput from '../../../components/NumericInput';
+import { notifyApiError } from '../../../utils/notify';
 
 export default function PosTerminal() {
   const navigate = useNavigate();
@@ -69,6 +70,7 @@ export default function PosTerminal() {
         });
       } catch (err) {
         console.error('Gagal memuat aturan POS:', err);
+        notifyApiError(err, 'Gagal memuat aturan POS.');
       }
     })();
   }, []);
@@ -137,6 +139,7 @@ export default function PosTerminal() {
         setCategories(activeCats);
       } catch (err) {
         console.error('Error fetching categories:', err);
+        notifyApiError(err, 'Gagal memuat kategori produk.');
       }
     };
     fetchCategories();
@@ -147,7 +150,7 @@ export default function PosTerminal() {
     const fetchProducts = async () => {
       setLoadingProducts(true);
       try {
-        const params = { is_active: true };
+        const params = { is_active: true, page: 1, page_size: 1000 };
         if (selectedCategory && selectedCategory !== 'all') {
           params.kategori = selectedCategory;
         }
@@ -155,9 +158,11 @@ export default function PosTerminal() {
           params.search = searchTerm;
         }
         const res = await apiClient.get('/products/', { params });
-        setProducts(res.data || []);
+        setProducts(res.data?.results || res.data || []);
       } catch (err) {
         console.error('Error fetching products:', err);
+        setProducts([]);
+        notifyApiError(err, 'Gagal memuat katalog produk. Silakan coba lagi.');
       } finally {
         setLoadingProducts(false);
       }
@@ -170,11 +175,13 @@ export default function PosTerminal() {
   // Fetch Contacts for Customer autocomplete
   const fetchContactsList = async (query = '') => {
     try {
-      const params = query ? { search: query } : {};
+      const params = { page: 1, page_size: 100, ...(query ? { search: query } : {}) };
       const res = await apiClient.get('/contacts/', { params });
-      setContacts(res.data || []);
+      setContacts(res.data?.results || res.data || []);
     } catch (err) {
       console.error('Error fetching contacts:', err);
+      setContacts([]);
+      notifyApiError(err, 'Gagal memuat data pelanggan. Silakan coba lagi.');
     }
   };
 
@@ -243,7 +250,9 @@ export default function PosTerminal() {
         pelanggan: selectedContact ? selectedContact.id : null,
         subtotal: getSubtotal(),
         diskon: getDiscountAmount(),
+        diskon_persen: discountPercent,
         pajak: getTaxAmount(),
+        pajak_persen: taxPercent,
         total: totalVal,
         metode_bayar: paymentMethod,
         dibayar: paidVal,
@@ -983,7 +992,7 @@ export default function PosTerminal() {
       <CreateOrderModal
         isOpen={isCreateOrderModalOpen}
         onClose={() => setIsCreateOrderModalOpen(false)}
-        onSuccess={() => setIsCreateOrderModalOpen(false)}
+        onSuccess={() => { clearCart(); setIsCreateOrderModalOpen(false); }}
         initialCustomer={selectedContact}
         initialCart={cart}
       />

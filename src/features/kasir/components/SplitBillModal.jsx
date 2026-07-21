@@ -23,7 +23,10 @@ export default function SplitBillModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastReceipt, setLastReceipt] = useState(null);
 
-  // Initialize bills on open
+  // FE-12: inisialisasi hanya saat modal DIBUKA. Sebelumnya efek ini juga
+  // bergantung pada `cart`; ketika pembayaran split memicu penghapusan item
+  // dari cart, `cart` berubah -> efek jalan lagi -> layar sukses (step 3)
+  // langsung ter-reset ke step 1. Penghapusan cart kini ditunda sampai selesai.
   useEffect(() => {
     if (isOpen) {
       // Clone original cart items
@@ -32,7 +35,8 @@ export default function SplitBillModal({
       setStep(1);
       setLastReceipt(null);
     }
-  }, [isOpen, cart]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -46,13 +50,15 @@ export default function SplitBillModal({
   };
 
   // Calculations
-  const getSubtotal = (items) => items.reduce((sum, item) => sum + item.harga * item.qty, 0);
-  const getDiscountAmount = (items) => (getSubtotal(items) * discountPercent) / 100;
+  // FE-13: bulatkan semua nilai uang agar konsisten dengan KasirContext dan
+  // menghindari galat presisi float saat dikirim ke server.
+  const getSubtotal = (items) => Math.round(items.reduce((sum, item) => sum + Number(item.harga) * Number(item.qty), 0));
+  const getDiscountAmount = (items) => Math.round((getSubtotal(items) * Number(discountPercent || 0)) / 100);
   const getTaxAmount = (items) => {
     const afterDiscount = getSubtotal(items) - getDiscountAmount(items);
-    return (afterDiscount * taxPercent) / 100;
+    return Math.round((afterDiscount * Number(taxPercent || 0)) / 100);
   };
-  const getTotal = (items) => getSubtotal(items) - getDiscountAmount(items) + getTaxAmount(items);
+  const getTotal = (items) => Math.round(getSubtotal(items) - getDiscountAmount(items) + getTaxAmount(items));
 
   // Move items from A to B
   const moveToB = (itemKey, qtyToMove = 1) => {
@@ -142,6 +148,8 @@ export default function SplitBillModal({
 
       const res = await apiClient.post('/pos/sales/', payload);
       setLastReceipt(res.data);
+      // FE-12: JANGAN mutasi cart di sini (akan me-reset modal). Item billB
+      // dihapus dari cart saat user menekan Selesai (handleFinish).
       setStep(3);
     } catch (err) {
       console.error('Error split payment:', err);
@@ -152,7 +160,8 @@ export default function SplitBillModal({
   };
 
   const handleFinish = () => {
-    // Notify parent to subtract billB quantities from main cart
+    // FE-12: sekarang baru kurangi qty billB dari cart utama, setelah alur
+    // split selesai sepenuhnya, lalu tutup modal.
     onSplitSuccess(billB);
     onClose();
   };

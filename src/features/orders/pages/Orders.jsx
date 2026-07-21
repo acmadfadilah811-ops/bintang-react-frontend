@@ -1,5 +1,5 @@
 import apiClient from '../../../api/apiClient';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import {
@@ -70,6 +70,7 @@ export default function Orders() {
   const [editModalData, setEditModalData] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [savingChanges, setSavingChanges] = useState(false);
 
   // States for Smart Calculator in Edit Modal
   const [editItems, setEditItems] = useState([]);
@@ -235,11 +236,21 @@ export default function Orders() {
     }
   };
 
+  // FE-14: batalkan request yang masih berjalan agar respon lama tidak menimpa
+  // hasil terbaru (race condition saat mengetik pencarian / ganti halaman).
+  const abortRef = useRef(null);
+
   const fetchOrders = async (isSilent = false, page = 1) => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       if (!isSilent) setLoading(true);
       const res = await apiClient.get(
-        `/orders/?page=${page}&page_size=50&search=${encodeURIComponent(searchQuery)}&tab=${activeTab}`
+        `/orders/?page=${page}&page_size=50&search=${encodeURIComponent(searchQuery)}&tab=${activeTab}`,
+        { signal: controller.signal }
       );
       if (res.data && res.data.results) {
         setOrders(res.data.results);
@@ -252,6 +263,8 @@ export default function Orders() {
         setTotalPages(1);
       }
     } catch (err) {
+      // Abaikan error pembatalan (request digantikan request lebih baru).
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       console.error('Gagal menarik data orders:', err);
     } finally {
       if (!isSilent) setLoading(false);
@@ -272,9 +285,14 @@ export default function Orders() {
     fetchOrders(false, currentPage);
   }, [currentPage, activeTab]);
 
+  // FE-14: debounce pencarian agar tidak menembak API di setiap ketikan.
   useEffect(() => {
-    setCurrentPage(1);
-    fetchOrders(true, 1);
+    const handler = setTimeout(() => {
+      setCurrentPage(1);
+      fetchOrders(true, 1);
+    }, 400);
+    return () => clearTimeout(handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
   // Polling data real-time
@@ -406,6 +424,8 @@ export default function Orders() {
 
   const handleUpdateStatus = async (e) => {
     e.preventDefault();
+    if (savingChanges) return;
+    setSavingChanges(true);
     const form = e.target;
     const newStatus = form.status.value;
     const staffId = form.assign_staff?.value;
@@ -442,6 +462,7 @@ export default function Orders() {
         await apiClient.post(`/orders/${editModalData.id}/bayar/`, {
           jumlah_bayar: jumlahBayar,
           metode_pembayaran: metodePembayaran,
+          idempotency_key: crypto.randomUUID(),
         });
       }
 
@@ -467,7 +488,9 @@ export default function Orders() {
       }
     } catch (error) {
       console.error('Gagal update:', error);
-      alert('Gagal menyimpan perubahan.');
+      alert('Gagal menyimpan perubahan: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setSavingChanges(false);
     }
   };
 
@@ -1355,15 +1378,12 @@ export default function Orders() {
                   Batal
                 </button>
                 <button
-                  type="submit"
-                  onClick={(e) => {
-                    // Submit the nearest form programmatically
-                    const form = e.target.closest('div').previousSibling;
-                    if (form) form.requestSubmit();
-                  }}
+                  type="button"
+                  disabled={savingChanges}
+                  onClick={() => document.querySelector('form')?.requestSubmit()}
                   className="px-4 py-2 bg-[#714B67] hover:bg-[#5b3c53] text-white rounded-lg text-[11px] font-bold shadow-sm transition-colors cursor-pointer"
                 >
-                  Simpan Perubahan
+                  {savingChanges ? 'Menyimpan…' : 'Simpan Perubahan'}
                 </button>
               </div>
             </div>

@@ -5,6 +5,7 @@ import apiClient from '../../../../api/apiClient';
 import { getLogoUrl } from '../../../../utils/logo';
 import { useAuth } from '../../../../context/AuthContext';
 import { todayISO, startOfYearISO } from '../../../../utils/date';
+import { fetchAllPages } from '../../../../utils/paginatedApi';
 import { ImportCsvModal } from './ImportCsvModal';
 import { PembelianModal } from './PembelianModal';
 import { StockInCreateForm } from './StockInCreateForm';
@@ -43,11 +44,12 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
   const fetchDocuments = async () => {
     setListLoading(true);
     try {
-      const res = await apiClient.get('/stock-in-documents/');
-      const data = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      const data = await fetchAllPages('/stock-in-documents/');
       setStockList(data.map(mapDocToRow));
     } catch (err) {
       console.error('[StockInPage] fetch documents error:', err);
+      setStockList([]);
+      alert('Gagal memuat dokumen stok masuk: ' + (err.response?.data?.detail || err.message));
     } finally {
       setListLoading(false);
     }
@@ -109,11 +111,13 @@ export function StockInPage({ onToggleCreate, viewState: propViewState }) {
     }
     const handle = setTimeout(async () => {
       try {
-        const res = await apiClient.get('/products/', { params: { search: searchProduct } });
+        const res = await apiClient.get('/products/', { params: { search: searchProduct, page: 1, page_size: 100 } });
         const data = Array.isArray(res.data) ? res.data : res.data?.results || [];
         setProductOptions(data);
       } catch (err) {
         console.error('[StockInPage] search product error:', err);
+        setProductOptions([]);
+        alert('Gagal mencari produk: ' + (err.response?.data?.detail || err.message));
       }
     }, 300);
     return () => clearTimeout(handle);

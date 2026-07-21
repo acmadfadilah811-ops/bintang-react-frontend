@@ -113,8 +113,9 @@ export default function GlobalListPanel() {
   const fetchOrders = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     try {
-      const res = await apiClient.get('/orders/');
-      if (mountedRef.current) setOrders(res.data);
+      const res = await apiClient.get('/orders/', { params: { page: 1, page_size: 1000 } });
+      const ordersData = Array.isArray(res.data) ? res.data : (res.data?.results || []);
+      if (mountedRef.current) setOrders(ordersData);
     } catch (err) {
       console.error('Gagal memuat orders:', err);
     } finally {
@@ -130,9 +131,9 @@ export default function GlobalListPanel() {
           apiClient.get('/tahap-proses/'),
           apiClient.get('/users/?role=staff'),
         ]);
-        setMetadataDivisions(resDivs.data);
-        setMetadataTahapList(resTahap.data);
-        setMetadataStaffList(resStaff.data);
+        setMetadataDivisions(Array.isArray(resDivs.data) ? resDivs.data : (resDivs.data?.results || []));
+        setMetadataTahapList(Array.isArray(resTahap.data) ? resTahap.data : (resTahap.data?.results || []));
+        setMetadataStaffList(Array.isArray(resStaff.data) ? resStaff.data : (resStaff.data?.results || []));
       } catch (err) {
         console.error('Gagal memuat metadata divisi/tahap/staff:', err);
       }

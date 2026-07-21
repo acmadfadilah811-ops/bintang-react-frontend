@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import apiClient from '../../../../api/apiClient';
 import { getLogoUrl } from '../../../../utils/logo';
 import { useAuth } from '../../../../context/AuthContext';
+import { fetchAllPages } from '../../../../utils/paginatedApi';
 import { todayISO, startOfYearISO } from '../../../../utils/date';
 import { receivedByDisplay, receivedByRaw } from '../../../../utils/stockDocument';
 import { ImportCsvModal } from './ImportCsvModal';
@@ -94,11 +95,12 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
   const fetchDocuments = async () => {
     setListLoading(true);
     try {
-      const res = await apiClient.get('/stock-out-documents/');
-      const data = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      const data = await fetchAllPages('/stock-out-documents/');
       setStockList(data.map(mapDocToRow));
     } catch (err) {
       console.error('[StockOutPage] fetch documents error:', err);
+      setStockList([]);
+      alert('Gagal memuat dokumen stok keluar: ' + (err.response?.data?.detail || err.message));
     } finally {
       setListLoading(false);
     }
@@ -150,11 +152,13 @@ export function StockOutPage({ onToggleCreate, viewState: propViewState }) {
     }
     const handle = setTimeout(async () => {
       try {
-        const res = await apiClient.get('/products/', { params: { search: searchProduct } });
+        const res = await apiClient.get('/products/', { params: { search: searchProduct, page: 1, page_size: 100 } });
         const data = Array.isArray(res.data) ? res.data : res.data?.results || [];
         setProductOptions(data);
       } catch (err) {
         console.error('[StockOutPage] search product error:', err);
+        setProductOptions([]);
+        alert('Gagal mencari produk: ' + (err.response?.data?.detail || err.message));
       }
     }, 300);
     return () => clearTimeout(handle);

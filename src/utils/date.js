@@ -62,3 +62,10 @@ export const nowTimeLocal = () => {
   const detik = String(d.getSeconds()).padStart(2, '0');
   return `${jam}:${menit}:${detik}`;
 };
+
+/** "YYYY-MM-DDTHH:mm" untuk input datetime-local, tanpa konversi UTC. */
+export const toLocalDateTimeInput = (date = new Date()) => {
+  const jam = String(date.getHours()).padStart(2, '0');
+  const menit = String(date.getMinutes()).padStart(2, '0');
+  return `${toISODate(date)}T${jam}:${menit}`;
+};

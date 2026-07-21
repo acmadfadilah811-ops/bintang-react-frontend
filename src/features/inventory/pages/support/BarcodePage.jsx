@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Download, Printer, Search, Trash2 } from 'lucide-react';
 import apiClient from '../../../../api/apiClient';
+import { fetchAllPages } from '../../../../utils/paginatedApi';
 import { Button, PageHeader } from '../components/PageShell';
 import BarcodeSvg from './BarcodeSvg';
 import { downloadSheetPng } from './barcodeSheet';
@@ -42,10 +43,10 @@ export function BarcodePage() {
   const [options, setOptions] = useState({ showSku: true, showName: true, showPrice: true, skuTop: false, nameBottom: false, useAltName: false });
 
   useEffect(() => {
-    Promise.all([apiClient.get('/products/'), apiClient.get('/product-packages/')])
-      .then(([productsRes, packagesRes]) => {
-        const productItems = flattenProducts(rows(productsRes.data));
-        const packageItems = rows(packagesRes.data).map((pkg) => ({
+    Promise.all([fetchAllPages('/products/'), fetchAllPages('/product-packages/')])
+      .then(([products, packages]) => {
+        const productItems = flattenProducts(products);
+        const packageItems = packages.map((pkg) => ({
           key: `package-${pkg.id}`, type: 'Paket', id: pkg.id, name: pkg.nama,
           altName: '', sku: pkg.sku, barcode: pkg.barcode || pkg.sku,
           price: pkg.harga_jual_offline,

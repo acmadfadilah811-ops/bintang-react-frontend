@@ -22,7 +22,7 @@ export function ProductOthersPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiClient.get('/products/');
+      const res = await apiClient.get('/products/', { params: { page: 1, page_size: 1000 } });
       const rows = res.data.results || res.data || [];
       setItems(rows.filter((p) => !p.lacak_inventori));
     } catch (err) {

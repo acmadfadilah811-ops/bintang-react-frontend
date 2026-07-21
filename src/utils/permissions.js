@@ -2,7 +2,7 @@
 export const MENU_FEATURES = [
   { id: 'dashboard', label: 'Dashboard Utama', path: '/' },
   { id: 'staff-dashboard', label: 'Dashboard Staff', path: '/staff-dashboard' },
-  { id: 'kasir-pos', label: 'Point of Sale (Kasir)', path: '/kasir-pos' },
+  { id: 'kasir-pos', label: 'Point of Sale (Kasir)', path: '/kasir' },
   { id: 'orders', label: 'Pesanan (Orders)', path: '/orders' },
   { id: 'jobs', label: 'Papan Produksi (Jobs)', path: '/jobs' },
   { id: 'customers', label: 'Pelanggan (Customers)', path: '/customers' },
@@ -165,9 +165,16 @@ export function hasMenuAccess(role, featureId) {
 
 // Memetakan URL path ke ID fitur untuk proteksi rute
 export function getFeatureIdByPath(path) {
-  if (path === '/') return 'dashboard';
-  if (path.startsWith('/produksi')) return 'jobs';
+  if (path === '/' || path.startsWith('/dashboard')) return 'dashboard';
+  if (path.startsWith('/staff-dashboard')) return 'staff-dashboard';
+  if (path.startsWith('/papan-kerja') || path.startsWith('/produksi') || path.startsWith('/jobs')) return 'jobs';
   if (path.startsWith('/product-inventory')) return 'product-inventory';
+  if (path.startsWith('/transaksi')) return 'buku-besar';
+  if (path.startsWith('/laporan')) return 'reports';
+  if (path.startsWith('/marketing')) return 'customers';
+  if (path.startsWith('/users')) return 'employees';
+  if (path.startsWith('/dashboard-eksekutif')) return 'dashboard';
+  if (path.startsWith('/komplain')) return 'customers';
   const match = MENU_FEATURES.find((f) => f.path !== '/' && path.startsWith(f.path));
   return match ? match.id : null;
 }

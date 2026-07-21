@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Ban, Calendar, Compass, Droplet, Lightbulb, Plus, Search, Tag, Trash2, TrendingUp } from 'lucide-react';
 import apiClient from '../../../../api/apiClient';
+import { fetchAllPages } from '../../../../utils/paginatedApi';
 import { Button, PageHeader } from '../components/PageShell';
 
 const ICONS = { lightbulb: Lightbulb, compass: Compass, tag: Tag, 'trending-up': TrendingUp, ban: Ban, calendar: Calendar, droplet: Droplet };
@@ -20,9 +21,8 @@ export function SpecialTypeListPage() {
   const load = async () => {
     setLoading(true); setError('');
     try {
-      const [typesRes, productsRes] = await Promise.all([apiClient.get('/special-types/'), apiClient.get('/products/')]);
-      const nextTypes = list(typesRes.data);
-      setTypes(nextTypes); setProducts(list(productsRes.data));
+      const [nextTypes, nextProducts] = await Promise.all([fetchAllPages('/special-types/'), fetchAllPages('/products/')]);
+      setTypes(nextTypes); setProducts(nextProducts);
       setActiveId((current) => current || nextTypes[0]?.id || null);
     } catch { setError('Gagal memuat tipe spesial dan produk.'); }
     finally { setLoading(false); }

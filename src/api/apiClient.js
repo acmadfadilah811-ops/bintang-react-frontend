@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Ganti URL fallback ke Cloudflare Tunnel untuk testing via Netlify
 // Ganti URL fallback ke URL Ngrok / production nanti
-const BASE_URL = import.meta.env.VITE_API_URL || 'https://bintang-adv.duckdns.org/api';
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 const apiClient = axios.create({
   baseURL: BASE_URL,

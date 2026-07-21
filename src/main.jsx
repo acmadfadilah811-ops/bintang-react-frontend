@@ -25,7 +25,6 @@ class LocalErrorBoundary extends Component {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Client-Log-Auth': 'BintangClientLogSecretKey123',
         },
         body: JSON.stringify({
           error: error?.message || String(error),
@@ -87,10 +86,10 @@ if (sentryDsn) {
   Sentry.init({
     dsn: sentryDsn,
     integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
-    tracesSampleRate: 1.0,
+    tracesSampleRate: 0.1,
     tracePropagationTargets: tracePropagationTargets,
-    replaysSessionSampleRate: 0.1,
-    replaysOnErrorSampleRate: 1.0,
+    replaysSessionSampleRate: 0,
+    replaysOnErrorSampleRate: 0,
   });
 }
 

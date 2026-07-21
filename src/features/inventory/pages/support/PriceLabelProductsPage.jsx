@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Printer, Search, Trash2 } from 'lucide-react';
 import apiClient from '../../../../api/apiClient';
+import { fetchAllPages } from '../../../../utils/paginatedApi';
 import BarcodeSvg from './BarcodeSvg';
 
 const DEFAULTS = { marginTop: 10, marginBottom: 10, marginLeft: 10, marginRight: 10, paperWidth: 210, labelsPerLine: 2, padding: 8, labelWidth: 90, labelHeight: 45, useAltName: true, showBarcode: true, showWeight: true, showPromo: true, storeName: 'Bintang Advertising' };
@@ -22,7 +23,7 @@ export function PriceLabelProductsPage() {
   const [error, setError] = useState('');
   const [settings, setSettings] = useState(() => { try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('price_label_settings') || '{}') }; } catch { return DEFAULTS; } });
 
-  useEffect(() => { apiClient.get('/products/').then((res) => setCatalog(flatten(list(res.data)))).catch(() => setError('Gagal memuat katalog produk.')); }, []);
+  useEffect(() => { fetchAllPages('/products/').then((products) => setCatalog(flatten(products))).catch((err) => setError('Gagal memuat katalog produk: ' + err.message)); }, []);
   useEffect(() => { const sync = () => { try { setSettings({ ...DEFAULTS, ...JSON.parse(localStorage.getItem('price_label_settings') || '{}') }); } catch { /* noop */ } }; window.addEventListener('storage', sync); return () => window.removeEventListener('storage', sync); }, []);
 
   const results = useMemo(() => { const q = query.trim().toLowerCase(); if (!q) return []; return catalog.filter((item) => (searchType === 'SKU' ? `${item.sku || ''} ${item.barcode || ''}` : `${item.name} ${item.altName || ''}`).toLowerCase().includes(q)).slice(0, 30); }, [catalog, query, searchType]);

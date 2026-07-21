@@ -44,7 +44,7 @@ export default function Sidebar({ collapsed, setCollapsed, activeTab, setActiveT
             </div>
             <div>
               <h1 className="text-sm font-bold text-white leading-tight">Papan Produksi</h1>
-              <p className="text-[10px] text-slate-500 font-medium">Bintang Advertising</p>
+              <p className="text-sm text-slate-500 font-medium">Bintang Advertising</p>
             </div>
           </div>
         )}
@@ -65,7 +65,7 @@ export default function Sidebar({ collapsed, setCollapsed, activeTab, setActiveT
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-xs font-bold transition-all ${
+              className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-sm font-bold transition-all ${
                 isActive
                   ? 'bg-indigo-600 text-white shadow-md'
                   : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'
@@ -81,11 +81,11 @@ export default function Sidebar({ collapsed, setCollapsed, activeTab, setActiveT
       {/* Footer */}
       <div className="p-4 border-t border-slate-800 text-center">
         {!collapsed ? (
-          <p className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider">
+          <p className="text-sm text-slate-600 font-semibold uppercase tracking-wider">
             v5.1 Production
           </p>
         ) : (
-          <span className="text-[10px] text-slate-600 font-black">V5</span>
+          <span className="text-sm text-slate-600 font-black">V5</span>
         )}
       </div>
     </div>

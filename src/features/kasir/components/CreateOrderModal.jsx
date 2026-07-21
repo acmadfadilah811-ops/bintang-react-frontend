@@ -53,7 +53,7 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess, initialCu
         const mappedItems = initialCart.map((c) => ({
           id: `cart-${c.id || Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           jenis_produk: c.nama || c.jenis_produk || '',
-          product: c.product_id || c.id || null,
+          product: c.product?.id || c.product_id || c.id || null,
           product_nama: c.nama || '',
           panjang: c.panjang || 1,
           lebar: c.lebar || 1,

@@ -31,7 +31,7 @@ export default function ReturnOrderForm({ onCancel, onSave }) {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const res = await apiClient.get('/orders/');
+        const res = await apiClient.get('/orders/', { params: { page: 1, page_size: 1000 } });
         // Filter only completed orders
         const completed = (res.data || []).filter((o) => o.status_global === 'selesai');
         setCompletedOrders(completed);
